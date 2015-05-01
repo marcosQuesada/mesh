@@ -20,13 +20,15 @@ func TestMain(t *testing.T) {
 	peer3 := &mesh.Client{Id: "3"}
 	peer3.StartClient("3", "127.0.0.1:5000")
 
-	peer1.Send("Hi from 1 \n")
-	peer2.Send("Hi from 2 \n")
-	peer3.Send("Hi from 3 \n")
-
+	/*	peer1.Send("Hi from 1 \n")
+		peer2.Send("Hi from 2 \n")
+		peer3.Send("Hi from 3 \n")
+	*/
 	go readMessages(peer1)
 	go readMessages(peer2)
 	go readMessages(peer3)
+
+	server.Broadcast()
 
 	time.Sleep(5 * time.Second)
 	t.Fail()

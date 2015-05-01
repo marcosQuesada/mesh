@@ -5,11 +5,20 @@ import (
 	"fmt"
 	"net"
 	"strings"
+	"time"
 )
 
 type Server struct {
-	Port int
+	Port  int
+	peers []*Peer
 }
+
+type Peer struct {
+	Id   int
+	Conn net.Conn
+}
+
+var clientId int
 
 func (s *Server) StartServer() (done chan bool) {
 	done = make(chan bool)
@@ -24,7 +33,9 @@ func (s *Server) StartServer() (done chan bool) {
 			if err != nil {
 				fmt.Println("Error Accepting")
 			}
-			go s.handleSession(conn)
+
+			peer := &Peer{Id: clientId, Conn: conn}
+			s.Add(peer)
 		}
 
 	}()
@@ -32,20 +43,32 @@ func (s *Server) StartServer() (done chan bool) {
 	return
 }
 
-func (s *Server) handleSession(conn net.Conn) {
+func (s *Server) Add(peer *Peer) {
+	s.peers = append(s.peers, peer)
+	go peer.handleSession()
+	clientId++
+}
+
+func (s *Server) Broadcast() {
+	go func() {
+		time.Sleep(1 * time.Second)
+		for _, p := range s.peers {
+			fmt.Println("\nWriting Broadcast ", p.Id)
+			p.Conn.Write([]byte("Broadcast from " + fmt.Sprintf("%d\n", p.Id)))
+		}
+	}()
+}
+
+func (p *Peer) handleSession() {
 	for {
 		// will listen for message to process ending in newline (\n)
-		message, err := bufio.NewReader(conn).ReadString('\n')
+		message, err := bufio.NewReader(p.Conn).ReadString('\n')
 		if err != nil {
 			fmt.Print("Error Receiving:", err)
 			break
 		}
 		// output message received
 		fmt.Print("Server Message Received:", string(message))
-		// sample process for string received
-		newmessage := strings.ToUpper(message)
-		fmt.Print("Server Says: Answer newmessage", newmessage)
-		// send new string back to client
-		conn.Write([]byte(newmessage + "\n"))
+		p.Conn.Write([]byte(strings.ToUpper(message) + "\n"))
 	}
 }
