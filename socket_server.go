@@ -12,15 +12,17 @@ func StartServer(port int) {
 	fmt.Println("Launching server...")
 
 	// listen on all interfaces
-	ln, _ := net.Listen("tcp", fmt.Sprintf(":%d", port))
+	go func() {
+		ln, _ := net.Listen("tcp", fmt.Sprintf(":%d", port))
 
-	for {
-		conn, err := ln.Accept()
-		if err != nil {
-			fmt.Println("Error Accepting")
+		for {
+			conn, err := ln.Accept()
+			if err != nil {
+				fmt.Println("Error Accepting")
+			}
+			go handleSession(conn)
 		}
-		go handleSession(conn)
-	}
+	}()
 }
 
 func handleSession(conn net.Conn) {
