@@ -8,35 +8,36 @@ import (
 )
 
 func TestMain(t *testing.T) {
-	mesh.StartServer(5000) /*
-		go mesh.StartServer(5001)
-		go mesh.StartServer(5002)*/
-	time.Sleep(1 * time.Second)
-	in1, out1 := mesh.StartClient("1", "127.0.0.1:5000")
-	in2, out2 := mesh.StartClient("2", "127.0.0.1:5000")
-	in3, out3 := mesh.StartClient("3", "127.0.0.1:5000")
+	server := &mesh.Server{Port: 5000}
+	<-server.StartServer()
 
-	go readMessages(in1, out1)
-	go readMessages(in2, out2)
-	go readMessages(in3, out3)
-	fmt.Println("here it goes")
-	time.Sleep(3 * time.Second)
+	peer1 := &mesh.Client{Id: "1"}
+	peer1.StartClient("1", "127.0.0.1:5000")
+
+	peer2 := &mesh.Client{Id: "2"}
+	peer2.StartClient("2", "127.0.0.1:5000")
+
+	peer3 := &mesh.Client{Id: "3"}
+	peer3.StartClient("3", "127.0.0.1:5000")
+
+	peer1.Send("Hi from 1 \n")
+	peer2.Send("Hi from 2 \n")
+	peer3.Send("Hi from 3 \n")
+
+	go readMessages(peer1)
+	go readMessages(peer2)
+	go readMessages(peer3)
+
+	time.Sleep(5 * time.Second)
 	t.Fail()
 }
 
-func sendMessages(ch chan string) {
-	for {
-		time.Sleep(1 * time.Second)
-		ch <- "Message sended"
-	}
-}
-
-func readMessages(inCh, outCh chan string) {
+func readMessages(peer *mesh.Client) {
 	for {
 		select {
-		case m := <-outCh:
+		case m := <-peer.OutCh:
 			fmt.Println("readMessages Received :", m)
-			inCh <- "Answer: " + m
+			peer.Send("Answer from " + peer.Id + " " + m)
 		default:
 		}
 	}

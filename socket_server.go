@@ -7,25 +7,32 @@ import (
 	"strings"
 )
 
-func StartServer(port int) {
+type Server struct {
+	Port int
+}
 
+func (s *Server) StartServer() (done chan bool) {
+	done = make(chan bool)
 	fmt.Println("Launching server...")
-
 	// listen on all interfaces
 	go func() {
-		ln, _ := net.Listen("tcp", fmt.Sprintf(":%d", port))
+		done <- true
+		ln, _ := net.Listen("tcp", fmt.Sprintf(":%d", s.Port))
 
 		for {
 			conn, err := ln.Accept()
 			if err != nil {
 				fmt.Println("Error Accepting")
 			}
-			go handleSession(conn)
+			go s.handleSession(conn)
 		}
+
 	}()
+
+	return
 }
 
-func handleSession(conn net.Conn) {
+func (s *Server) handleSession(conn net.Conn) {
 	for {
 		// will listen for message to process ending in newline (\n)
 		message, err := bufio.NewReader(conn).ReadString('\n')

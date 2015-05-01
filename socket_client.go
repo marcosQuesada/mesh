@@ -6,36 +6,46 @@ import (
 	"net"
 )
 
-func StartClient(id string, remote string) (inCh, outCh chan string) {
-	inCh = make(chan string)
-	outCh = make(chan string)
+type Client struct {
+	Id          string
+	inCh, OutCh chan string
+	conn        net.Conn
+}
+
+func (c *Client) StartClient(id string, remote string) (inCh, outCh chan string) {
+	c.inCh = make(chan string)
+	c.OutCh = make(chan string)
 	go func() {
-		conn, err := net.Dial("tcp", remote)
+		var err error
+		c.conn, err = net.Dial("tcp", remote)
 		if err != nil {
 			fmt.Println("Error starting socket client to: ", remote, "err: ", err)
 			return
 		}
 
-		fmt.Println("Client ", id, "connected")
-		fmt.Fprintf(conn, "hi from "+id+"\n")
+		fmt.Println("Client ", c.Id, "connected")
+
 		for {
-			go receiveMessages(inCh, conn, id)
-			message, _ := bufio.NewReader(conn).ReadString('\n')
-			fmt.Print("Client", id, " says: Received from server: "+message)
-			outCh <- message
+			go c.receiveMessages()
+			message, _ := bufio.NewReader(c.conn).ReadString('\n')
+			fmt.Print("Client", c.Id, " says: Received from server: "+message)
+			c.OutCh <- message
 		}
 	}()
 
 	return
 }
 
-func receiveMessages(inCh chan string, conn net.Conn, id string) {
+func (c *Client) receiveMessages() {
 	for {
 		select {
-		case m := <-inCh:
-			fmt.Println("Client inCh Received :", m)
-			fmt.Fprintf(conn, id+" - "+m+"\n")
+		case m := <-c.inCh:
+			fmt.Fprintf(c.conn, c.Id+" - "+m+"\n")
 		default:
 		}
 	}
+}
+
+func (c *Client) Send(msg string) {
+	c.inCh <- msg
 }
