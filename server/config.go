@@ -71,9 +71,13 @@ func parse(node string) (*Node, error) {
 	}
 	port, err := strconv.ParseInt(p[1], 10, 64)
 	if err != nil {
-		fmt.Println("Error Parsing Port config: ", p)
+		fmt.Println("Error Parsing Port config: ", p, err)
 		return nil, err
 	}
 
 	return &Node{host: p[0], port: int(port)}, nil
+}
+
+func clear(node string) []string {
+	return strings.Split(node, "\n")
 }
