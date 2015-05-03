@@ -13,7 +13,7 @@ func TestNodeAddress(t *testing.T) {
 
 func TestParseOnSuccess(t *testing.T) {
 	nodeList := "127.0.0.1:12000,127.0.0.1:12001,127.0.0.1:12002"
-	nodes := parse(nodeList)
+	nodes := parseList(nodeList)
 
 	if len(nodes) != 3 {
 		t.Error("Bad Result parsing Node List, expected 3, are:", nodes)
@@ -38,7 +38,7 @@ func TestParseOnSuccess(t *testing.T) {
 
 func TestParseOnErrorsList(t *testing.T) {
 	nodeList := "127.0.0.1:12001x127.0.0.1:12002"
-	nodes := parse(nodeList)
+	nodes := parseList(nodeList)
 
 	if len(nodes) != 0 {
 		t.Error("Bad Result parsing Node List, expected 0, are:", nodes)
@@ -47,7 +47,7 @@ func TestParseOnErrorsList(t *testing.T) {
 
 func TestParseOnErrors(t *testing.T) {
 	nodeList := "127.0.0.1,127.0.0.1:12001,127.0.0.1:12002"
-	nodes := parse(nodeList)
+	nodes := parseList(nodeList)
 
 	if len(nodes) != 2 {
 		t.Error("Bad Result parsing Node List, expected 2, are:", nodes)
