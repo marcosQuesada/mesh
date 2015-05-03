@@ -7,6 +7,7 @@ import (
 )
 
 type Server struct {
+	//peers      []Peer
 	config     *Config
 	exit       chan bool
 	peerClient []*PeerClient    //clients that handle remotes
@@ -50,7 +51,7 @@ func (s *Server) Close() {
 func (s *Server) startServer() error {
 	var err error
 
-	//@TODO! THink about that
+	//@TODO! Code Duplication!
 	s.listener, err = net.Listen("tcp", s.config.addr.Address())
 	go func() error {
 		for {
@@ -67,13 +68,17 @@ func (s *Server) startServer() error {
 	s.raft, err = net.Listen("tcp", s.config.raft_addr.Address())
 	go func() error {
 		for {
+			/*			srvPeer := NewServerPeer(s.raft)
+						srvPeer.Connect()
+						defer srvPeer.Exit()*/
+
 			conn, err := s.raft.Accept()
 			if err != nil {
 				fmt.Println("Error Accepting")
 				return err
 			}
 			defer conn.Close()
-			go s.handleRaftConnection(conn)
+			go s.handleClusterConnection(conn)
 
 		}
 	}()
@@ -99,57 +104,32 @@ func (s *Server) exitPeerClient() {
 	}
 }
 
-func (s *Server) handleConnection(c net.Conn) {
-	fmt.Println("Handling connection ")
-	defer c.Close()
-	var first bool = true // forst message belongs to remote id
-
-	for {
-		fmt.Println("Before Server first ", first)
-		message, err := bufio.NewReader(c).ReadString('\n')
-		if err != nil {
-			fmt.Print("Error Receiving on server, err ", err)
-			return
-		}
-		fmt.Println("Server first ", first)
-		if first {
-			fmt.Println("First message", message)
-			remoteNode, err := parse(message)
-			if err != nil {
-				fmt.Println("First message is NOT ID")
-				continue
-			}
-			fmt.Println("Remote node id : ", remoteNode)
-		}
-
-		fmt.Println("Server received Message ", message)
-		first = false
-	}
-}
-
-func (s *Server) handleRaftConnection(c net.Conn) {
+//Intra cluster socket server
+func (s *Server) handleClusterConnection(c net.Conn) {
 	var first bool = true // forst message belongs to remote id
 	var remoteId *Node
 	fmt.Println("Handling Raft connection ")
 	defer c.Close()
 
 	for {
+
 		message, err := bufio.NewReader(c).ReadString('\n')
 		if err != nil {
 			fmt.Print("Error Receiving on server, err ", err)
 			return
 		}
+		//Clear end character \n
 		messageParts := clear(message)
 		if len(messageParts) != 0 {
 			message = messageParts[0]
 		}
 		if first {
-			//Clear end character \n
 			remoteNode, err := parse(message)
 			if err != nil {
 				fmt.Println("First message is NOT ID")
 				continue
 			}
+			first = false
 			//Registering Peer
 			remoteId = remoteNode
 			s.addPeer(remoteId)
@@ -157,7 +137,6 @@ func (s *Server) handleRaftConnection(c net.Conn) {
 		}
 
 		fmt.Println("Server received Message ", message, "from remote node: ", remoteId.Address())
-		first = false
 	}
 }
 
@@ -169,4 +148,19 @@ func (s *Server) addPeer(remoteId *Node) {
 func (s *Server) removePeer(remoteId *Node) {
 	delete(s.peers, remoteId.Address())
 	fmt.Println("Total Peers are ", len(s.peers))
+}
+
+// Socket Client access
+func (s *Server) handleConnection(c net.Conn) {
+	defer c.Close()
+
+	for {
+		message, err := bufio.NewReader(c).ReadString('\n')
+		if err != nil {
+			fmt.Print("Error Receiving on server, err ", err)
+			return
+		}
+
+		fmt.Println("Server received Message ", message)
+	}
 }

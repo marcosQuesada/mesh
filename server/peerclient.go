@@ -20,6 +20,7 @@ const (
 )
 
 type PeerClient struct {
+	Peer
 	local_node *Node
 	remote     *Node
 	state      State
@@ -30,6 +31,7 @@ type PeerClient struct {
 
 func NewPeerClient(lp *Node, n *Node, checkInterval int) *PeerClient {
 	return &PeerClient{
+		Peer:       NewDialPeer(),
 		local_node: lp,
 		remote:     n,
 		state:      PeerClientStateNew,
@@ -41,18 +43,13 @@ func (p *PeerClient) Run() {
 	go func() {
 		defer close(p.exit)
 		var first bool = true //send ID on first message
+
 		for {
 			select {
 			case <-p.ticker.C:
-				if p.conn == nil {
-					conn, err := net.Dial("tcp", p.remote.Address())
-					if err != nil {
-						fmt.Println("Error starting socket client to: ", p.remote, "err: ", err)
-						continue
-					}
-					//On success persist connection
-					p.conn = conn
-					defer p.conn.Close()
+				if !p.Connected() {
+					p.Connect(p.remote)
+					defer p.Exit()
 				} else {
 					message := "Hi from PeerClient " + p.local_node.Address() + "\n"
 					if first {
@@ -60,9 +57,8 @@ func (p *PeerClient) Run() {
 						first = false
 					}
 
-					_, err := p.conn.Write([]byte(message))
+					err := p.Send([]byte(message))
 					if err != nil {
-						p.conn = nil
 						fmt.Println("Error Writting on socket ", err)
 					}
 				}
