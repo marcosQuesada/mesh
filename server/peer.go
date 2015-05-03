@@ -6,6 +6,7 @@ package server
 
 import (
 	"fmt"
+	"net"
 	"time"
 )
 
@@ -23,6 +24,7 @@ type Peer struct {
 	state  State
 	ticker *time.Ticker
 	exit   chan bool
+	conn   net.Conn
 }
 
 func NewPeer(n *Node, checkInterval int) *Peer {
@@ -40,7 +42,17 @@ func (p *Peer) Run() {
 			select {
 			case <-p.ticker.C:
 				fmt.Println("Running Peer ", p.remote, "Ticker check")
-				//Check remote peer
+				if p.conn == nil {
+					conn, err := net.Dial("tcp", p.remote.Address())
+					if err != nil {
+						fmt.Println("Error starting socket client to: ", p.remote, "err: ", err)
+					}
+					fmt.Println("Peer connected to ", p.remote.Address())
+					p.conn = conn
+				} else {
+					//Check remote peer
+					fmt.Fprintf(p.conn, "Hi from Peer "+p.remote.Address()+"\n")
+				}
 			case <-p.exit:
 				fmt.Println("Exiting from Peer ", p.remote)
 				return
