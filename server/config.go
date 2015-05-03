@@ -64,6 +64,10 @@ func parseList(raftCluster string) []*Node {
 }
 
 func parse(node string) (*Node, error) {
+	nodeParts := clear(node)
+	if len(nodeParts) != 0 {
+		node = nodeParts[0]
+	}
 	p := strings.Split(node, ":")
 	if len(p) != 2 {
 		fmt.Println("Error building Node on config: ", p)

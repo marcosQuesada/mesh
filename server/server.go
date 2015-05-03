@@ -7,14 +7,14 @@ import (
 )
 
 type Server struct {
-	//peers      []Peer
 	config     *Config
 	exit       chan bool
-	peerClient []*PeerClient    //clients that handle remotes
-	peers      map[string]*Node //Connected from server
-	listener   net.Listener
-	raft       net.Listener
-	node       *Node
+	peerClient []*PeerClient //clients that handle remotes
+	peerList   map[string]Peer
+	//peers      map[string]*Node //Connected from server
+	listener net.Listener
+	raft     net.Listener
+	node     *Node
 }
 
 func New(c *Config) *Server {
@@ -22,7 +22,8 @@ func New(c *Config) *Server {
 		config: c,
 		exit:   make(chan bool),
 		node:   c.raft_addr,
-		peers:  make(map[string]*Node),
+		//peers:    make(map[string]*Node),
+		peerList: make(map[string]Peer),
 	}
 }
 
@@ -51,7 +52,6 @@ func (s *Server) Close() {
 func (s *Server) startServer() error {
 	var err error
 
-	//@TODO! Code Duplication!
 	s.listener, err = net.Listen("tcp", s.config.addr.Address())
 	go func() error {
 		for {
@@ -68,17 +68,11 @@ func (s *Server) startServer() error {
 	s.raft, err = net.Listen("tcp", s.config.raft_addr.Address())
 	go func() error {
 		for {
-			/*			srvPeer := NewServerPeer(s.raft)
-						srvPeer.Connect()
-						defer srvPeer.Exit()*/
+			srvPeer := NewServerPeer(s.raft)
+			srvPeer.Connect(&Node{})
+			defer srvPeer.Exit()
 
-			conn, err := s.raft.Accept()
-			if err != nil {
-				fmt.Println("Error Accepting")
-				return err
-			}
-			defer conn.Close()
-			go s.handleClusterConnection(conn)
+			go s.handleClusterConnection(srvPeer)
 
 		}
 	}()
@@ -88,6 +82,7 @@ func (s *Server) startServer() error {
 
 func (s *Server) startPeerClient() {
 	for _, p := range s.config.raft_cluster {
+
 		//if destination is not local
 		if p.Address() != s.node.Address() {
 			PeerClient := NewPeerClient(s.node, p, 1000)
@@ -105,24 +100,18 @@ func (s *Server) exitPeerClient() {
 }
 
 //Intra cluster socket server
-func (s *Server) handleClusterConnection(c net.Conn) {
-	var first bool = true // forst message belongs to remote id
-	var remoteId *Node
+func (s *Server) handleClusterConnection(c Peer) {
+	var first bool = true // first message belongs to remote id
 	fmt.Println("Handling Raft connection ")
-	defer c.Close()
 
 	for {
-
-		message, err := bufio.NewReader(c).ReadString('\n')
+		byteMessage, err := c.Receive()
 		if err != nil {
-			fmt.Print("Error Receiving on server, err ", err)
 			return
 		}
-		//Clear end character \n
-		messageParts := clear(message)
-		if len(messageParts) != 0 {
-			message = messageParts[0]
-		}
+		message := string(byteMessage)
+
+		// Identify from remote node
 		if first {
 			remoteNode, err := parse(message)
 			if err != nil {
@@ -130,24 +119,21 @@ func (s *Server) handleClusterConnection(c net.Conn) {
 				continue
 			}
 			first = false
-			//Registering Peer
-			remoteId = remoteNode
-			s.addPeer(remoteId)
-			defer s.removePeer(remoteId)
+			c.Identify(remoteNode)
+			s.addPeer(c)
+			defer s.removePeer(remoteNode)
 		}
 
-		fmt.Println("Server received Message ", message, "from remote node: ", remoteId.Address())
+		fmt.Println("Server received from remote node: ", c.Id().Address(), "message: ", message)
 	}
 }
 
-func (s *Server) addPeer(remoteId *Node) {
-	s.peers[remoteId.Address()] = remoteId
-	fmt.Println("Total Peers are ", len(s.peers))
+func (s *Server) addPeer(p Peer) {
+	s.peerList[p.Id().Address()] = p
 }
 
 func (s *Server) removePeer(remoteId *Node) {
-	delete(s.peers, remoteId.Address())
-	fmt.Println("Total Peers are ", len(s.peers))
+	delete(s.peerList, remoteId.Address())
 }
 
 // Socket Client access
