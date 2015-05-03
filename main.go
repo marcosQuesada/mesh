@@ -1,24 +1,41 @@
-package mesh
+package main
 
 import (
 	"flag"
-	"fmt"
+	"github.com/marcosQuesada/mesh/server"
+	"os"
+	"os/signal"
+	"syscall"
 )
 
 func main() {
-	//serverPort := flag.Int("port", 5000, "socket server port")
-	mode := flag.String("mode", "alone", "node initialization mode")
-	remote := flag.String("remote", "", "remote server address to join as 127.0.0.1:8081")
+	addr := flag.String("addr", "127.0.0.1:11000", "Port where Mesh is listen on")
+	raftAddr := flag.String("raft_addr", "127.0.0.1:12000", "raft listening address")
+	raftCluster := flag.String("raft_cluster", "127.0.0.1:12000", "cluster list definition separated by commas")
+	raftDataDir := flag.String("raft_data_dir", "./data/var0", "raft data store path")
+
 	flag.Parse()
 
-	fmt.Println("mode:", *mode)
-	fmt.Println("remote:", *remote)
-	/*
-		go StartServer(*serverPort)
+	//Create COnfiguration
+	config := server.NewConfig(*addr, *raftAddr, *raftCluster, *raftDataDir)
+	//Define serfer from config
+	s := server.New(config)
+	c := make(chan os.Signal, 1)
 
-		if *remote != "" {
-			go StartClient("1", *remote)
-		}*/
+	signal.Notify(
+		c,
+		os.Kill,
+		os.Interrupt,
+		syscall.SIGHUP,
+		syscall.SIGINT,
+		syscall.SIGTERM,
+		syscall.SIGQUIT)
 
-	fmt.Println("here it goes")
+	go func() {
+		<-c
+		s.Close()
+	}()
+
+	//Server Run
+	s.Run()
 }
