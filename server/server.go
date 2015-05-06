@@ -1,7 +1,6 @@
 package server
 
 import (
-	"bufio"
 	"fmt"
 	"net"
 )
@@ -61,7 +60,7 @@ func (s *Server) startServer() error {
 				return err
 			}
 			defer conn.Close()
-			go s.handleConnection(conn)
+			go s.handleCliSession(conn)
 		}
 	}()
 
@@ -136,17 +135,17 @@ func (s *Server) removePeer(remoteId *Node) {
 	delete(s.peerList, remoteId.Address())
 }
 
+func (s *Server) PeerList() map[string]Peer {
+	return s.peerList
+}
+
 // Socket Client access
-func (s *Server) handleConnection(c net.Conn) {
+func (s *Server) handleCliSession(c net.Conn) {
 	defer c.Close()
 
-	for {
-		message, err := bufio.NewReader(c).ReadString('\n')
-		if err != nil {
-			fmt.Print("Error Receiving on server, err ", err)
-			return
-		}
-
-		fmt.Println("Server received Message ", message)
+	cli := &CliSession{
+		conn:   c,
+		server: s,
 	}
+	cli.handle()
 }
