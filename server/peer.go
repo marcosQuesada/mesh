@@ -1,132 +1,81 @@
 package server
 
+//A Peer is a representation of a remote node
+
+//It handles connection state supervision
+
 import (
-	"bufio"
-	"fmt"
-	"net"
+	"log"
+	"time"
 )
 
-type Peer interface {
-	Id() *Node
-	Identify(*Node)
-	Connect(*Node)
-	Send(message []byte) error
-	Receive() ([]byte, error)
-	Connected() bool
-	Exit()
+type State string
+
+const (
+	PeerStateNew        = State("new")
+	PeerStateConnecting = State("connecting")
+	PeerStateConnected  = State("connected")
+	PeerStateExiting    = State("exiting")
+)
+
+type Message interface {
+	MessageType()
 }
 
-type DialPeer struct {
-	conn net.Conn
-	id   *Node
+type Peer struct {
+	Link
+	local_node *Node
+	remote     *Node
+	state      State
+	ticker     *time.Ticker
+	exit       chan bool
+	rcvChan    chan Message
+	sndChan    chan Message
 }
 
-func NewDialPeer() *DialPeer {
-	return &DialPeer{}
+func NewPeer(lp *Node, n *Node, checkInterval int) *Peer {
+	return &Peer{
+		Link:       NewDialLink(),
+		local_node: lp,
+		remote:     n,
+		state:      PeerStateNew,
+		exit:       make(chan bool),
+		ticker:     time.NewTicker(time.Duration(checkInterval) * time.Millisecond)}
 }
 
-func (p *DialPeer) Connect(n *Node) {
-	p.id = n
-	conn, err := net.Dial("tcp", n.Address())
-	if err != nil {
-		fmt.Println("Error starting socket client to: ", n.Address(), "err: ", err)
-		return
-	}
+func (p *Peer) Run() {
+	go func() {
+		defer close(p.exit)
+		var first bool = true //send ID on first message
 
-	p.conn = conn
+		for {
+			select {
+			case <-p.ticker.C:
+				if !p.Connected() {
+					p.Connect(p.remote)
+					defer p.Exit()
+				} else {
+					message := "Hi from Peer " + p.local_node.Address() + "\n"
+					if first {
+						message = p.local_node.Address() + "\n"
+						first = false
+					}
+
+					err := p.Send([]byte(message))
+					if err != nil {
+						log.Println("Error Writting on socket ", err)
+					}
+				}
+			case <-p.exit:
+				log.Println("Exiting from Peer ", p.remote)
+				return
+			default:
+			}
+		}
+	}()
 }
 
-func (p *DialPeer) Identify(n *Node) {
-	p.id = n
-}
-
-func (p *DialPeer) Id() *Node {
-	return p.id
-}
-
-func (p *DialPeer) Send(message []byte) error {
-	_, err := p.conn.Write([]byte(message))
-	if err != nil {
-		p.conn = nil
-		fmt.Println("Error Writting on socket ", err)
-		return err
-	}
-
-	return nil
-}
-
-func (p *DialPeer) Receive() ([]byte, error) {
-	message, err := bufio.NewReader(p.conn).ReadBytes('\n')
-	if err != nil {
-		fmt.Print("Error Receiving on server, err ", err)
-		return nil, err
-	}
-	return message, nil
-}
-
-func (p *DialPeer) Connected() bool {
-	return p.conn != nil
-}
-
-func (p *DialPeer) Exit() {
-	p.conn.Close()
-	p.conn = nil
-}
-
-type ServerPeer struct {
-	conn     net.Conn
-	listener net.Listener
-	id       *Node
-}
-
-func NewServerPeer(l net.Listener) *ServerPeer {
-	return &ServerPeer{
-		listener: l,
-	}
-}
-
-func (p *ServerPeer) Identify(n *Node) {
-	p.id = n
-}
-
-func (p *ServerPeer) Id() *Node {
-	return p.id
-}
-
-func (p *ServerPeer) Connect(n *Node) {
-	conn, err := p.listener.Accept()
-	if err != nil {
-		fmt.Println("Error starting socket client to: ", n.Address(), "err: ", err)
-		return
-	}
-
-	p.conn = conn
-}
-
-func (p *ServerPeer) Connected() bool {
-	return p.conn != nil
-}
-
-func (p *ServerPeer) Send(message []byte) error {
-	_, err := p.conn.Write([]byte(message))
-	if err != nil {
-		fmt.Println("Error Writting on socket ", err)
-
-		return err
-	}
-
-	return nil
-}
-
-func (p *ServerPeer) Receive() ([]byte, error) {
-	message, err := bufio.NewReader(p.conn).ReadBytes('\n')
-	if err != nil {
-		fmt.Print("Error Receiving on server, err ", err)
-		return nil, err
-	}
-	return message, nil
-}
-
-func (p *ServerPeer) Exit() {
-	p.conn.Close()
+func (p *Peer) Exit() {
+	log.Println("Exitting Peer ", p.remote)
+	p.exit <- true
 }

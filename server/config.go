@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"log"
 	"strconv"
 	"strings"
 )
@@ -16,14 +17,14 @@ type Config struct {
 func NewConfig(addr, raftAddr, raftCluster, raftDataDir string) *Config {
 	addrNode, err := parse(addr)
 	if err != nil {
-		fmt.Println("Error parsing Local Address ", addr)
+		log.Println("Error parsing Local Address ", addr)
 
 		return nil
 	}
 
 	raftAddrNode, err := parse(raftAddr)
 	if err != nil {
-		fmt.Println("Error parsing Raft Address ", raftAddrNode)
+		log.Println("Error parsing Raft Address ", raftAddrNode)
 
 		return nil
 	}
@@ -48,7 +49,7 @@ func (n *Node) Address() string {
 func parseList(raftCluster string) []*Node {
 	parts := strings.Split(raftCluster, ",")
 	if len(parts) > 0 && len(parts[0]) > 0 {
-		fmt.Println("Parts are: ", parts)
+		log.Println("Parts are: ", parts)
 		var nodes []*Node
 		for _, nodePart := range parts {
 			node, err := parse(nodePart)
@@ -70,12 +71,12 @@ func parse(node string) (*Node, error) {
 	}
 	p := strings.Split(node, ":")
 	if len(p) != 2 {
-		fmt.Println("Error building Node on config: ", p)
+		log.Println("Error building Node on config: ", p)
 		return nil, fmt.Errorf("Error building Node on config: %s", p)
 	}
 	port, err := strconv.ParseInt(p[1], 10, 64)
 	if err != nil {
-		fmt.Println("Error Parsing Port config: ", p, err)
+		log.Println("Error Parsing Port config: ", p, err)
 		return nil, err
 	}
 

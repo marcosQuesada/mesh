@@ -3,6 +3,7 @@ package server
 import (
 	"bufio"
 	"fmt"
+	"log"
 	"net"
 	"strings"
 )
@@ -18,13 +19,13 @@ func (c *CliSession) handle() {
 	for !c.finish {
 		message, err := bufio.NewReader(c.conn).ReadString('\n')
 		if err != nil {
-			fmt.Print("Error Receiving on server, err ", err)
+			log.Print("Error Receiving on server, err ", err)
 			return
 		}
 
 		c.process(message)
 
-		fmt.Println("Server received Message ", message)
+		log.Println("Server received Message ", message)
 	}
 }
 
@@ -35,8 +36,8 @@ func (c *CliSession) process(line string) {
 	case "HELP":
 		response = "Available commands:\n LIST \n SHUTDOWN \n EXIT \n"
 	case "LIST":
-		response = fmt.Sprintf("Total Peers: %d \n", len(c.server.PeerList()))
-		for key, _ := range c.server.PeerList() {
+		response = fmt.Sprintf("Total Peers: %d \n", len(c.server.Links()))
+		for key, _ := range c.server.Links() {
 			response = response + " " + key + "\n"
 		}
 	case "SHUTDOWN":
@@ -53,6 +54,6 @@ func (c *CliSession) process(line string) {
 func (c *CliSession) send(response string) {
 	_, err := c.conn.Write([]byte(response))
 	if err != nil {
-		fmt.Println("Error Writting on socket ", err)
+		log.Println("Error Writting on socket ", err)
 	}
 }

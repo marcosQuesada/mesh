@@ -34,7 +34,7 @@ func TestMain(t *testing.T) {
 	peer3.Terminate()
 }
 
-func TestRing(t *testing.T) {
+func TestMultiServerStarScheme(t *testing.T) {
 	time.Sleep(2 * time.Second)
 	//Start all server nodes
 	server := &cluster.Server{Port: 5001}
