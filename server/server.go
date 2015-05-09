@@ -6,13 +6,11 @@ import (
 )
 
 type Server struct {
-	config   *Config
-	exit     chan bool
-	peers    []*Peer         //clients that handle remotes
-	links    map[string]Link //connections served
-	listener net.Listener
-	raft     net.Listener
-	node     *Node
+	config *Config
+	exit   chan bool
+	peers  []*Peer         //clients that handle remotes
+	links  map[string]Link //connections served
+	node   *Node
 }
 
 func New(c *Config) *Server {
@@ -30,6 +28,7 @@ func (s *Server) Run() {
 	defer close(s.exit)
 
 	s.startServer()
+	//@TODO: Peers must be coordinated from mesh!
 	s.startPeer()
 	for {
 		select {
@@ -50,10 +49,11 @@ func (s *Server) Close() {
 func (s *Server) startServer() error {
 	var err error
 
-	s.listener, err = net.Listen("tcp", s.config.addr.Address())
+	// Cli Socket server
+	listener, err := net.Listen("tcp", s.config.addr.Address())
 	go func() error {
 		for {
-			conn, err := s.listener.Accept()
+			conn, err := listener.Accept()
 			if err != nil {
 				log.Println("Error Accepting")
 				return err
@@ -63,10 +63,13 @@ func (s *Server) startServer() error {
 		}
 	}()
 
-	s.raft, err = net.Listen("tcp", s.config.raft_addr.Address())
+	// Cluster socket server
+	clusterListener, err := net.Listen("tcp", s.config.raft_addr.Address())
 	go func() error {
 		for {
-			srvLink := NewServerLink(s.raft)
+
+			//@TODO: THink about this like a peer
+			srvLink := NewServerLink(clusterListener)
 			srvLink.Connect(&Node{})
 			defer srvLink.Exit()
 
@@ -74,6 +77,8 @@ func (s *Server) startServer() error {
 
 		}
 	}()
+
+	//@TODO: Implement Service Socket Server
 
 	return err
 }
