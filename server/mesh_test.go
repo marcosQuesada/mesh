@@ -46,3 +46,17 @@ func TestRejectOnExistentNode(t *testing.T) {
 		t.Error("Unexpected Join Request")
 	}
 }
+
+func TestRemovePeerFromMesh(t *testing.T) {
+	node := &Node{host: "127.0.0.1", port: 123}
+	peer := &Peer{Link: NewDialLink()}
+	peer.Identify(node)
+
+	if !m.RemoveRequest(peer) {
+		t.Error("Unexpected Remove Request")
+	}
+
+	if m.RemoveRequest(peer) {
+		t.Error("Unexpected Remove Request")
+	}
+}

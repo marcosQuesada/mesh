@@ -27,12 +27,21 @@ func InitMesh(m []address) *mesh {
 }
 
 func (m *mesh) JoinRequest(p *Peer) bool {
-	fmt.Println("Join req from is ", p.Id().Address())
 	if m.exist(p) {
 		return false
 	}
 	m.members[address(p.Id().Address())] = true
 	m.add(p)
+
+	return true
+}
+
+func (m *mesh) RemoveRequest(p *Peer) bool {
+	if !m.exist(p) {
+		return false
+	}
+	delete(m.members, address(p.Id().Address()))
+	m.remove(p)
 
 	return true
 }

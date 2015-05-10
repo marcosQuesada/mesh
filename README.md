@@ -22,3 +22,11 @@ Where:
 	raft_addr: raft listening address
 	raft_data_dir: raft data store path
 	raft_cluster: cluster list definition separated by commas
+
+
+
+NOTES
+=====
+
+Node Name is Server:Port 
+Communication between peers using message passing

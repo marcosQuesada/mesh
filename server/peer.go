@@ -18,10 +18,6 @@ const (
 	PeerStateExiting    = State("exiting")
 )
 
-type Message interface {
-	MessageType()
-}
-
 type Peer struct {
 	Link
 	local_node *Node
