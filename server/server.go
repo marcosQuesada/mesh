@@ -6,11 +6,14 @@ import (
 )
 
 type Server struct {
+	PeerHandler
+
+	Router
+
 	config *Config
-	exit   chan bool
-	peers  []*Peer         //clients that handle remotes
-	links  map[string]Link //connections served
-	node   *Node
+
+	node *Node
+	exit chan bool
 }
 
 func New(c *Config) *Server {
@@ -18,24 +21,19 @@ func New(c *Config) *Server {
 		config: c,
 		exit:   make(chan bool),
 		node:   c.raft_addr,
-		peers:  make([]*Peer, 0),
-		links:  make(map[string]Link),
 	}
 }
 
 func (s *Server) Run() {
-	defer log.Println("Server Exitting")
 	defer close(s.exit)
 
 	s.startServer()
-	//@TODO: Peers must be coordinated from mesh!
-	s.startPeer()
+
 	for {
 		select {
 		case <-s.exit:
 			//Notify Exit to remote Peer
 			//Shutdown peer connections
-			s.exitPeer()
 			return
 		default:
 		}
@@ -46,11 +44,53 @@ func (s *Server) Close() {
 	s.exit <- true
 }
 
-func (s *Server) startServer() error {
-	var err error
+func (s *Server) startServer() {
+	listener, err := net.Listen("tcp", string(s.config.raft_addr.Address()))
+	if err != nil {
+		log.Println("Error starting Socket Server: ", err)
+		return
+	}
 
-	// Cli Socket server
-	listener, err := net.Listen("tcp", s.config.addr.Address())
+	for {
+		conn, err := listener.Accept()
+		if err != nil {
+			log.Println("Error starting socket client to: ", s.node.Address(), "err: ", err)
+			return
+		}
+
+		peer := NewSocketPeer(conn)
+		go s.handleConnection(peer)
+
+		err = s.PeerHandler.Accept(peer)
+		if err != nil {
+			log.Print("Error accepting peer: ", err)
+		}
+	}
+}
+
+func (s *Server) handleConnection(peer *SocketPeer) {
+	defer peer.conn.Close()
+	defer close(peer.rcvChan)
+	defer close(peer.exitChan)
+	for {
+		if msg, err := peer.Receive(); err != nil {
+			log.Print("Error reading connection ", err)
+			s.PeerHandler.Notify(peer.Id(), err)
+			break
+
+		} else {
+			peer.rcvChan <- msg
+		}
+	}
+}
+
+// Cli Socket server
+func (s *Server) startCliServer() error {
+	listener, err := net.Listen("tcp", string(s.config.addr.Address()))
+	if err != nil {
+		log.Println("Error Listening Cli Server")
+		return err
+	}
 	go func() error {
 		for {
 			conn, err := listener.Accept()
@@ -59,94 +99,15 @@ func (s *Server) startServer() error {
 				return err
 			}
 			defer conn.Close()
-			go s.handleCliSession(conn)
+			go s.handleCliConnection(conn)
 		}
 	}()
 
-	// Cluster socket server
-	clusterListener, err := net.Listen("tcp", s.config.raft_addr.Address())
-	go func() error {
-		for {
-
-			//@TODO: THink about this like a peer
-			srvLink := NewServerLink(clusterListener)
-			srvLink.Connect(&Node{})
-			defer srvLink.Exit()
-
-			go s.handleClusterConnection(srvLink)
-
-		}
-	}()
-
-	//@TODO: Implement Service Socket Server
-
-	return err
-}
-
-func (s *Server) startPeer() {
-	for _, p := range s.config.raft_cluster {
-
-		//if destination is not local
-		if p.Address() != s.node.Address() {
-			Peer := NewPeer(s.node, p, 1000)
-			Peer.Run()
-
-			s.peers = append(s.peers, Peer)
-		}
-	}
-}
-
-func (s *Server) exitPeer() {
-	for _, peer := range s.peers {
-		peer.Exit()
-	}
-}
-
-//Intra cluster socket server
-func (s *Server) handleClusterConnection(c Link) {
-	var first bool = true // first message belongs to remote id
-	log.Println("Handling Raft connection ")
-
-	for {
-		byteMessage, err := c.Receive()
-		if err != nil {
-			log.Println("Error receiving message")
-
-			return
-		}
-		message := string(byteMessage)
-
-		// Identify from remote node
-		if first {
-			remoteNode, err := parse(message)
-			if err != nil {
-				log.Println("First message is NOT ID")
-				continue
-			}
-			first = false
-			c.Identify(remoteNode)
-			s.addLink(c)
-			defer s.removeLink(remoteNode)
-		}
-
-		log.Println("Server received from remote node: ", c.Id().Address(), "message: ", message)
-	}
-}
-
-func (s *Server) addLink(p Link) {
-	s.links[p.Id().Address()] = p
-}
-
-func (s *Server) removeLink(remoteId *Node) {
-	delete(s.links, remoteId.Address())
-}
-
-func (s *Server) Links() map[string]Link {
-	return s.links
+	return nil
 }
 
 // Socket Client access
-func (s *Server) handleCliSession(c net.Conn) {
+func (s *Server) handleCliConnection(c net.Conn) {
 	defer c.Close()
 
 	cli := &CliSession{

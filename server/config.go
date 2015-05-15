@@ -13,6 +13,7 @@ type Config struct {
 	raft_data_dir string
 	raft_cluster  []*Node
 }
+type address string
 
 func NewConfig(addr, raftAddr, raftCluster, raftDataDir string) *Config {
 	addrNode, err := parse(addr)
@@ -42,8 +43,8 @@ type Node struct {
 	port int
 }
 
-func (n *Node) Address() string {
-	return fmt.Sprintf("%s:%d", n.host, n.port)
+func (n *Node) Address() address {
+	return address(fmt.Sprintf("%s:%d", n.host, n.port))
 }
 
 func parseList(raftCluster string) []*Node {

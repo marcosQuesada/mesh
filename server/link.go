@@ -2,6 +2,8 @@ package server
 
 import (
 	"bufio"
+	"encoding/json"
+	"fmt"
 	"log"
 	"net"
 )
@@ -28,7 +30,7 @@ func NewDialLink() *DialLink {
 
 func (p *DialLink) Connect(n *Node) {
 	p.id = n
-	conn, err := net.Dial("tcp", n.Address())
+	conn, err := net.Dial("tcp", string(n.Address()))
 	if err != nil {
 		log.Println("Error starting socket client to: ", n.Address(), "err: ", err)
 		return
@@ -46,7 +48,11 @@ func (p *DialLink) Id() *Node {
 }
 
 func (p *DialLink) Send(message []byte) error {
-	_, err := p.conn.Write([]byte(message))
+	//Where message *Message
+	//msg, err := json.Marshal(message)
+	//_, err := p.conn.Write(msg)
+
+	_, err := p.conn.Write(message)
 	if err != nil {
 		p.conn = nil
 		log.Println("Error Writting on socket ", err)
@@ -57,6 +63,23 @@ func (p *DialLink) Send(message []byte) error {
 }
 
 func (p *DialLink) Receive() ([]byte, error) {
+	var rawMsg []byte
+	n, err := p.conn.Read(rawMsg)
+	if err != nil {
+		log.Print("Error Receiving on server, err ", err)
+		return nil, err
+	}
+
+	if n > 0 {
+		var msg Message
+		err = json.Unmarshal(rawMsg, msg)
+		if err != nil {
+			log.Print("Error Receiving on server, err ", err)
+			return nil, err
+		}
+		fmt.Println("Received Message type: ", msg.MessageType())
+	}
+
 	message, err := bufio.NewReader(p.conn).ReadBytes('\n')
 	if err != nil {
 		log.Print("Error Receiving on server, err ", err)

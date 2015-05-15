@@ -5,73 +5,57 @@ package server
 //It handles connection state supervision
 
 import (
+	"fmt"
+	"github.com/nu7hatch/gouuid"
 	"log"
-	"time"
+	"net"
 )
 
-type State string
+type Peer interface {
+	Receive() (Message, error)
+	Id() ID
+}
 
-const (
-	PeerStateNew        = State("new")
-	PeerStateConnecting = State("connecting")
-	PeerStateConnected  = State("connected")
-	PeerStateExiting    = State("exiting")
-)
+type ID *uuid.UUID
 
-type Peer struct {
-	Link
-	local_node *Node
-	remote     *Node
-	state      State
-	ticker     *time.Ticker
-	exit       chan bool
+type SocketPeer struct {
+	conn       net.Conn
+	id         ID
+	serializer Serializer
 	rcvChan    chan Message
-	sndChan    chan Message
+	exitChan   chan bool
 }
 
-func NewPeer(lp *Node, n *Node, checkInterval int) *Peer {
-	return &Peer{
-		Link:       NewDialLink(),
-		local_node: lp,
-		remote:     n,
-		state:      PeerStateNew,
-		exit:       make(chan bool),
-		ticker:     time.NewTicker(time.Duration(checkInterval) * time.Millisecond)}
+func NewSocketPeer(conn net.Conn) *SocketPeer {
+	id, err := uuid.NewV4()
+	if err != nil {
+		fmt.Println("error:", err)
+		return nil
+	}
+
+	return &SocketPeer{
+		id:         id,
+		conn:       conn,
+		serializer: &JsonSerializer{},
+		rcvChan:    make(chan Message),
+		exitChan:   make(chan bool),
+	}
 }
 
-func (p *Peer) Run() {
-	go func() {
-		defer close(p.exit)
-		var first bool = true //send ID on first message
-
-		for {
-			select {
-			case <-p.ticker.C:
-				if !p.Connected() {
-					p.Connect(p.remote)
-					defer p.Exit()
-				} else {
-					message := "Hi from Peer " + p.local_node.Address() + "\n"
-					if first {
-						message = p.local_node.Address() + "\n"
-						first = false
-					}
-
-					err := p.Send([]byte(message))
-					if err != nil {
-						log.Println("Error Writting on socket ", err)
-					}
-				}
-			case <-p.exit:
-				log.Println("Exiting from Peer ", p.remote)
-				return
-			default:
-			}
-		}
-	}()
+func (p *SocketPeer) Id() ID {
+	return p.id
 }
+func (p *SocketPeer) Receive() (msg Message, err error) {
+	var rawMsg []byte
+	n, err := p.conn.Read(rawMsg)
+	if err != nil {
+		log.Print("Error Receiving on server, err ", err)
+		return nil, err
+	}
 
-func (p *Peer) Exit() {
-	log.Println("Exitting Peer ", p.remote)
-	p.exit <- true
+	if n > 0 {
+		msg, err = p.serializer.Deserialize(rawMsg)
+	}
+
+	return
 }

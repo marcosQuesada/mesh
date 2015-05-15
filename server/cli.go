@@ -2,7 +2,7 @@ package server
 
 import (
 	"bufio"
-	"fmt"
+	//"fmt"
 	"log"
 	"net"
 	"strings"
@@ -36,10 +36,10 @@ func (c *CliSession) process(line string) {
 	case "HELP":
 		response = "Available commands:\n LIST \n SHUTDOWN \n EXIT \n"
 	case "LIST":
-		response = fmt.Sprintf("Total Peers: %d \n", len(c.server.Links()))
-		for key, _ := range c.server.Links() {
-			response = response + " " + key + "\n"
-		}
+		/*		response = fmt.Sprintf("Total Peers: %d \n", len(c.server.Links()))
+				for key, _ := range c.server.Links() {
+					response = response + " " + key + "\n"
+				}*/
 	case "SHUTDOWN":
 		c.server.Close()
 		response = "Server Shutting down \n"

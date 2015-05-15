@@ -1,5 +1,6 @@
 package server
 
+/*
 import (
 	"testing"
 )
@@ -60,3 +61,4 @@ func TestRemovePeerFromMesh(t *testing.T) {
 		t.Error("Unexpected Remove Request")
 	}
 }
+*/

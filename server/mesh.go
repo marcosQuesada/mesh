@@ -1,15 +1,16 @@
 package server
 
+/*
 import "fmt"
 
 //Mesh takes care on handling peers as unique members in swarm
 
 type mesh struct {
 	members map[address]bool
-	peers   map[string]*Peer
+	peers   map[address]*Peer
 }
 
-type address string
+
 
 func InitMesh(m []address) *mesh {
 	fmt.Println("Mesh INIT m ", m, len(m))
@@ -22,7 +23,7 @@ func InitMesh(m []address) *mesh {
 
 	return &mesh{
 		members: addresses,
-		peers:   make(map[string]*Peer, len(m)),
+		peers:   make(map[address]*Peer, len(m)),
 	}
 }
 
@@ -69,3 +70,4 @@ func (m *mesh) exist(p *Peer) (ok bool) {
 
 	return
 }
+*/
