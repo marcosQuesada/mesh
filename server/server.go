@@ -19,10 +19,11 @@ type Server struct {
 
 func New(c *Config) *Server {
 	return &Server{
-		//PeerHandler:
-		config: c,
-		exit:   make(chan bool),
-		node:   c.raft_addr,
+		Router:      NewRouter(),
+		PeerHandler: DefaultPeerHandler(),
+		config:      c,
+		exit:        make(chan bool),
+		node:        c.raft_addr,
 	}
 }
 
@@ -48,12 +49,12 @@ func (s *Server) Close() {
 
 func (s *Server) startServer() {
 	log.Print("Starting server: ", s.config.raft_addr.Address())
+
 	listener, err := net.Listen("tcp", string(s.config.raft_addr.Address()))
 	if err != nil {
 		log.Println("Error starting Socket Server: ", err)
 		return
 	}
-	log.Print("Before Accepting Peer")
 	go func() {
 		for {
 			conn, err := listener.Accept()
@@ -61,33 +62,37 @@ func (s *Server) startServer() {
 				log.Println("Error starting socket client to: ", s.node.Address(), "err: ", err)
 				return
 			}
-			log.Print("LIstener Accept Handle connection")
 
 			peer := NewSocketPeer(conn)
 			go s.handleConnection(peer)
+			go s.Router.Accept(peer)
 
-			/*			err = s.PeerHandler.Accept(peer)
-						if err != nil {
-							log.Print("Error accepting peer: ", err)
-						}*/
+			err = s.PeerHandler.Accept(peer)
+			if err != nil {
+				log.Print("Error accepting peer: ", err)
+			}
+
 		}
 	}()
 }
 
 func (s *Server) handleConnection(peer *SocketPeer) {
 	defer peer.Conn.Close()
-	defer close(peer.rcvChan)
+	defer close(peer.RcvChan)
 	defer close(peer.exitChan)
+
+	log.Print("Handling Connection from: ", peer.Id())
+
 	for {
 		msg, err := peer.Receive()
 		if err != nil {
 			log.Print("Error reading connection ", err)
 			s.PeerHandler.Notify(peer.Id(), err)
 			break
-
 		}
+
 		fmt.Println("Received Message ", msg)
-		peer.rcvChan <- msg
+		peer.RcvChan <- msg
 	}
 }
 

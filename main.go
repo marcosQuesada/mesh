@@ -6,10 +6,12 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"runtime"
 	"syscall"
 )
 
 func main() {
+	runtime.GOMAXPROCS(runtime.NumCPU())
 
 	//Parse config
 	addr := flag.String("addr", "127.0.0.1:11000", "Port where Mesh is listen on")

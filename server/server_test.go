@@ -31,14 +31,34 @@ func TestBasicServerClient(t *testing.T) {
 			Details: map[string]interface{}{"foo": "bar"},
 		}
 		peerA.Send(msg)
-
-		/*		m, err := peerA.Receive()
-				fmt.Println("Message is ", m, "err", err)
-				if m.MessageType() != 0 {
-					t.Error("Error on received Hello Message ", m)
-				}*/
-
 	}()
 
-	time.Sleep(time.Millisecond * 100)
+	time.Sleep(time.Millisecond * 500)
+
+	peers := srv.PeerHandler.Peers()
+	if len(peers) != 1 {
+		t.Error("Unexpected Registered Peers size ", peers)
+	}
+	fmt.Println("Total Peer List is ", len(peers), peers)
+
+	//Router Addition get in charge from ReadMessages Channel...so commented and wait!
+	/*
+		for _, p := range peers {
+			timeout := time.NewTimer(time.Second * 1)
+			select {
+			case m := <-p.ReadMessage():
+				if m == nil {
+					t.Error("Unexpected receive result")
+					r := <-p.ReadMessage()
+					fmt.Println("r is ", r)
+					t.Fail()
+				}
+				fmt.Println("Message is ", m)
+				if m.MessageType() != 0 {
+					t.Error("Error on received Hello Message ", m)
+				}
+			case <-timeout.C:
+				t.Error("Timeout receiving expected response")
+			}
+	*/
 }

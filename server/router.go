@@ -1,25 +1,51 @@
 package server
 
+import (
+	"fmt"
+)
+
 type Router interface {
-	Route()
-	Accept(p *Peer)
+	Accept(p Peer)
 }
 
-type defaultRouter struct{}
-
-func (r *defaultRouter) Accept(p *Peer) {
-
+type defaultRouter struct {
+	exit chan bool
 }
 
-func (r *defaultRouter) Route() {
+func NewRouter() *defaultRouter {
+	return &defaultRouter{
+		exit: make(chan bool),
+	}
+}
 
+func (r *defaultRouter) Accept(p Peer) {
+	fmt.Println("Router accepting peer: ", p.Id())
+	for {
+		select {
+		case <-r.exit:
+			return
+		case msg := <-p.ReadMessage():
+			switch msg.(type) {
+			case *Hello:
+				fmt.Println("Router Hello", msg.(*Hello))
+			case *Welcome:
+				fmt.Println("Router Welcome: ", msg.(*Welcome))
+			case *Abort:
+				fmt.Println("Router Abort: ", msg.(*Abort))
+			case *Ping:
+				fmt.Println("Router Ping: ", msg.(*Ping))
+			case *Pong:
+				fmt.Println("Router Pong: ", msg.(*Pong))
+			default:
+
+			}
+		default:
+
+		}
+	}
 }
 
 /*
-	switch msg.(type) {
-	case *Hello:
-		fmt.Println("Match", msg.(*Hello).Details["foo"])
-	}
 
 	defer close(p.exit)
 	//var first bool = true //send ID on first message

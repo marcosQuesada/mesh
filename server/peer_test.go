@@ -11,7 +11,7 @@ func TestBasicPeersOnServerClient(t *testing.T) {
 	startTestServer()
 	time.Sleep(time.Second * 1)
 
-	conn, err := net.Dial("tcp", "localhost:8000")
+	conn, err := net.Dial("tcp", "localhost:8002")
 	if err != nil {
 		fmt.Println("dial error:", err)
 		return
@@ -43,7 +43,7 @@ func TestBasicPeersOnServerClient(t *testing.T) {
 }
 
 func startTestServer() {
-	port := ":8000"
+	port := ":8002"
 	fmt.Println("Starting server: ", port)
 	listener, err := net.Listen("tcp", port)
 	if err != nil {

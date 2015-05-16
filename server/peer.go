@@ -15,18 +15,19 @@ import (
 )
 
 type Peer interface {
+	Id() ID
 	Receive() (Message, error)
 	Send(Message) error
-	Id() ID
+	ReadMessage() chan Message
 }
 
-type ID *uuid.UUID
+type ID string
 
 type SocketPeer struct {
 	Conn       net.Conn
 	id         ID
 	serializer Serializer
-	rcvChan    chan Message
+	RcvChan    chan Message
 	exitChan   chan bool
 }
 
@@ -38,12 +39,11 @@ func NewSocketPeer(conn net.Conn) *SocketPeer {
 		fmt.Println("error:", err)
 		return nil
 	}
-
 	return &SocketPeer{
-		id:         id,
+		id:         ID(id.String()),
 		Conn:       conn,
 		serializer: &JsonSerializer{}, //@TODO: Must be plugable!
-		rcvChan:    make(chan Message),
+		RcvChan:    make(chan Message),
 		exitChan:   make(chan bool),
 	}
 }
@@ -83,4 +83,8 @@ func (p *SocketPeer) Receive() (msg Message, err error) {
 	msg, err = p.serializer.Deserialize(c)
 
 	return
+}
+
+func (p *SocketPeer) ReadMessage() chan Message {
+	return p.RcvChan
 }

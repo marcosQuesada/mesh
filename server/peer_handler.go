@@ -17,7 +17,7 @@ const (
 
 //PeerHandler is in charge of Handle Peer Lifecycle
 type PeerHandler interface {
-	Accept(*SocketPeer) error
+	Accept(Peer) error
 	Remove(Peer)
 	Notify(ID, error) //Used to get notifications of peer conn failures
 	Peers() map[ID]Peer
@@ -30,11 +30,18 @@ type defaultPeerHandler struct {
 	mutex sync.Mutex
 }
 
+func DefaultPeerHandler() *defaultPeerHandler {
+	//watcher Watcher
+	return &defaultPeerHandler{
+		peers: make(map[ID]Peer),
+	}
+}
+
 func (h *defaultPeerHandler) Accept(p Peer) error {
 	h.mutex.Lock()
 	defer h.mutex.Unlock()
 	h.peers[p.Id()] = p
-
+	fmt.Println("Accepted Peer", p.Id())
 	return nil
 }
 
