@@ -5,21 +5,25 @@ package server
 //It handles connection state supervision
 
 import (
+	"bufio"
+	"bytes"
 	"fmt"
 	"github.com/nu7hatch/gouuid"
+	"io"
 	"log"
 	"net"
 )
 
 type Peer interface {
 	Receive() (Message, error)
+	Send(Message) error
 	Id() ID
 }
 
 type ID *uuid.UUID
 
 type SocketPeer struct {
-	conn       net.Conn
+	Conn       net.Conn
 	id         ID
 	serializer Serializer
 	rcvChan    chan Message
@@ -27,6 +31,8 @@ type SocketPeer struct {
 }
 
 func NewSocketPeer(conn net.Conn) *SocketPeer {
+	//connection origin
+	fmt.Println("Socket Peer conn origin: ", conn.RemoteAddr())
 	id, err := uuid.NewV4()
 	if err != nil {
 		fmt.Println("error:", err)
@@ -35,8 +41,8 @@ func NewSocketPeer(conn net.Conn) *SocketPeer {
 
 	return &SocketPeer{
 		id:         id,
-		conn:       conn,
-		serializer: &JsonSerializer{},
+		Conn:       conn,
+		serializer: &JsonSerializer{}, //@TODO: Must be plugable!
 		rcvChan:    make(chan Message),
 		exitChan:   make(chan bool),
 	}
@@ -45,17 +51,36 @@ func NewSocketPeer(conn net.Conn) *SocketPeer {
 func (p *SocketPeer) Id() ID {
 	return p.id
 }
-func (p *SocketPeer) Receive() (msg Message, err error) {
-	var rawMsg []byte
-	n, err := p.conn.Read(rawMsg)
+
+func (p *SocketPeer) Send(msg Message) error {
+	rawMsg, err := p.serializer.Serialize(msg)
 	if err != nil {
-		log.Print("Error Receiving on server, err ", err)
-		return nil, err
+		return err
 	}
 
-	if n > 0 {
-		msg, err = p.serializer.Deserialize(rawMsg)
+	var n int
+	rawMsg = append(rawMsg, '\n')
+	n, err = p.Conn.Write(rawMsg)
+	if err != nil || n == 0 {
+		return fmt.Errorf("Error writting ", err, n)
 	}
+
+	return nil
+}
+
+func (p *SocketPeer) Receive() (msg Message, err error) {
+	b := bufio.NewReader(p.Conn)
+	buffer, err := b.ReadBytes('\n')
+	if err != nil {
+		if err != io.EOF {
+			log.Print("Error Receiving on server, err ", err)
+			p.Conn.Close()
+		}
+
+		return nil, err
+	}
+	c := bytes.Trim(buffer, "\n")
+	msg, err = p.serializer.Deserialize(c)
 
 	return
 }

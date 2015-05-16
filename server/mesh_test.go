@@ -61,4 +61,4 @@ func TestRemovePeerFromMesh(t *testing.T) {
 		t.Error("Unexpected Remove Request")
 	}
 }
-*/
+	it*/

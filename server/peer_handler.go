@@ -20,6 +20,7 @@ type PeerHandler interface {
 	Accept(*SocketPeer) error
 	Remove(Peer)
 	Notify(ID, error) //Used to get notifications of peer conn failures
+	Peers() map[ID]Peer
 }
 
 type defaultPeerHandler struct {
@@ -29,7 +30,7 @@ type defaultPeerHandler struct {
 	mutex sync.Mutex
 }
 
-func (h *defaultPeerHandler) Accept(p *SocketPeer) error {
+func (h *defaultPeerHandler) Accept(p Peer) error {
 	h.mutex.Lock()
 	defer h.mutex.Unlock()
 	h.peers[p.Id()] = p
@@ -46,6 +47,10 @@ func (h *defaultPeerHandler) Remove(p Peer) {
 	defer h.mutex.Unlock()
 
 	delete(h.peers, p.Id())
+}
+
+func (h *defaultPeerHandler) Peers() map[ID]Peer {
+	return h.peers
 }
 
 func (h *defaultPeerHandler) check() {

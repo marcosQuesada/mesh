@@ -16,13 +16,13 @@ func main() {
 	raftAddr := flag.String("raft_addr", "127.0.0.1:12000", "cluster node listening address")
 	raftCluster := flag.String("raft_cluster", "127.0.0.1:12000,127.0.0.2:12001,127.0.0.3:12002", "cluster list definition separated by commas")
 	raftDataDir := flag.String("raft_data_dir", "./data/var0", "raft data store path")
-	logFile := flag.String("logFile", "./log/log0.log", "log file")
+	//logFile := flag.String("logFile", "./log/log0.log", "log file")
 	flag.Parse()
 
 	//Init logger
-	f := handleFile(*logFile)
-	defer f.Close()
-	log.SetOutput(f)
+	//f := handleFile(*logFile)
+	//defer f.Close()
+	//log.SetOutput(f)
 	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
 
 	//Create COnfiguration
