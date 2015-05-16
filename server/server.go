@@ -2,13 +2,12 @@ package server
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"net"
 )
 
 type Server struct {
-	PeerHandler
-
 	Router
 
 	config *Config
@@ -19,11 +18,11 @@ type Server struct {
 
 func New(c *Config) *Server {
 	return &Server{
-		Router:      NewRouter(),
-		PeerHandler: DefaultPeerHandler(),
-		config:      c,
-		exit:        make(chan bool),
-		node:        c.raft_addr,
+		Router: NewRouter(),
+
+		config: c,
+		exit:   make(chan bool),
+		node:   c.raft_addr,
 	}
 }
 
@@ -67,11 +66,6 @@ func (s *Server) startServer() {
 			go s.handleConnection(peer)
 			go s.Router.Accept(peer)
 
-			err = s.PeerHandler.Accept(peer)
-			if err != nil {
-				log.Print("Error accepting peer: ", err)
-			}
-
 		}
 	}()
 }
@@ -86,9 +80,11 @@ func (s *Server) handleConnection(peer *SocketPeer) {
 	for {
 		msg, err := peer.Receive()
 		if err != nil {
-			log.Print("Error reading connection ", err)
-			s.PeerHandler.Notify(peer.Id(), err)
+			if err != io.EOF {
+				log.Print("Error reading connection ", err)
+			}
 			break
+			//s.PeerHandler.Notify(peer.Id(), err)
 		}
 
 		fmt.Println("Received Message ", msg)

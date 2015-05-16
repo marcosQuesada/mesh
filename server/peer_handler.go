@@ -18,7 +18,7 @@ const (
 //PeerHandler is in charge of Handle Peer Lifecycle
 type PeerHandler interface {
 	Accept(Peer) error
-	Remove(Peer)
+	Remove(Peer) error
 	Notify(ID, error) //Used to get notifications of peer conn failures
 	Peers() map[ID]Peer
 }
@@ -40,8 +40,14 @@ func DefaultPeerHandler() *defaultPeerHandler {
 func (h *defaultPeerHandler) Accept(p Peer) error {
 	h.mutex.Lock()
 	defer h.mutex.Unlock()
+
+	if _, ok := h.peers[p.Id()]; ok {
+		return fmt.Errorf("Peer Already registered")
+	}
+
 	h.peers[p.Id()] = p
 	fmt.Println("Accepted Peer", p.Id())
+
 	return nil
 }
 
@@ -49,11 +55,18 @@ func (h *defaultPeerHandler) Notify(id ID, err error) {
 
 }
 
-func (h *defaultPeerHandler) Remove(p Peer) {
+func (h *defaultPeerHandler) Remove(p Peer) error {
 	h.mutex.Lock()
 	defer h.mutex.Unlock()
 
+	if _, ok := h.peers[p.Id()]; !ok {
+		return fmt.Errorf("Peer Not found")
+	}
+
 	delete(h.peers, p.Id())
+	fmt.Println("Removed Peer", p.Id())
+
+	return nil
 }
 
 func (h *defaultPeerHandler) Peers() map[ID]Peer {

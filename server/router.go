@@ -9,16 +9,20 @@ type Router interface {
 }
 
 type defaultRouter struct {
+	Broker
+
 	exit chan bool
 }
 
 func NewRouter() *defaultRouter {
 	return &defaultRouter{
-		exit: make(chan bool),
+		Broker: NewBroker(),
+		exit:   make(chan bool),
 	}
 }
 
 func (r *defaultRouter) Accept(p Peer) {
+	defer close(r.exit)
 	fmt.Println("Router accepting peer: ", p.Id())
 	for {
 		select {
@@ -28,14 +32,20 @@ func (r *defaultRouter) Accept(p Peer) {
 			switch msg.(type) {
 			case *Hello:
 				fmt.Println("Router Hello", msg.(*Hello))
+				result := r.Broker.Accept(p, msg.(*Hello))
+				p.Send(result)
 			case *Welcome:
 				fmt.Println("Router Welcome: ", msg.(*Welcome))
 			case *Abort:
 				fmt.Println("Router Abort: ", msg.(*Abort))
 			case *Ping:
+				r.Broker.Ping(p, msg.(*Ping))
 				fmt.Println("Router Ping: ", msg.(*Ping))
 			case *Pong:
 				fmt.Println("Router Pong: ", msg.(*Pong))
+			case *GoodBye:
+				result := r.Broker.GoodBye(p, msg.(*GoodBye))
+				p.Send(result)
 			default:
 
 			}
@@ -44,29 +54,3 @@ func (r *defaultRouter) Accept(p Peer) {
 		}
 	}
 }
-
-/*
-
-	defer close(p.exit)
-	//var first bool = true //send ID on first message
-
-	for {
-		select {
-		case m := <-p.rcvChan:
-			msg := *m
-			switch msg.MessageType() {
-			case HELLO:
-				fmt.Printf("Peer Hello received", msg.(*Hello))
-			case WELCOME:
-				fmt.Printf("Peer Welcome received", msg.(*Welcome))
-			case ABORT:
-				fmt.Printf("Peer Abort received", msg.(*Abort))
-			default:
-				fmt.Printf("unexpected type %T", msg)
-			}
-		case <-p.ticker.C:
-			if !p.Connected() {
-				fmt.Println("Connecting to ", p.remote)
-				p.Connect(p.remote)
-				defer p.Exit()
-			}*/

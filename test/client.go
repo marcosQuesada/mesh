@@ -24,4 +24,15 @@ func main() {
 
 	m, err := peerA.Receive()
 	fmt.Println("Message is ", m, "err", err)
+	fmt.Println("MessageType:", m.MessageType())
+
+	gdbMsg := server.GoodBye{
+		Id:      10,
+		Details: map[string]interface{}{"foo": "bar"},
+	}
+	peerA.Send(gdbMsg)
+
+	m, err = peerA.Receive()
+	fmt.Println("Message is ", m, "err", err)
+	fmt.Println("MessageType:", m.MessageType())
 }
