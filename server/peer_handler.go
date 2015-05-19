@@ -47,6 +47,8 @@ func (h *defaultPeerHandler) Accept(p Peer) error {
 
 	h.peers[p.Id()] = p
 	fmt.Println("Accepted Peer", p.Id())
+	n := p.(*SocketPeer)
+	fmt.Println("Accepted Peer", n.Conn.LocalAddr())
 
 	return nil
 }

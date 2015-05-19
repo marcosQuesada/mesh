@@ -20,6 +20,8 @@ func (mt messageType) New() Message {
 		return &Pong{}
 	case GOODBYE:
 		return &GoodBye{}
+	case ERROR:
+		return &Error{}
 	}
 
 	return nil
@@ -32,11 +34,13 @@ const (
 	PING    = messageType(3)
 	PONG    = messageType(4)
 	GOODBYE = messageType(5)
+	ERROR   = messageType(99)
 )
 
 // First connection message
 type Hello struct {
 	Id      int
+	From    ID
 	Details map[string]interface{}
 }
 
@@ -47,6 +51,7 @@ func (h Hello) MessageType() messageType {
 // Hello Accepted
 type Welcome struct {
 	Id      int
+	From    ID
 	Details map[string]interface{}
 }
 
@@ -57,6 +62,7 @@ func (w Welcome) MessageType() messageType {
 // Hello Rejected
 type Abort struct {
 	Id      int
+	From    ID
 	Details map[string]interface{}
 }
 
@@ -67,6 +73,7 @@ func (a Abort) MessageType() messageType {
 // Ping request to a remote node
 type Ping struct {
 	Id      int
+	From    ID
 	Details map[string]interface{}
 }
 
@@ -77,6 +84,7 @@ func (p Ping) MessageType() messageType {
 // Pong response as a ping request
 type Pong struct {
 	Id      int
+	From    ID
 	Details map[string]interface{}
 }
 
@@ -86,9 +94,20 @@ func (p Pong) MessageType() messageType {
 
 type GoodBye struct {
 	Id      int
+	From    ID
 	Details map[string]interface{}
 }
 
 func (g GoodBye) MessageType() messageType {
 	return GOODBYE
+}
+
+type Error struct {
+	Id      int
+	From    ID
+	Details map[string]interface{}
+}
+
+func (w Error) MessageType() messageType {
+	return ERROR
 }
