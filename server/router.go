@@ -34,18 +34,31 @@ func (r *defaultRouter) Accept(p Peer) {
 				fmt.Println("Router Hello", msg.(*Hello))
 				result := r.Broker.Accept(p, msg.(*Hello))
 				p.Send(result)
+
 			case *Welcome:
 				fmt.Println("Router Welcome: ", msg.(*Welcome))
+				a := msg.(*Welcome)
+				p.Send(&Error{Id: a.Id, Details: a.Details})
+
 			case *Abort:
 				fmt.Println("Router Abort: ", msg.(*Abort))
+				a := msg.(*Abort)
+				p.Send(&Error{Id: a.Id, Details: a.Details})
+
 			case *Ping:
-				r.Broker.Ping(p, msg.(*Ping))
+				result := r.Broker.Ping(p, msg.(*Ping))
+				p.Send(result)
 				fmt.Println("Router Ping: ", msg.(*Ping))
+
 			case *Pong:
 				fmt.Println("Router Pong: ", msg.(*Pong))
+				pong := msg.(*Pong)
+				p.Send(&Error{Id: pong.Id, Details: pong.Details})
+
 			case *GoodBye:
 				result := r.Broker.GoodBye(p, msg.(*GoodBye))
 				p.Send(result)
+
 			default:
 
 			}

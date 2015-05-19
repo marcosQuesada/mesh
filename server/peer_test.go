@@ -2,13 +2,91 @@ package server
 
 import (
 	"fmt"
+	"io"
 	"net"
 	"testing"
 	"time"
 )
 
+type testPeerHandler struct {
+	lastMsg *Hello
+	outChan chan *Hello
+	exit    bool
+}
+
+func TestPeersOnPipes(t *testing.T) {
+	a, b := net.Pipe()
+
+	peerA := NewSocketPeer(a)
+	peerB := NewSocketPeer(b)
+	defer peerA.Conn.Close()
+	defer peerB.Conn.Close()
+
+	tp := &testPeerHandler{
+		outChan: make(chan *Hello, 1),
+	}
+	go tp.handlePeer(peerA)
+	go tp.handlePeer(peerB)
+
+	//first message
+	msg := Hello{
+		Id:      0,
+		From:    peerA.Id(),
+		Details: map[string]interface{}{"foo": "bar"},
+	}
+	peerA.Send(msg)
+
+	time.Sleep(time.Millisecond * 300)
+	tp.exit = true
+	lastMessage := <-tp.outChan
+	fmt.Println("lastMessage A", lastMessage)
+
+	if int(lastMessage.Id) == 0 {
+		t.Error("LastMessage must be bigger ")
+	}
+
+	if lastMessage.Details["foo"].(string) != "PING" && lastMessage.Details["foo"].(string) != "PONG" {
+		t.Error("LastMessageDetails has not changed! ")
+	}
+}
+
+func (ph *testPeerHandler) handlePeer(p *SocketPeer) {
+	defer func() {
+		ph.outChan <- ph.lastMsg
+	}()
+
+	for !ph.exit {
+		m, err := p.Receive()
+		if err != nil {
+			fmt.Println("Error Receiving on server, err ", err)
+			return
+		}
+
+		if m.MessageType() != 0 {
+			fmt.Println("Error on received Hello Message ", m)
+			return
+		}
+
+		newMsg := m.(*Hello)
+		if newMsg.Details["foo"].(string) == "PONG" {
+			newMsg.Details["foo"] = "PING"
+		} else {
+			newMsg.Details["foo"] = "PONG"
+		}
+		newMsg.Id++
+		newMsg.From = p.Id()
+
+		err = p.Send(newMsg)
+		if err != nil {
+			//fmt.Println("Error sending: ", err)
+			return
+		}
+		ph.lastMsg = newMsg
+	}
+}
+
 func TestBasicPeersOnServerClient(t *testing.T) {
-	startTestServer()
+	go startTestServer()
 	time.Sleep(time.Second * 1)
 
 	conn, err := net.Dial("tcp", "localhost:8002")
@@ -27,6 +105,10 @@ func TestBasicPeersOnServerClient(t *testing.T) {
 	peerA.Send(msg)
 
 	m, err := peerA.Receive()
+	if err != nil {
+		t.Error("Error on received Hello Message ", err)
+	}
+
 	fmt.Println("Message is ", m, "err", err)
 	if m.MessageType() != 0 {
 		t.Error("Error on received Hello Message ", m)
@@ -67,13 +149,15 @@ func handleConnection(peer *SocketPeer) {
 	for {
 		m, err := peer.Receive()
 		if err != nil {
-			fmt.Println("Error Receiving: ", err)
+			if err != io.EOF {
+				fmt.Println("Error Receiving: ", err)
+			}
 			peer.Conn.Close()
 			break
 		}
 		err = peer.Send(m)
 		if err != nil {
-
+			fmt.Println("Error Receiving: ", err)
 		}
 	}
 
