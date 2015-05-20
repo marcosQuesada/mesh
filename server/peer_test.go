@@ -17,8 +17,8 @@ type testPeerHandler struct {
 func TestPeersOnPipes(t *testing.T) {
 	a, b := net.Pipe()
 
-	peerA := NewSocketPeer(a)
-	peerB := NewSocketPeer(b)
+	peerA := NewJSONSocketPeer(a)
+	peerB := NewJSONSocketPeer(b)
 	defer peerA.Conn.Close()
 	defer peerB.Conn.Close()
 
@@ -96,7 +96,7 @@ func TestBasicPeersOnServerClient(t *testing.T) {
 	}
 	defer conn.Close()
 
-	peerA := NewSocketPeer(conn)
+	peerA := NewJSONSocketPeer(conn)
 
 	msg := Hello{
 		Id:      10,
@@ -139,7 +139,7 @@ func startTestServer() {
 			fmt.Println("Error accepting: ", err)
 			continue
 		}
-		peer := NewSocketPeer(conn)
+		peer := NewJSONSocketPeer(conn)
 		go handleConnection(peer)
 	}
 }

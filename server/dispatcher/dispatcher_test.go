@@ -7,9 +7,7 @@ import (
 func TestBasicDispatcher(t *testing.T) {
 	l := &fakeListener{}
 
-	d := &DefaultDispatcher{
-		listeners: make(map[EventType][]Listener),
-	}
+	d := New()
 
 	d.RegisterListener(&OnFakeEvent{}, l.Listener)
 

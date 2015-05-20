@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/mitchellh/mapstructure"
 )
 
@@ -31,6 +32,10 @@ func (s *JsonSerializer) Serialize(m Message) ([]byte, error) {
 func (s *JsonSerializer) Deserialize(m []byte) (Message, error) {
 	payload := map[string]interface{}{}
 	err := json.Unmarshal(m, &payload)
+
+	if _, ok := payload["type"].(float64); !ok {
+		return nil, fmt.Errorf("Type is not float64", payload["type"])
+	}
 
 	mt := messageType(int(payload["type"].(float64)))
 	msg := mt.New()

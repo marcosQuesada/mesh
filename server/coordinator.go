@@ -38,10 +38,10 @@ func (c *coordinator) Receive() Message {
 	}
 }
 
-func (r *coordinator) run() {
-	for !r.stop {
+func (c *coordinator) run() {
+	for !c.stop {
 		select {
-		case msg := <-r.rcvChan:
+		case msg := <-c.rcvChan:
 			switch msg.MessageType() {
 			case HELLO:
 				cmd := msg.(*Hello)

@@ -40,7 +40,7 @@ const (
 // First connection message
 type Hello struct {
 	Id      int
-	From    ID
+	From    ID //Node
 	Details map[string]interface{}
 }
 

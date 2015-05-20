@@ -11,12 +11,18 @@ type Dispatcher interface {
 	Dispatch(Event)
 }
 
-type DefaultDispatcher struct {
+type defaultDispatcher struct {
 	listeners map[EventType][]Listener
 	mutex     sync.Mutex
 }
 
-func (d *DefaultDispatcher) RegisterListener(e Event, l Listener) {
+func New() *defaultDispatcher {
+	return &defaultDispatcher{
+		listeners: make(map[EventType][]Listener, 0),
+	}
+}
+
+func (d *defaultDispatcher) RegisterListener(e Event, l Listener) {
 	d.mutex.Lock()
 	defer d.mutex.Unlock()
 
@@ -27,7 +33,7 @@ func (d *DefaultDispatcher) RegisterListener(e Event, l Listener) {
 	d.listeners[e.GetEventType()] = append(d.listeners[e.GetEventType()], l)
 }
 
-func (d *DefaultDispatcher) Dispatch(e Event) {
+func (d *defaultDispatcher) Dispatch(e Event) {
 	if _, ok := d.listeners[e.GetEventType()]; !ok {
 		return
 	}

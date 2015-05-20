@@ -12,6 +12,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"time"
 )
 
 type Peer interface {
@@ -26,12 +27,13 @@ type ID string
 type SocketPeer struct {
 	Conn       net.Conn
 	id         ID
+	Node       Node
 	serializer Serializer
 	RcvChan    chan Message
 	exitChan   chan bool
 }
 
-func NewSocketPeer(conn net.Conn) *SocketPeer {
+func NewJSONSocketPeer(conn net.Conn) *SocketPeer {
 	fmt.Println("Socket Peer conn origin: ", conn.RemoteAddr())
 	id, err := uuid.NewV4()
 	if err != nil {
@@ -67,20 +69,38 @@ func (p *SocketPeer) Send(msg Message) error {
 	return nil
 }
 
+type response struct {
+	Msg Message
+	Err error
+}
+
 func (p *SocketPeer) Receive() (msg Message, err error) {
-	b := bufio.NewReader(p.Conn)
-	buffer, err := b.ReadBytes('\n')
-	if err != nil {
-		if err != io.EOF {
-			log.Print("Error Receiving on server, err ", err)
-			p.Conn.Close()
+	r := make(chan response)
+
+	go func(rsp chan response) {
+		b := bufio.NewReader(p.Conn)
+		buffer, err := b.ReadBytes('\n')
+		if err != nil {
+			if err != io.EOF {
+				log.Print("Error Receiving on server, err ", err)
+				p.Conn.Close()
+			}
+			r <- response{Err: err}
 		}
+		c := bytes.Trim(buffer, "\n")
+		msg, err = p.serializer.Deserialize(c)
+		r <- response{Msg: msg, Err: err}
+		close(r)
+	}(r)
 
-		return nil, err
+	timeout := time.NewTimer(time.Second * 2)
+
+	select {
+	case m := <-r:
+		return m.Msg, m.Err
+	case <-timeout.C:
+		return nil, fmt.Errorf("Timeout receiving peer response")
 	}
-	c := bytes.Trim(buffer, "\n")
-	msg, err = p.serializer.Deserialize(c)
-
 	return
 }
 

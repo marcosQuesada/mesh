@@ -62,7 +62,7 @@ func (s *Server) startServer() {
 				return
 			}
 
-			peer := NewSocketPeer(conn)
+			peer := NewJSONSocketPeer(conn)
 			go s.handleConnection(peer)
 			go s.Router.Accept(peer)
 

@@ -16,7 +16,8 @@ func TestBasicServerClient(t *testing.T) {
 	srv.startServer()
 	time.Sleep(time.Millisecond * 100)
 
-	go func() {
+	done := make(chan bool)
+	go func(d chan bool) {
 		conn, err := net.Dial("tcp", "localhost:8001")
 		if err != nil {
 			fmt.Println("dial error:", err)
@@ -24,16 +25,17 @@ func TestBasicServerClient(t *testing.T) {
 		}
 		defer conn.Close()
 
-		peerA := NewSocketPeer(conn)
+		peerA := NewJSONSocketPeer(conn)
 
 		msg := Hello{
 			Id:      10,
 			Details: map[string]interface{}{"foo": "bar"},
 		}
 		peerA.Send(msg)
-	}()
+		done <- true
+	}(done)
 
-	time.Sleep(time.Millisecond * 500)
+	<-done
 
 	/*	peers := srv.PeerHandler.Peers()
 		if len(peers) != 1 {
