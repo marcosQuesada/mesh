@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"net"
 	"sync"
 )
 
@@ -26,8 +27,8 @@ type PeerHandler interface {
 type defaultPeerHandler struct {
 	watcher Watcher
 	peers   map[ID]Peer
-	//What about nodes??
-	mutex sync.Mutex
+	remotes map[net.Addr]ID
+	mutex   sync.Mutex
 }
 
 func DefaultPeerHandler() *defaultPeerHandler {
@@ -46,6 +47,7 @@ func (h *defaultPeerHandler) Accept(p Peer) error {
 	}
 
 	h.peers[p.Id()] = p
+	h.remotes[p.Remote()] = p.Id()
 	fmt.Println("Accepted Peer", p.Id())
 	n := p.(*SocketPeer)
 	fmt.Println("Accepted Peer", n.Conn.LocalAddr())
@@ -66,6 +68,8 @@ func (h *defaultPeerHandler) Remove(p Peer) error {
 	}
 
 	delete(h.peers, p.Id())
+	delete(h.remotes, p.Remote())
+
 	fmt.Println("Removed Peer", p.Id())
 
 	return nil

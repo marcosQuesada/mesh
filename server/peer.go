@@ -17,6 +17,7 @@ import (
 
 type Peer interface {
 	Id() ID
+	Remote() net.Addr //.String()
 	Receive() (Message, error)
 	Send(Message) error
 	ReadMessage() chan Message
@@ -51,6 +52,10 @@ func NewJSONSocketPeer(conn net.Conn) *SocketPeer {
 
 func (p *SocketPeer) Id() ID {
 	return p.id
+}
+
+func (p *SocketPeer) Remote() net.Addr {
+	return p.Conn.RemoteAddr()
 }
 
 func (p *SocketPeer) Send(msg Message) error {
