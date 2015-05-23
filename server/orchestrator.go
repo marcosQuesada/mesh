@@ -43,10 +43,10 @@ func StartOrchestrator(members map[*Node]bool) *Orchestrator {
 
 func (o *Orchestrator) Run() {
 	o.bootClients()
+	//handle updates from members
 	for {
 		select {
 		case m := <-o.inChan:
-			//handle updates from members
 			fmt.Print("Handle Update ", m)
 			switch m.event {
 			case ClientStatusConnected:
@@ -81,24 +81,45 @@ func (o *Orchestrator) bootClients() {
 			var c *Client
 			done.Add(1)
 			go func() {
+				//Blocking call, wait until connection success
 				c = StartDialClient(node)
 				go c.Run()
 				o.clients[node] = c
 				done.Done()
-				m := memberUpdate{
-					node:  node,
-					event: ClientStatusConnected,
+
+				msg := Hello{
+					Id:      0,
+					Details: map[string]interface{}{"foo": "bar"},
+				}
+				c.Send(msg)
+
+				//Blocking call again until response
+				rsp := <-c.ReceiveChan()
+
+				var m memberUpdate
+				switch rsp.(type) {
+				case *Welcome:
+					o.clientHandler.Accept(c)
+					fmt.Println("response Welcome", rsp.(*Welcome))
+					m = memberUpdate{
+						node:  node,
+						event: ClientStatusConnected,
+					}
+					fmt.Println("Client Achieved: ", node)
+				case *Abort:
+					fmt.Println("response Abort ", rsp.(*Abort))
+					m = memberUpdate{
+						node:  node,
+						event: ClientStatusError,
+					}
+				default:
+					fmt.Println("Unexpected type On response ")
 				}
 				o.inChan <- m
-				o.clientHandler.Accept(c)
-				fmt.Println("Client Achieved: ", node)
 			}()
 		}
-
 	}
 	done.Wait()
-
-	fmt.Println("Are: ", o.clients)
 }
 
 //BIND MANY CHANNELS TO ONE AND HANDLE all

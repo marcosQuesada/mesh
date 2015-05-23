@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"io"
 	"net"
 )
 
@@ -32,15 +33,24 @@ func StartDialClient(node *Node) *Client {
 		conn, err = net.Dial("tcp", string(node.String()))
 		if err != nil {
 			fmt.Println("dial error:", err)
-
 		} else {
 			break
 		}
 	}
-	fmt.Println("Dial client started, err: ", err)
+
 	return &Client{
 		Peer:     NewJSONSocketPeer(conn),
 		node:     node,
+		message:  make(chan Message, 0),
+		exitChan: make(chan bool),
+	}
+}
+
+func StartAcceptClient(conn net.Conn) *Client {
+
+	return &Client{
+		Peer: NewJSONSocketPeer(conn),
+		//node:     node,
 		message:  make(chan Message, 0),
 		exitChan: make(chan bool),
 	}
@@ -56,6 +66,9 @@ func (c *Client) Run() {
 		go func() {
 			m, err := c.Receive()
 			if err != nil {
+				if err != io.EOF {
+					fmt.Println("Error Receiving: ", err)
+				}
 				r <- err
 			}
 			r <- m
