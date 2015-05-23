@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"sync"
 	//"time"
 )
 
@@ -18,29 +19,30 @@ const (
 )
 
 type memberUpdate struct {
-	node  Node
+	node  *Node
 	event Status // ??
 }
 
 type Orchestrator struct {
 	clientHandler ClientHandler
-	members       map[Node]bool
-	clients       map[Node]*Client
+	members       map[*Node]bool
+	clients       map[*Node]*Client
 	inChan        chan memberUpdate
 	exitChan      chan bool
 }
 
-func StartOrchestrator(members map[Node]bool) *Orchestrator {
+func StartOrchestrator(members map[*Node]bool) *Orchestrator {
 	return &Orchestrator{
 		clientHandler: DefaultClientHandler(),
 		members:       members,
+		clients:       make(map[*Node]*Client, 0),
 		inChan:        make(chan memberUpdate, 0),
 		exitChan:      make(chan bool, 0),
 	}
 }
 
 func (o *Orchestrator) Run() {
-	o.initClients()
+	o.bootClients()
 	for {
 		select {
 		case m := <-o.inChan:
@@ -48,8 +50,10 @@ func (o *Orchestrator) Run() {
 			fmt.Print("Handle Update ", m)
 			switch m.event {
 			case ClientStatusConnected:
+				fmt.Print("Event Status Connected ", m)
 				o.members[m.node] = true
 			case ClientStatusError:
+				fmt.Print("Event Status Error ", m)
 				o.members[m.node] = false
 				o.clients[m.node] = nil
 			}
@@ -70,51 +74,31 @@ func (o *Orchestrator) State() bool {
 	return true
 }
 
-func (o *Orchestrator) initClients() {
-	for n, _ := range o.members {
-		fmt.Println("Starting client Peer ", n.String())
-
-		//THIS GOES TO CLIENT!!!
-		go func() {
-			h := &handleClient{node: n, exit: make(chan bool, 0)}
-			c := h.connect()
-
-			//To PeerHandler!!!!
-			o.clients[n] = c
-			fmt.Println("Client Achieved: ", n)
-
-			m := memberUpdate{
-				node:  n,
-				event: ClientStatusConnected,
-			}
-			o.inChan <- m
-
-			return
-		}()
-	}
-}
-
-type handleClient struct {
-	node Node
-	exit chan bool
-}
-
-func (h *handleClient) connect() *Client {
-	result := make(chan *Client, 0)
-	go func() {
-		for {
-			/*			c, err := StartDialClient(h.node)
-						if err == nil {
-							result <- c
-						}
-
-						fmt.Println("Error ", err)
-						time.Sleep(time.Second * 1)*/
+func (o *Orchestrator) bootClients() {
+	var done sync.WaitGroup
+	for node, inService := range o.members {
+		if !inService {
+			var c *Client
+			done.Add(1)
+			go func() {
+				c = StartDialClient(node)
+				go c.Run()
+				o.clients[node] = c
+				done.Done()
+				m := memberUpdate{
+					node:  node,
+					event: ClientStatusConnected,
+				}
+				o.inChan <- m
+				o.clientHandler.Accept(c)
+			}()
 		}
-	}()
 
-	r := <-result
-	return r
+		fmt.Println("Client Achieved: ", node)
+	}
+	done.Wait()
+
+	fmt.Println("Are: ", o.clients)
 }
 
 //BIND MANY CHANNELS TO ONE AND HANDLE all

@@ -2,7 +2,7 @@ package server
 
 import (
 	"fmt"
-	//"net"
+	"net"
 )
 
 const (
@@ -15,32 +15,36 @@ type PeerClient interface {
 	Run()
 	Exit()
 	ReceiveChan() chan Message
-	Send()
+	Send(Message) error
 }
 
 type Client struct {
 	Peer
-	node     Node
+	node     *Node
 	message  chan Message
 	exitChan chan bool
 }
 
-/*
-func StartDialClient(node Node) (*Client, error) {
-	conn, err := net.Dial("tcp", string(node.String()))
-	if err != nil {
-		fmt.Println("dial error:", err)
-		return nil, err
-	}
+func StartDialClient(node *Node) *Client {
+	var conn net.Conn
+	var err error
+	for {
+		conn, err = net.Dial("tcp", string(node.String()))
+		if err != nil {
+			fmt.Println("dial error:", err)
 
+		} else {
+			break
+		}
+	}
 	return &Client{
 		Peer:     NewJSONSocketPeer(conn),
 		node:     node,
 		message:  make(chan Message, 0),
 		exitChan: make(chan bool),
-	}, nil
+	}
 }
-*/
+
 func (c *Client) ReceiveChan() chan Message {
 	return c.message
 }
@@ -80,6 +84,6 @@ func (c *Client) Exit() {
 	c.exitChan <- true
 }
 
-func (c *Client) Node() Node {
+func (c *Client) Node() *Node {
 	return c.node
 }

@@ -71,7 +71,8 @@ func (f *fakeClient) Node() *Node {
 
 func (f *fakeClient) Run() {
 }
-func (f *fakeClient) Send() {
+func (f *fakeClient) Send(Message) error {
+	return nil
 }
 func (f *fakeClient) ReceiveChan() (v chan Message) {
 	return v

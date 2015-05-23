@@ -9,7 +9,7 @@ import (
 func TestClientMessagingUnderPipes(t *testing.T) {
 	a, b := net.Pipe()
 
-	n1 := Node{host: "foo", port: 5678}
+	n1 := &Node{host: "foo", port: 5678}
 	c1 := &Client{
 		Peer:     NewJSONSocketPeer(a),
 		node:     n1,
@@ -18,7 +18,7 @@ func TestClientMessagingUnderPipes(t *testing.T) {
 	}
 	go c1.Run()
 
-	n2 := Node{host: "bar", port: 5678}
+	n2 := &Node{host: "bar", port: 5678}
 	c2 := &Client{
 		Peer:     NewJSONSocketPeer(b),
 		node:     n2,
