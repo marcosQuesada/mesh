@@ -21,6 +21,7 @@ type Peer interface {
 	Receive() (Message, error)
 	Send(Message) error
 	ReadMessage() chan Message
+	Terminate()
 }
 
 type ID string
@@ -80,6 +81,23 @@ type response struct {
 }
 
 func (p *SocketPeer) Receive() (msg Message, err error) {
+	b := bufio.NewReader(p.Conn)
+	buffer, err := b.ReadBytes('\n')
+	if err != nil {
+		if err != io.EOF {
+			log.Print("Error Receiving on server, err ", err)
+			p.Conn.Close()
+		}
+
+		return nil, err
+	}
+	c := bytes.Trim(buffer, "\n")
+	msg, err = p.serializer.Deserialize(c)
+
+	return
+}
+
+func (p *SocketPeer) ReceiveTimeout() (msg Message, err error) {
 	r := make(chan response)
 
 	go func(rsp chan response) {
@@ -111,4 +129,8 @@ func (p *SocketPeer) Receive() (msg Message, err error) {
 
 func (p *SocketPeer) ReadMessage() chan Message {
 	return p.RcvChan
+}
+
+func (p *SocketPeer) Terminate() {
+	p.Conn.Close()
 }

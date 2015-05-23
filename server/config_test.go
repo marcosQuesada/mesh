@@ -6,7 +6,7 @@ import (
 
 func TestNodeAddress(t *testing.T) {
 	node := &Node{host: "localhost", port: 1234}
-	if node.Address() != "localhost:1234" {
+	if node.String() != "localhost:1234" {
 		t.Error("Config Error Generating string address")
 	}
 }

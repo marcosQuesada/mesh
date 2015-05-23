@@ -38,13 +38,13 @@ type subject struct {
 }
 
 func (w *defaultWatcher) Care(p *Peer) {
-	s := &subject{
+	/*	s := &subject{
 		peer:   p,
 		exit:   make(chan bool),
 		ticker: time.NewTicker(time.Duration(1) * time.Millisecond),
-	}
+	}*/
 
-	w.childs[s] = PeerStatusUnknown
+	//w.childs[s] = PeerStatusUnknown
 }
 
 func (w *defaultWatcher) Run() {

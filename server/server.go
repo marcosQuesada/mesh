@@ -47,9 +47,9 @@ func (s *Server) Close() {
 }
 
 func (s *Server) startServer() {
-	log.Print("Starting server: ", s.config.raft_addr.Address())
+	log.Print("Starting server: ", s.config.raft_addr.String())
 
-	listener, err := net.Listen("tcp", string(s.config.raft_addr.Address()))
+	listener, err := net.Listen("tcp", string(s.config.raft_addr.String()))
 	if err != nil {
 		log.Println("Error starting Socket Server: ", err)
 		return
@@ -58,14 +58,13 @@ func (s *Server) startServer() {
 		for {
 			conn, err := listener.Accept()
 			if err != nil {
-				log.Println("Error starting socket client to: ", s.node.Address(), "err: ", err)
+				log.Println("Error starting socket client to: ", s.node.String(), "err: ", err)
 				return
 			}
 
 			peer := NewJSONSocketPeer(conn)
 			go s.handleConnection(peer)
 			go s.Router.Accept(peer)
-
 		}
 	}()
 }
@@ -94,7 +93,7 @@ func (s *Server) handleConnection(peer *SocketPeer) {
 
 // Cli Socket server
 func (s *Server) startCliServer() error {
-	listener, err := net.Listen("tcp", string(s.config.addr.Address()))
+	listener, err := net.Listen("tcp", s.config.addr.String())
 	if err != nil {
 		log.Println("Error Listening Cli Server")
 		return err

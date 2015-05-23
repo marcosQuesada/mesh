@@ -14,7 +14,7 @@ func main() {
 	}
 	defer conn.Close()
 
-	peerA := server.NewSocketPeer(conn)
+	peerA := server.NewJSONSocketPeer(conn)
 
 	msg := server.Hello{
 		Id:      10,

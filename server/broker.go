@@ -11,21 +11,21 @@ type Broker interface {
 }
 
 type defaultBroker struct {
-	PeerHandler
+	//PeerHandler
 }
 
 func NewBroker() *defaultBroker {
 	return &defaultBroker{
-		PeerHandler: DefaultPeerHandler(),
+	//PeerHandler: DefaultPeerHandler(),
 	}
 }
 
 func (b *defaultBroker) Accept(p Peer, h *Hello) Message {
 	fmt.Println("Broker Accept: ", h)
-	err := b.PeerHandler.Accept(p)
-	if err != nil {
-		return &Abort{Id: h.Id, From: p.Id(), Details: map[string]interface{}{"foo_bar": 1231}}
-	}
+	/*	err := b.PeerHandler.Accept(p)
+		if err != nil {
+			return &Abort{Id: h.Id, From: p.Id(), Details: map[string]interface{}{"foo_bar": 1231}}
+		}*/
 
 	return &Welcome{Id: h.Id, From: p.Id(), Details: map[string]interface{}{"foo_bar": 1231}}
 }
@@ -35,10 +35,10 @@ func (b *defaultBroker) Ping(p Peer, pi *Ping) Message {
 }
 
 func (b *defaultBroker) GoodBye(p Peer, g *GoodBye) Message {
-	fmt.Println("Broker GoodBye: ", g)
-	err := b.PeerHandler.Remove(p)
-	if err != nil {
-		return &Abort{Id: g.Id, From: p.Id(), Details: map[string]interface{}{"foo_bar": 1231}}
-	}
+	/*	fmt.Println("Broker GoodBye: ", g)
+		err := b.PeerHandler.Remove(p)
+		if err != nil {
+			return &Abort{Id: g.Id, From: p.Id(), Details: map[string]interface{}{"foo_bar": 1231}}
+		}*/
 	return &GoodBye{Id: g.Id, From: p.Id(), Details: map[string]interface{}{"foo_bar": 1231}}
 }

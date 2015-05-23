@@ -9,8 +9,6 @@ type Node struct {
 	port int
 }
 
-type address string
-
-func (n *Node) Address() address {
-	return address(fmt.Sprintf("%s:%d", n.host, n.port))
+func (n *Node) String() string {
+	return fmt.Sprintf("%s:%d", n.host, n.port)
 }
