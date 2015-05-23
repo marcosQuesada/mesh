@@ -2,7 +2,7 @@ package server
 
 import (
 	"fmt"
-	"net"
+	//"net"
 )
 
 const (
@@ -25,7 +25,8 @@ type Client struct {
 	exitChan chan bool
 }
 
-func StartClient(node Node) (*Client, error) {
+/*
+func StartDialClient(node Node) (*Client, error) {
 	conn, err := net.Dial("tcp", string(node.String()))
 	if err != nil {
 		fmt.Println("dial error:", err)
@@ -39,7 +40,7 @@ func StartClient(node Node) (*Client, error) {
 		exitChan: make(chan bool),
 	}, nil
 }
-
+*/
 func (c *Client) ReceiveChan() chan Message {
 	return c.message
 }
@@ -61,14 +62,14 @@ func (c *Client) Run() {
 			case error:
 				fmt.Println("Error Receiving on server, err ", t)
 			case Message:
+				fmt.Println("Client Message received: ", t.(Message))
 				c.message <- t.(Message)
-				//Here we can handle HELLO WELCOME FLOW !
-
 			default:
 				fmt.Printf("unexpected type %T", t)
 			}
 		case <-c.exitChan:
 			fmt.Printf("Exiting Client Peer: ", c.node.String())
+			c.message = nil
 			c.Terminate()
 			return
 		}
@@ -78,6 +79,7 @@ func (c *Client) Run() {
 func (c *Client) Exit() {
 	c.exitChan <- true
 }
+
 func (c *Client) Node() Node {
 	return c.node
 }

@@ -133,4 +133,6 @@ func (p *SocketPeer) ReadMessage() chan Message {
 
 func (p *SocketPeer) Terminate() {
 	p.Conn.Close()
+	close(p.RcvChan)
+	close(p.exitChan)
 }

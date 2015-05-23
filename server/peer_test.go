@@ -145,7 +145,7 @@ func startTestServer() {
 }
 
 func handleConnection(peer *SocketPeer) {
-	fmt.Println("Client %v connected.", peer.Conn.RemoteAddr())
+	fmt.Printf("Client %v connected.", peer.Conn.RemoteAddr(), "\n")
 	for {
 		m, err := peer.Receive()
 		if err != nil {

@@ -2,7 +2,7 @@ package server
 
 import (
 	"fmt"
-	"time"
+	//"time"
 )
 
 // Orchestrator takes cares on all cluster related tasks
@@ -103,16 +103,18 @@ func (h *handleClient) connect() *Client {
 	result := make(chan *Client, 0)
 	go func() {
 		for {
-			c, err := StartClient(h.node)
-			if err == nil {
-				result <- c
-			}
+			/*			c, err := StartDialClient(h.node)
+						if err == nil {
+							result <- c
+						}
 
-			fmt.Println("Error ", err)
-			time.Sleep(time.Second * 1)
+						fmt.Println("Error ", err)
+						time.Sleep(time.Second * 1)*/
 		}
 	}()
 
 	r := <-result
 	return r
 }
+
+//BIND MANY CHANNELS TO ONE AND HANDLE all
