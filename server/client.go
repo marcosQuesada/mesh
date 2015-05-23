@@ -37,6 +37,7 @@ func StartDialClient(node *Node) *Client {
 			break
 		}
 	}
+	fmt.Println("Dial client started, err: ", err)
 	return &Client{
 		Peer:     NewJSONSocketPeer(conn),
 		node:     node,

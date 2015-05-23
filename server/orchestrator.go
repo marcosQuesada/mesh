@@ -91,10 +91,10 @@ func (o *Orchestrator) bootClients() {
 				}
 				o.inChan <- m
 				o.clientHandler.Accept(c)
+				fmt.Println("Client Achieved: ", node)
 			}()
 		}
 
-		fmt.Println("Client Achieved: ", node)
 	}
 	done.Wait()
 

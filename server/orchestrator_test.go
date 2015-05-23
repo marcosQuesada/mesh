@@ -10,8 +10,8 @@ import (
 
 func TestBasicOrchestrator(t *testing.T) {
 
-	startBasicTestServer()
-	node := &Node{host: "localhost", port: 8005}
+	go startBasicTestServer()
+	node := &Node{host: "localhost", port: 9011}
 
 	members := make(map[*Node]bool, 1)
 	members[node] = false
@@ -26,21 +26,24 @@ func TestBasicOrchestrator(t *testing.T) {
 	}
 }
 
-func startBasicTestServer() {
-	port := ":8005"
+func startBasicTestServer() error {
+	port := ":9011"
 	fmt.Println("Starting server: ", port)
 	listener, err := net.Listen("tcp", port)
 	if err != nil {
 		fmt.Println("Error starting Socket Server: ", err)
-		return
+		//return err
 	}
 
+	fmt.Println("Before accept")
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
 			fmt.Println("Error accepting: ", err)
 			continue
 		}
+		defer listener.Close()
+		fmt.Println("Accepted")
 		peer := NewJSONSocketPeer(conn)
 		go handleBasicConnection(peer)
 	}
@@ -48,13 +51,14 @@ func startBasicTestServer() {
 
 func handleBasicConnection(peer *SocketPeer) {
 	fmt.Printf("Client %v connected.", peer.Conn.RemoteAddr(), "\n")
+	defer peer.Conn.Close()
 	for {
 		m, err := peer.Receive()
 		if err != nil {
 			if err != io.EOF {
 				fmt.Println("Error Receiving: ", err)
 			}
-			peer.Conn.Close()
+			//peer.Conn.Close()
 			break
 		}
 		err = peer.Send(m)
@@ -65,3 +69,6 @@ func handleBasicConnection(peer *SocketPeer) {
 
 	fmt.Println("Connection from %v closed.", peer.Conn.RemoteAddr())
 }
+
+/*
+ */

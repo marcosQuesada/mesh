@@ -139,6 +139,7 @@ func startTestServer() {
 			fmt.Println("Error accepting: ", err)
 			continue
 		}
+		defer listener.Close()
 		peer := NewJSONSocketPeer(conn)
 		go handleConnection(peer)
 	}
