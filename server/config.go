@@ -8,13 +8,11 @@ import (
 )
 
 type Config struct {
-	addr          *Node
-	raft_addr     *Node
-	raft_data_dir string
-	raft_cluster  []*Node
+	addr    *Node
+	cluster []*Node
 }
 
-func NewConfig(addr, raftAddr, raftCluster, raftDataDir string) *Config {
+func NewConfig(addr, cluster string) *Config {
 	addrNode, err := parse(addr)
 	if err != nil {
 		log.Println("Error parsing Local Address ", addr)
@@ -22,18 +20,9 @@ func NewConfig(addr, raftAddr, raftCluster, raftDataDir string) *Config {
 		return nil
 	}
 
-	raftAddrNode, err := parse(raftAddr)
-	if err != nil {
-		log.Println("Error parsing Raft Address ", raftAddrNode)
-
-		return nil
-	}
-
 	return &Config{
-		addr:          addrNode,
-		raft_addr:     raftAddrNode,
-		raft_data_dir: raftDataDir,
-		raft_cluster:  parseList(raftCluster),
+		addr:    addrNode,
+		cluster: parseList(cluster),
 	}
 }
 

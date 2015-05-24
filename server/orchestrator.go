@@ -28,9 +28,8 @@ type Orchestrator struct {
 	members       map[*Node]bool
 	clients       map[*Node]*Client
 	inChan        chan memberUpdate
+	mainChan      chan Message // Used as aggregated channel from Client Peers
 	exitChan      chan bool
-
-	mainChan chan Message // Used as aggregates channel
 }
 
 func StartOrchestrator(members map[*Node]bool) *Orchestrator {
@@ -56,10 +55,8 @@ func (o *Orchestrator) Run() {
 			fmt.Println("Handle Update ", m)
 			switch m.event {
 			case ClientStatusConnected:
-				fmt.Println("Event Status Connected ", m)
 				o.members[m.node] = true
 			case ClientStatusError:
-				fmt.Println("Event Status Error ", m)
 				o.members[m.node] = false
 				o.clients[m.node] = nil
 			}
@@ -122,22 +119,20 @@ func (o *Orchestrator) bootClients() {
 		}
 	}
 	done.Wait()
-
-	fmt.Println("Done Initialicing")
 }
 
 func (o *Orchestrator) consumeMainChannel() {
-	fmt.Println("Start consume Main Channel")
 	for {
 		select {
 		case m := <-o.mainChan:
 			fmt.Println("Received Message on Main Channel ", m)
+			//
+			// Consumers may be exported
 		}
 	}
 }
 
 func (o *Orchestrator) aggregate(c chan Message) {
-	fmt.Println("Aggregating receive chan")
 	go func() {
 		for {
 			select {
@@ -145,8 +140,5 @@ func (o *Orchestrator) aggregate(c chan Message) {
 				o.mainChan <- m
 			}
 		}
-		fmt.Println("Aggregating receive chan Done")
 	}()
 }
-
-//BIND MANY CHANNELS TO ONE AND HANDLE all

@@ -37,7 +37,6 @@ type SocketPeer struct {
 }
 
 func NewJSONSocketPeer(conn net.Conn) *SocketPeer {
-	fmt.Println("Socket Peer conn origin: ", conn.RemoteAddr())
 	id, err := uuid.NewV4()
 	if err != nil {
 		fmt.Println("error:", err)

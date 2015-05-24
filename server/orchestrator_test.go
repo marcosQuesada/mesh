@@ -38,7 +38,6 @@ func TestBasicOrchestrator(t *testing.T) {
 	if len(clients) != 1 {
 		t.Error("Unexpected client registered size", clients)
 	}
-	fmt.Println("clients", clients)
 
 	_, ok := clients["localhost:9011"]
 	if !ok {

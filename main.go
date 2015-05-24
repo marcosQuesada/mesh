@@ -14,10 +14,8 @@ func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
 	//Parse config
-	addr := flag.String("addr", "127.0.0.1:11000", "Port where Mesh is listen on")
-	raftAddr := flag.String("raft_addr", "127.0.0.1:12000", "cluster node listening address")
-	raftCluster := flag.String("raft_cluster", "127.0.0.1:12000,127.0.0.2:12001,127.0.0.3:12002", "cluster list definition separated by commas")
-	raftDataDir := flag.String("raft_data_dir", "./data/var0", "raft data store path")
+	addr := flag.String("addr", "127.0.0.1:12000", "Port where Mesh is listen on")
+	cluster := flag.String("cluster", "127.0.0.1:12000,127.0.0.2:12001,127.0.0.3:12002", "cluster list definition separated by commas")
 	//logFile := flag.String("logFile", "./log/log0.log", "log file")
 	flag.Parse()
 
@@ -28,7 +26,7 @@ func main() {
 	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
 
 	//Create COnfiguration
-	config := server.NewConfig(*addr, *raftAddr, *raftCluster, *raftDataDir)
+	config := server.NewConfig(*addr, *cluster)
 	//Define serfer from config
 	s := server.New(config)
 	c := make(chan os.Signal, 1)

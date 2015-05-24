@@ -1,7 +1,6 @@
 package server
 
 import (
-	"fmt"
 	"net"
 	"testing"
 )
@@ -48,12 +47,6 @@ func TestClientMessagingUnderPipes(t *testing.T) {
 		return
 	}()
 
-	/*	msg := Hello{
-			Id:      0,
-			Details: map[string]interface{}{"foo": "bar"},
-		}
-		c1.Send(msg)
-		c2.Send(msg)*/
 	c1.SayHello()
 	c2.SayHello()
 
@@ -64,7 +57,6 @@ func TestClientMessagingUnderPipes(t *testing.T) {
 	r := make([]Message, 0)
 	for k := range resChan {
 		r = append(r, k)
-		fmt.Println("k ", k)
 	}
 
 	if len(r) != 2 {

@@ -22,7 +22,7 @@ func New(c *Config) *Server {
 
 		config: c,
 		exit:   make(chan bool),
-		node:   c.raft_addr,
+		node:   c.addr,
 	}
 }
 
@@ -47,9 +47,9 @@ func (s *Server) Close() {
 }
 
 func (s *Server) startServer() {
-	log.Print("Starting server: ", s.config.raft_addr.String())
+	log.Print("Starting server: ", s.config.addr.String())
 
-	listener, err := net.Listen("tcp", string(s.config.raft_addr.String()))
+	listener, err := net.Listen("tcp", string(s.config.addr.String()))
 	if err != nil {
 		log.Println("Error starting Socket Server: ", err)
 		return

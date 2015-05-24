@@ -62,7 +62,6 @@ func (c *Client) ReceiveChan() chan Message {
 }
 
 func (c *Client) SayHello() {
-	fmt.Println("Before Send")
 	msg := Hello{
 		Id:      0,
 		Details: map[string]interface{}{"foo": "bar"},
@@ -71,7 +70,6 @@ func (c *Client) SayHello() {
 }
 
 func (c *Client) Run() {
-
 	defer fmt.Println("Exiting Client Run")
 
 	r := make(chan interface{}, 0)

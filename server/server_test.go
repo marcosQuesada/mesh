@@ -9,7 +9,7 @@ import (
 
 func TestBasicServerClient(t *testing.T) {
 	config := &Config{
-		raft_addr: &Node{host: "localhost", port: 8001},
+		addr: &Node{host: "localhost", port: 8001},
 	}
 
 	srv := New(config)
