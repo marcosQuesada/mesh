@@ -19,6 +19,7 @@ type Peer interface {
 	Id() ID
 	Remote() net.Addr //.String()
 	Receive() (Message, error)
+	ReceiveTimeout() (Message, error)
 	Send(Message) error
 	ReadMessage() chan Message
 	Terminate()

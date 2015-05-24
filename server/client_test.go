@@ -48,12 +48,14 @@ func TestClientMessagingUnderPipes(t *testing.T) {
 		return
 	}()
 
-	msg := Hello{
-		Id:      0,
-		Details: map[string]interface{}{"foo": "bar"},
-	}
-	c1.Send(msg)
-	c2.Send(msg)
+	/*	msg := Hello{
+			Id:      0,
+			Details: map[string]interface{}{"foo": "bar"},
+		}
+		c1.Send(msg)
+		c2.Send(msg)*/
+	c1.SayHello()
+	c2.SayHello()
 
 	c1.Exit()
 	c2.Exit()

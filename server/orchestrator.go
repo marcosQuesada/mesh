@@ -29,6 +29,8 @@ type Orchestrator struct {
 	clients       map[*Node]*Client
 	inChan        chan memberUpdate
 	exitChan      chan bool
+
+	mainChan chan Message // Used as aggregates channel
 }
 
 func StartOrchestrator(members map[*Node]bool) *Orchestrator {
@@ -38,22 +40,26 @@ func StartOrchestrator(members map[*Node]bool) *Orchestrator {
 		clients:       make(map[*Node]*Client, 0),
 		inChan:        make(chan memberUpdate, 0),
 		exitChan:      make(chan bool, 0),
+
+		mainChan: make(chan Message, 0),
 	}
 }
 
 func (o *Orchestrator) Run() {
+	defer fmt.Println("Exiting Orchestrator Run")
+	go o.consumeMainChannel()
 	o.bootClients()
 	//handle updates from members
 	for {
 		select {
 		case m := <-o.inChan:
-			fmt.Print("Handle Update ", m)
+			fmt.Println("Handle Update ", m)
 			switch m.event {
 			case ClientStatusConnected:
-				fmt.Print("Event Status Connected ", m)
+				fmt.Println("Event Status Connected ", m)
 				o.members[m.node] = true
 			case ClientStatusError:
-				fmt.Print("Event Status Error ", m)
+				fmt.Println("Event Status Error ", m)
 				o.members[m.node] = false
 				o.clients[m.node] = nil
 			}
@@ -87,39 +93,60 @@ func (o *Orchestrator) bootClients() {
 				o.clients[node] = c
 				done.Done()
 
-				msg := Hello{
-					Id:      0,
-					Details: map[string]interface{}{"foo": "bar"},
-				}
-				c.Send(msg)
-
+				//Say Hello and wait response
+				c.SayHello()
 				//Blocking call again until response
 				rsp := <-c.ReceiveChan()
-
-				var m memberUpdate
 				switch rsp.(type) {
 				case *Welcome:
 					o.clientHandler.Accept(c)
-					fmt.Println("response Welcome", rsp.(*Welcome))
-					m = memberUpdate{
+					fmt.Println("Client has received Welcome", rsp.(*Welcome))
+					o.inChan <- memberUpdate{
 						node:  node,
 						event: ClientStatusConnected,
 					}
+
+					//aggregate receiveChan to mainChan
+					o.aggregate(c.ReceiveChan())
 					fmt.Println("Client Achieved: ", node)
 				case *Abort:
 					fmt.Println("response Abort ", rsp.(*Abort))
-					m = memberUpdate{
+					o.inChan <- memberUpdate{
 						node:  node,
 						event: ClientStatusError,
 					}
 				default:
 					fmt.Println("Unexpected type On response ")
 				}
-				o.inChan <- m
 			}()
 		}
 	}
 	done.Wait()
+
+	fmt.Println("Done Initialicing")
+}
+
+func (o *Orchestrator) consumeMainChannel() {
+	fmt.Println("Start consume Main Channel")
+	for {
+		select {
+		case m := <-o.mainChan:
+			fmt.Println("Received Message on Main Channel ", m)
+		}
+	}
+}
+
+func (o *Orchestrator) aggregate(c chan Message) {
+	fmt.Println("Aggregating receive chan")
+	go func() {
+		for {
+			select {
+			case m := <-c:
+				o.mainChan <- m
+			}
+		}
+		fmt.Println("Aggregating receive chan Done")
+	}()
 }
 
 //BIND MANY CHANNELS TO ONE AND HANDLE all

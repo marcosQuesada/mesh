@@ -17,6 +17,7 @@ type PeerClient interface {
 	Exit()
 	ReceiveChan() chan Message
 	Send(Message) error
+	SayHello() // Pending to remove, must be internal
 }
 
 type Client struct {
@@ -60,7 +61,19 @@ func (c *Client) ReceiveChan() chan Message {
 	return c.message
 }
 
+func (c *Client) SayHello() {
+	fmt.Println("Before Send")
+	msg := Hello{
+		Id:      0,
+		Details: map[string]interface{}{"foo": "bar"},
+	}
+	c.Send(msg)
+}
+
 func (c *Client) Run() {
+
+	defer fmt.Println("Exiting Client Run")
+
 	r := make(chan interface{}, 0)
 	for {
 		go func() {
@@ -70,6 +83,7 @@ func (c *Client) Run() {
 					fmt.Println("Error Receiving: ", err)
 				}
 				r <- err
+				return
 			}
 			r <- m
 		}()

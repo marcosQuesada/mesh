@@ -79,3 +79,5 @@ func (f *fakeClient) ReceiveChan() (v chan Message) {
 }
 func (f *fakeClient) Exit() {
 }
+func (f *fakeClient) SayHello() {
+}
