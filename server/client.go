@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"time"
 )
 
 const (
@@ -34,6 +35,7 @@ func StartDialClient(node *Node) *Client {
 		conn, err = net.Dial("tcp", string(node.String()))
 		if err != nil {
 			fmt.Println("dial error:", err)
+			time.Sleep(time.Second)
 		} else {
 			break
 		}
