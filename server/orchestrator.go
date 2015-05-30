@@ -24,6 +24,7 @@ type memberUpdate struct {
 }
 
 type Orchestrator struct {
+	from          *Node
 	clientHandler ClientHandler
 	members       map[string]*Node
 	clients       map[string]*Client
@@ -32,7 +33,7 @@ type Orchestrator struct {
 	exitChan      chan bool
 }
 
-func StartOrchestrator(members map[string]*Node) *Orchestrator {
+func StartOrchestrator(from *Node, members map[string]*Node) *Orchestrator {
 	return &Orchestrator{
 		clientHandler: DefaultClientHandler(),
 		members:       members,
@@ -71,7 +72,7 @@ func (o *Orchestrator) Run() {
 }
 
 func (o *Orchestrator) State() bool {
-	for _, s := range o.members {
+	for _, s := range o.clients {
 		if s == nil {
 			return false
 		}
@@ -89,9 +90,8 @@ func (o *Orchestrator) bootClients() {
 			go func(n *Node, nodeString string) {
 				//Blocking call, wait until connection success
 				log.Println("Starting Dial Client on Node ", nodeString)
-				c = StartDialClient(n)
+				c = StartDialClient(o.from, n)
 				go c.Run()
-				o.clients[n.String()] = c
 				done.Done()
 
 				//Say Hello and wait response
@@ -100,8 +100,10 @@ func (o *Orchestrator) bootClients() {
 				rsp := <-c.ReceiveChan()
 				switch rsp.(type) {
 				case *Welcome:
+					log.Println("Client has received Welcome from", n.String(), rsp.(*Welcome))
+					log.Println("Assign Client node:", n.String())
+					o.clients[n.String()] = c
 					o.clientHandler.Accept(c)
-					log.Println("Client has received Welcome from", n, rsp.(*Welcome))
 					o.inChan <- memberUpdate{
 						node:  n,
 						event: ClientStatusConnected,
@@ -111,7 +113,7 @@ func (o *Orchestrator) bootClients() {
 					o.aggregate(c.ReceiveChan())
 					log.Println("Client Achieved: ", n)
 				case *Abort:
-					log.Println("response Abort ", rsp.(*Abort))
+					log.Println("Response Abort ", rsp.(*Abort), " remote node:", n.String())
 					o.inChan <- memberUpdate{
 						node:  n,
 						event: ClientStatusError,

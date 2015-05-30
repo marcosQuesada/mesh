@@ -21,11 +21,12 @@ func TestMain(m *testing.M) {
 }
 
 func TestBasicOrchestrator(t *testing.T) {
+	from := &Node{host: "localhost", port: 9000}
 	node := &Node{host: "localhost", port: 9011}
 	members := make(map[string]*Node, 1)
 	members[node.String()] = node
 
-	o = StartOrchestrator(members)
+	o = StartOrchestrator(from, members)
 	go o.Run()
 
 	time.Sleep(time.Millisecond * 100)
@@ -82,7 +83,7 @@ func startBasicTestServer() error {
 			//say ping to test what happen
 			pingMsg := &Ping{
 				Id:      123,
-				From:    ID(9),
+				From:    &Node{},
 				Details: map[string]interface{}{"foo": "bar"},
 			}
 			c.Send(pingMsg)

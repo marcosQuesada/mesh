@@ -17,7 +17,7 @@ type Server struct {
 
 func New(c *Config) *Server {
 	return &Server{
-		Router: NewRouter(),
+		Router: NewRouter(c.addr),
 
 		config: c,
 		exit:   make(chan bool),
@@ -31,7 +31,7 @@ func (s *Server) Run() {
 	s.startServer()
 
 	// StartOrchestrator
-	st := StartOrchestrator(s.config.cluster)
+	st := StartOrchestrator(s.node, s.config.cluster)
 	go st.Run()
 
 	for {
@@ -90,7 +90,7 @@ func (s *Server) handleConnection(peer *SocketPeer) {
 		}
 
 		log.Println("Received Message ", msg)
-		peer.RcvChan <- msg
+		//		peer.RcvChan <- msg
 	}
 }
 

@@ -1,7 +1,7 @@
 package server
 
 import (
-	"fmt"
+	"log"
 )
 
 type Router interface {
@@ -10,20 +10,21 @@ type Router interface {
 
 type defaultRouter struct {
 	Broker
-
+	node *Node
 	exit chan bool
 }
 
-func NewRouter() *defaultRouter {
+func NewRouter(n *Node) *defaultRouter {
 	return &defaultRouter{
-		Broker: NewBroker(),
+		Broker: NewBroker(n),
+		node:   n,
 		exit:   make(chan bool),
 	}
 }
 
 func (r *defaultRouter) Accept(p Peer) {
 	defer close(r.exit)
-	fmt.Println("Router accepting peer: ", p.Id())
+	log.Println("Router accepting peer: ", p.Id())
 	for {
 		select {
 		case <-r.exit:
@@ -31,27 +32,27 @@ func (r *defaultRouter) Accept(p Peer) {
 		case msg := <-p.ReadMessage():
 			switch msg.(type) {
 			case *Hello:
-				fmt.Println("Router Hello", msg.(*Hello))
+				log.Println("Router Hello", msg.(*Hello))
 				result := r.Broker.Accept(p, msg.(*Hello))
 				p.Send(result)
 
 			case *Welcome:
-				fmt.Println("Router Welcome: ", msg.(*Welcome))
+				log.Println("Router Welcome: ", msg.(*Welcome))
 				a := msg.(*Welcome)
 				p.Send(&Error{Id: a.Id, Details: a.Details})
 
 			case *Abort:
-				fmt.Println("Router Abort: ", msg.(*Abort))
+				log.Println("Router Abort: ", msg.(*Abort))
 				a := msg.(*Abort)
 				p.Send(&Error{Id: a.Id, Details: a.Details})
 
 			case *Ping:
 				result := r.Broker.Ping(p, msg.(*Ping))
 				p.Send(result)
-				fmt.Println("Router Ping: ", msg.(*Ping))
+				log.Println("Router Ping: ", msg.(*Ping))
 
 			case *Pong:
-				fmt.Println("Router Pong: ", msg.(*Pong))
+				log.Println("Router Pong: ", msg.(*Pong))
 				pong := msg.(*Pong)
 				p.Send(&Error{Id: pong.Id, Details: pong.Details})
 

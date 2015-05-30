@@ -25,13 +25,13 @@ func TestPeersOnPipes(t *testing.T) {
 	tp := &testPeerHandler{
 		outChan: make(chan *Hello, 1),
 	}
-	go tp.handlePeer(peerA)
-	go tp.handlePeer(peerB)
+	go tp.handlePeer(peerA, &Node{host: "localhost", port: 5000})
+	go tp.handlePeer(peerB, &Node{host: "localhost", port: 5005})
 
 	//first message
 	msg := Hello{
 		Id:      0,
-		From:    peerA.Id(),
+		From:    &Node{host: "localhost", port: 5000},
 		Details: map[string]interface{}{"foo": "bar"},
 	}
 	peerA.Send(msg)
@@ -50,7 +50,7 @@ func TestPeersOnPipes(t *testing.T) {
 	}
 }
 
-func (ph *testPeerHandler) handlePeer(p *SocketPeer) {
+func (ph *testPeerHandler) handlePeer(p *SocketPeer, from *Node) {
 	defer func() {
 		ph.outChan <- ph.lastMsg
 	}()
@@ -74,7 +74,7 @@ func (ph *testPeerHandler) handlePeer(p *SocketPeer) {
 			newMsg.Details["foo"] = "PONG"
 		}
 		newMsg.Id++
-		newMsg.From = p.Id()
+		newMsg.From = from
 
 		err = p.Send(newMsg)
 		if err != nil {

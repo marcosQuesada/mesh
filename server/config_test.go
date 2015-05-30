@@ -19,6 +19,10 @@ func TestParseOnSuccess(t *testing.T) {
 		t.Error("Bad Result parsing Node List, expected 3, are:", nodes)
 	}
 
+	if nodes["127.0.0.1:12000"] == nil {
+		t.Error("Bad Result parsing , Unexpected host", nodes["127.0.0.1:12000"])
+	}
+
 	if nodes["127.0.0.1:12000"].host != "127.0.0.1" {
 		t.Error("Bad Result parsing , Unexpected host", nodes["127.0.0.1:12000"])
 	}

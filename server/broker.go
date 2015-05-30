@@ -11,12 +11,13 @@ type Broker interface {
 }
 
 type defaultBroker struct {
+	from *Node
 	//PeerHandler
 }
 
-func NewBroker() *defaultBroker {
+func NewBroker(from *Node) *defaultBroker {
 	return &defaultBroker{
-	//PeerHandler: DefaultPeerHandler(),
+		from: from,
 	}
 }
 
@@ -27,11 +28,11 @@ func (b *defaultBroker) Accept(p Peer, h *Hello) Message {
 			return &Abort{Id: h.Id, From: p.Id(), Details: map[string]interface{}{"foo_bar": 1231}}
 		}*/
 
-	return &Welcome{Id: h.Id, From: p.Id(), Details: map[string]interface{}{"foo_bar": 1231}}
+	return &Welcome{Id: h.Id, From: b.from, Details: map[string]interface{}{"foo_bar": 1231}}
 }
 
 func (b *defaultBroker) Ping(p Peer, pi *Ping) Message {
-	return &Pong{Id: pi.Id, From: p.Id(), Details: map[string]interface{}{"foo_bar": 1231}}
+	return &Pong{Id: pi.Id, From: b.from, Details: map[string]interface{}{"foo_bar": 1231}}
 }
 
 func (b *defaultBroker) GoodBye(p Peer, g *GoodBye) Message {
@@ -40,5 +41,5 @@ func (b *defaultBroker) GoodBye(p Peer, g *GoodBye) Message {
 		if err != nil {
 			return &Abort{Id: g.Id, From: p.Id(), Details: map[string]interface{}{"foo_bar": 1231}}
 		}*/
-	return &GoodBye{Id: g.Id, From: p.Id(), Details: map[string]interface{}{"foo_bar": 1231}}
+	return &GoodBye{Id: g.Id, From: b.from, Details: map[string]interface{}{"foo_bar": 1231}}
 }

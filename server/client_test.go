@@ -11,6 +11,7 @@ func TestClientMessagingUnderPipes(t *testing.T) {
 	n1 := &Node{host: "foo", port: 5678}
 	c1 := &Client{
 		Peer:     NewJSONSocketPeer(a),
+		from:     &Node{host: "192.168.1.1", port: 8000},
 		node:     n1,
 		message:  make(chan Message, 0),
 		exitChan: make(chan bool),
@@ -20,6 +21,7 @@ func TestClientMessagingUnderPipes(t *testing.T) {
 	n2 := &Node{host: "bar", port: 5678}
 	c2 := &Client{
 		Peer:     NewJSONSocketPeer(b),
+		from:     &Node{host: "192.168.1.10", port: 8000},
 		node:     n2,
 		message:  make(chan Message, 0),
 		exitChan: make(chan bool),
@@ -65,10 +67,10 @@ func TestClientMessagingUnderPipes(t *testing.T) {
 
 	h1 := r[0].(*Hello)
 	if h1.Id != 2 {
-		t.Error("Unexpected First Id received ", h1.Id)
+		t.Error("Unexpected First Id received ", h1)
 	}
 	h2 := r[1].(*Hello)
 	if h2.Id != 1 {
-		t.Error("Unexpected First Id received ", h1.Id)
+		t.Error("Unexpected First Id received ", h2)
 	}
 }

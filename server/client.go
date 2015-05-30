@@ -24,12 +24,13 @@ type PeerClient interface {
 
 type Client struct {
 	Peer
+	from     *Node
 	node     *Node
 	message  chan Message
 	exitChan chan bool
 }
 
-func StartDialClient(node *Node) *Client {
+func StartDialClient(from *Node, node *Node) *Client {
 	var conn net.Conn
 	var err error
 	for {
@@ -43,6 +44,7 @@ func StartDialClient(node *Node) *Client {
 	}
 
 	return &Client{
+		from:     from,
 		Peer:     NewJSONSocketPeer(conn),
 		node:     node,
 		message:  make(chan Message, 0),
@@ -51,7 +53,6 @@ func StartDialClient(node *Node) *Client {
 }
 
 func StartAcceptClient(conn net.Conn) *Client {
-
 	return &Client{
 		Peer: NewJSONSocketPeer(conn),
 		//node:     node,
@@ -67,6 +68,7 @@ func (c *Client) ReceiveChan() chan Message {
 func (c *Client) SayHello() {
 	msg := Hello{
 		Id:      0,
+		From:    c.from,
 		Details: map[string]interface{}{"foo": "bar"},
 	}
 	c.Send(msg)
