@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"log"
 	"time"
 )
 
@@ -45,13 +46,13 @@ func (c *coordinator) run() {
 			switch msg.MessageType() {
 			case HELLO:
 				cmd := msg.(*Hello)
-				fmt.Println("HELLO Message", cmd.Id)
+				log.Println("HELLO Message", cmd.Id)
 			case WELCOME:
 				cmd := msg.(*Welcome)
-				fmt.Println("Welcome Message", cmd.Id)
+				log.Println("Welcome Message", cmd.Id)
 			case ABORT:
 				cmd := msg.(*Abort)
-				fmt.Println("Abort Message", cmd.Id)
+				log.Println("Abort Message", cmd.Id)
 			}
 		}
 	}

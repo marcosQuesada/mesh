@@ -15,7 +15,7 @@ func main() {
 
 	//Parse config
 	addr := flag.String("addr", "127.0.0.1:12000", "Port where Mesh is listen on")
-	cluster := flag.String("cluster", "127.0.0.1:12000,127.0.0.2:12001,127.0.0.3:12002", "cluster list definition separated by commas")
+	cluster := flag.String("cluster", "127.0.0.1:12000,127.0.0.1:12001,127.0.0.1:12002", "cluster list definition separated by commas")
 	//logFile := flag.String("logFile", "./log/log0.log", "log file")
 	flag.Parse()
 

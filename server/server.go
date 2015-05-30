@@ -1,7 +1,6 @@
 package server
 
 import (
-	"fmt"
 	"io"
 	"log"
 	"net"
@@ -97,7 +96,7 @@ func (s *Server) handleConnection(peer *SocketPeer) {
 			//s.PeerHandler.Notify(peer.Id(), err)
 		}
 
-		fmt.Println("Received Message ", msg)
+		log.Println("Received Message ", msg)
 		peer.RcvChan <- msg
 	}
 }

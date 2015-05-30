@@ -3,6 +3,7 @@ package server
 import (
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"time"
 )
@@ -34,7 +35,7 @@ func StartDialClient(node *Node) *Client {
 	for {
 		conn, err = net.Dial("tcp", string(node.String()))
 		if err != nil {
-			fmt.Println("dial error:", err)
+			log.Println("dial error:", err)
 			time.Sleep(time.Second)
 		} else {
 			break
@@ -72,7 +73,7 @@ func (c *Client) SayHello() {
 }
 
 func (c *Client) Run() {
-	defer fmt.Println("Exiting Client Run")
+	defer log.Println("Exiting Client Run")
 
 	r := make(chan interface{}, 0)
 	for {
@@ -80,7 +81,7 @@ func (c *Client) Run() {
 			m, err := c.Receive()
 			if err != nil {
 				if err != io.EOF {
-					fmt.Println("Error Receiving: ", err)
+					log.Println("Error Receiving: ", err)
 				}
 				r <- err
 				return
@@ -92,12 +93,19 @@ func (c *Client) Run() {
 		case msg := <-r:
 			switch t := msg.(type) {
 			case error:
-				fmt.Println("Error Receiving on server, err ", t)
+				log.Println("Error Receiving on server, err ", t)
+				if c.node != nil {
+					log.Println("Error Receiving exiting client Peer:", c.node.String())
+				}
+				return
 			case Message:
-				fmt.Println("Client Message received: ", t.(Message))
+				log.Println("Client Message received: ", t.(Message))
+				if c.node != nil {
+					log.Println(" from: ", c.node.String())
+				}
 				c.message <- t.(Message)
 			default:
-				fmt.Printf("unexpected type %T", t)
+				log.Println("unexpected type %T", t)
 			}
 		case <-c.exitChan:
 			fmt.Printf("Exiting Client Peer: ", c.node.String())

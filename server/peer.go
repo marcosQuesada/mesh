@@ -39,7 +39,7 @@ type SocketPeer struct {
 func NewJSONSocketPeer(conn net.Conn) *SocketPeer {
 	id, err := uuid.NewV4()
 	if err != nil {
-		fmt.Println("error:", err)
+		log.Println("error:", err)
 		return nil
 	}
 	return &SocketPeer{
