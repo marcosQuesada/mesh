@@ -30,15 +30,8 @@ func (s *Server) Run() {
 
 	s.startServer()
 
-	//@TODO: Remove it!!!!
-	// ISSUE maps[*Node] is a unique index, but has no node address representation
-	r := make(map[*Node]bool, len(s.config.cluster))
-	for _, v := range s.config.cluster {
-		r[v] = false
-	}
-
 	// StartOrchestrator
-	st := StartOrchestrator(r)
+	st := StartOrchestrator(s.config.cluster)
 	go st.Run()
 
 	for {

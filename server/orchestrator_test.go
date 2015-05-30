@@ -22,8 +22,8 @@ func TestMain(m *testing.M) {
 
 func TestBasicOrchestrator(t *testing.T) {
 	node := &Node{host: "localhost", port: 9011}
-	members := make(map[*Node]bool, 1)
-	members[node] = false
+	members := make(map[string]*Node, 1)
+	members[node.String()] = node
 
 	o = StartOrchestrator(members)
 	go o.Run()

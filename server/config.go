@@ -9,7 +9,7 @@ import (
 
 type Config struct {
 	addr    *Node
-	cluster []*Node
+	cluster map[string]*Node
 }
 
 func NewConfig(addr, cluster string) *Config {
@@ -26,19 +26,19 @@ func NewConfig(addr, cluster string) *Config {
 	}
 }
 
-func parseList(raftCluster string) []*Node {
-	parts := strings.Split(raftCluster, ",")
+func parseList(clusterList string) map[string]*Node {
+	parts := strings.Split(clusterList, ",")
+	r := make(map[string]*Node, len(parts))
 	if len(parts) > 0 && len(parts[0]) > 0 {
 		log.Println("Parts are: ", parts)
-		var nodes []*Node
 		for _, nodePart := range parts {
 			node, err := parse(nodePart)
 			if err != nil {
 				continue
 			}
-			nodes = append(nodes, node)
+			r[node.String()] = node
 		}
-		return nodes
+		return r
 	}
 
 	return nil

@@ -25,18 +25,18 @@ type memberUpdate struct {
 
 type Orchestrator struct {
 	clientHandler ClientHandler
-	members       map[*Node]bool
-	clients       map[*Node]*Client //NOOOOOOO
+	members       map[string]*Node
+	clients       map[string]*Client
 	inChan        chan memberUpdate
 	mainChan      chan Message // Used as aggregated channel from Client Peers
 	exitChan      chan bool
 }
 
-func StartOrchestrator(members map[*Node]bool) *Orchestrator {
+func StartOrchestrator(members map[string]*Node) *Orchestrator {
 	return &Orchestrator{
 		clientHandler: DefaultClientHandler(),
 		members:       members,
-		clients:       make(map[*Node]*Client, 0),
+		clients:       make(map[string]*Client, 0),
 		inChan:        make(chan memberUpdate, 0),
 		exitChan:      make(chan bool, 0),
 
@@ -55,13 +55,13 @@ func (o *Orchestrator) Run() {
 			log.Println("Handle Update ", m, "State is: ", o.State())
 			switch m.event {
 			case ClientStatusConnected:
-				o.members[m.node] = true
+				o.members[m.node.String()] = m.node
 				if o.State() {
 					log.Println("Cluster Completed!")
 				}
 			case ClientStatusError:
-				o.members[m.node] = false
-				o.clients[m.node] = nil
+				o.members[m.node.String()] = nil
+				o.clients[m.node.String()] = nil
 			}
 		case <-o.exitChan:
 			return
@@ -72,7 +72,7 @@ func (o *Orchestrator) Run() {
 
 func (o *Orchestrator) State() bool {
 	for _, s := range o.members {
-		if !s {
+		if s == nil {
 			return false
 		}
 	}
@@ -82,16 +82,16 @@ func (o *Orchestrator) State() bool {
 
 func (o *Orchestrator) bootClients() {
 	var done sync.WaitGroup
-	for node, inService := range o.members {
-		if !inService {
+	for node, v := range o.members {
+		if v != nil {
 			var c *Client
 			done.Add(1)
-			go func(n *Node) {
+			go func(n *Node, nodeString string) {
 				//Blocking call, wait until connection success
-				log.Println("Starting Dial Client on Node ", n)
+				log.Println("Starting Dial Client on Node ", nodeString)
 				c = StartDialClient(n)
 				go c.Run()
-				o.clients[n] = c
+				o.clients[n.String()] = c
 				done.Done()
 
 				//Say Hello and wait response
@@ -119,7 +119,7 @@ func (o *Orchestrator) bootClients() {
 				default:
 					log.Println("Unexpected type On response ")
 				}
-			}(node)
+			}(v, node)
 		}
 	}
 	done.Wait()
