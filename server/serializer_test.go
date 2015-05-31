@@ -1,12 +1,11 @@
 package server
 
 import (
-	"fmt"
 	"testing"
 )
 
 func TestJsonSerializer(t *testing.T) {
-	node := Node{host: "localhost", port: 13123}
+	node := Node{Host: "localhost", Port: 13123}
 
 	msg := Hello{
 		Id:      10,
@@ -19,7 +18,6 @@ func TestJsonSerializer(t *testing.T) {
 	if err != nil {
 		t.Error("Unexpected error serializing ", err)
 	}
-	fmt.Println("Data is ", msg, string(data))
 
 	var rcvMessage Message
 	rcvMessage, err = s.Deserialize(data)

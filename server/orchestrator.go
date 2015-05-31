@@ -61,7 +61,8 @@ func (o *Orchestrator) Run() {
 					log.Println("Cluster Completed!", "Total Members:", len(o.members), "Total Clients:", len(o.clients))
 				}
 			case ClientStatusError:
-				log.Println("Client Exitting")
+				log.Println("Client Exitting", m.node)
+				return
 				/*				o.members[m.node.String()] = nil
 								o.clients[m.node.String()] = nil*/
 			}
@@ -85,18 +86,17 @@ func (o *Orchestrator) State() bool {
 func (o *Orchestrator) bootClients() {
 	var done sync.WaitGroup
 	for _, node := range o.members {
-		/*		if v != nil {*/
 		var c *Client
 		done.Add(1)
 		go func(n Node) {
 			//Blocking call, wait until connection success
-			log.Println("Starting Dial Client on Node ", o.from.String(), "destination: ", n.String())
+			//log.Println("Starting Dial Client on Node ", o.from.String(), "destination: ", n.String())
 			c = StartDialClient(o.from, n)
 			go c.Run()
 			done.Done()
 
 			//Say Hello and wait response
-			log.Println("Say Hello from ", n.String(), o.from.String())
+			//log.Println("Say Hello from ", o.from.String(), "to", n.String())
 			c.SayHello()
 			//Blocking call again until response
 			rsp := <-c.ReceiveChan()
@@ -112,7 +112,6 @@ func (o *Orchestrator) bootClients() {
 					}
 					return
 				} else {
-					log.Println("Assign Client node:", n.String())
 					o.clients[n.String()] = c
 					o.inChan <- memberUpdate{
 						node:  n,
@@ -133,7 +132,6 @@ func (o *Orchestrator) bootClients() {
 				log.Println("Unexpected type On response ")
 			}
 		}(node)
-		//}
 	}
 	done.Wait()
 }

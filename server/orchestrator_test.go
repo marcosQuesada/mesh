@@ -21,8 +21,8 @@ func TestMain(m *testing.M) {
 }
 
 func TestBasicOrchestrator(t *testing.T) {
-	from := Node{host: "localhost", port: 9000}
-	node := Node{host: "localhost", port: 9011}
+	from := Node{Host: "localhost", Port: 9000}
+	node := Node{Host: "localhost", Port: 9011}
 	members := make(map[string]Node, 1)
 	members[node.String()] = node
 

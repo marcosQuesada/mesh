@@ -23,8 +23,6 @@ func NewRouter(n Node, clh ClientHandler) *defaultRouter {
 }
 
 func (r *defaultRouter) Accept(p PeerClient) {
-	//defer close(r.exit)
-	log.Println("Router accepting peer: ", p.Id())
 	for {
 		select {
 		case <-r.exit:
@@ -33,14 +31,14 @@ func (r *defaultRouter) Accept(p PeerClient) {
 			log.Println("Msg Received ", msg)
 			switch msg.(type) {
 			case *Hello:
-				p.Identify(msg.(*Hello).From)
+				//p.Identify(msg.(*Hello).From)
 				err := r.clientHandler.Accept(p)
 				if err != nil {
-					log.Println("Error Accepting Peer !! ", err, " from ", r.node)
 					p.Send(&Abort{Id: msg.(*Hello).Id, From: r.node, Details: map[string]interface{}{"foo_bar": 1231}})
+					p.Exit()
+
 					return
 				}
-				log.Println("Welcome Accepting Peer !! from ", r.node)
 				p.Send(&Welcome{Id: msg.(*Hello).Id, From: r.node, Details: map[string]interface{}{"foo_bar": 1231}})
 			case *Welcome:
 				log.Println("Router Welcome: ", msg.(*Welcome))

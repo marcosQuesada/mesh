@@ -60,7 +60,7 @@ func parse(node string) (Node, error) {
 		return Node{}, err
 	}
 
-	return Node{host: p[0], port: int(port)}, nil
+	return Node{Host: p[0], Port: int(port)}, nil
 }
 
 func clear(node string) []string {

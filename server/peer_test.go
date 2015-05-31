@@ -25,13 +25,13 @@ func TestPeersOnPipes(t *testing.T) {
 	tp := &testPeerHandler{
 		outChan: make(chan *Hello, 1),
 	}
-	go tp.handlePeer(peerA, Node{host: "localhost", port: 5000})
-	go tp.handlePeer(peerB, Node{host: "localhost", port: 5005})
+	go tp.handlePeer(peerA, Node{Host: "localhost", Port: 5000})
+	go tp.handlePeer(peerB, Node{Host: "localhost", Port: 5005})
 
 	//first message
 	msg := Hello{
 		Id:      0,
-		From:    Node{host: "localhost", port: 5000},
+		From:    Node{Host: "localhost", Port: 5000},
 		Details: map[string]interface{}{"foo": "bar"},
 	}
 	peerA.Send(msg)

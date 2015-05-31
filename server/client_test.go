@@ -10,8 +10,8 @@ func TestClientMessagingUnderPipes(t *testing.T) {
 
 	c1 := &Client{
 		Peer:     NewJSONSocketPeer(a),
-		from:     Node{host: "192.168.1.1", port: 8000},
-		node:     Node{host: "foo", port: 5678},
+		from:     Node{Host: "192.168.1.1", Port: 8000},
+		node:     Node{Host: "foo", Port: 5678},
 		message:  make(chan Message, 0),
 		exitChan: make(chan bool),
 	}
@@ -19,8 +19,8 @@ func TestClientMessagingUnderPipes(t *testing.T) {
 
 	c2 := &Client{
 		Peer:     NewJSONSocketPeer(b),
-		from:     Node{host: "192.168.1.10", port: 8000},
-		node:     Node{host: "bar", port: 5678},
+		from:     Node{Host: "192.168.1.10", Port: 8000},
+		node:     Node{Host: "bar", Port: 5678},
 		message:  make(chan Message, 0),
 		exitChan: make(chan bool),
 	}

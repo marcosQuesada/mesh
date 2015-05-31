@@ -5,7 +5,7 @@ import (
 )
 
 func TestNodeAddress(t *testing.T) {
-	node := &Node{host: "localhost", port: 1234}
+	node := &Node{Host: "localhost", Port: 1234}
 	if node.String() != "localhost:1234" {
 		t.Error("Config Error Generating string address")
 	}
@@ -23,19 +23,19 @@ func TestParseOnSuccess(t *testing.T) {
 		t.Error("Bad Result parsing , Unexpected host", nodes["127.0.0.1:12000"])
 	}*/
 
-	if nodes["127.0.0.1:12000"].host != "127.0.0.1" {
+	if nodes["127.0.0.1:12000"].Host != "127.0.0.1" {
 		t.Error("Bad Result parsing , Unexpected host", nodes["127.0.0.1:12000"])
 	}
 
-	if nodes["127.0.0.1:12000"].port != 12000 {
+	if nodes["127.0.0.1:12000"].Port != 12000 {
 		t.Error("Bad Result parsing , Unexpected port", nodes["127.0.0.1:12000"])
 	}
 
-	if nodes["127.0.0.1:12001"].port != 12001 {
+	if nodes["127.0.0.1:12001"].Port != 12001 {
 		t.Error("Bad Result parsing , Unexpected port", nodes["127.0.0.1:12001"])
 	}
 
-	if nodes["127.0.0.1:12002"].port != 12002 {
+	if nodes["127.0.0.1:12002"].Port != 12002 {
 		t.Error("Bad Result parsing , Unexpected port", nodes["127.0.0.1:12002"])
 	}
 }

@@ -33,8 +33,8 @@ func TestErrorOnAddTwiceSameClient(t *testing.T) {
 	if err == nil {
 		t.Error("Unexpected Error Accepting PeerClient", err)
 	}
-	if err.Error() != "Client Already registered" {
-		t.Error("Unexpected error message")
+	if err.Error() != "Client: bar:1234 Already registered" {
+		t.Error("Unexpected error message", err.Error())
 	}
 }
 
@@ -66,7 +66,7 @@ type fakeClient struct {
 }
 
 func (f *fakeClient) Node() Node {
-	return Node{host: f.host, port: f.port}
+	return Node{Host: f.host, Port: f.port}
 }
 func (f *fakeClient) Id() ID {
 	return ID(0)
