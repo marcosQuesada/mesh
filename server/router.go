@@ -31,7 +31,8 @@ func (r *defaultRouter) Accept(p PeerClient) {
 			log.Println("Msg Received ", msg)
 			switch msg.(type) {
 			case *Hello:
-				//p.Identify(msg.(*Hello).From)
+				p.Identify(msg.(*Hello).From)
+				log.Println("Server Side, Identify Hello Request, Peer ORG ", msg.(*Hello).From)
 				err := r.clientHandler.Accept(p)
 				if err != nil {
 					p.Send(&Abort{Id: msg.(*Hello).Id, From: r.node, Details: map[string]interface{}{"foo_bar": 1231}})

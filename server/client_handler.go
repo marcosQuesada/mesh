@@ -21,6 +21,7 @@ type ClientHandler interface {
 	Remove(PeerClient) error
 	Notify(Node, error) //Used to get notifications of Client conn failures
 	Clients() map[string]PeerClient
+	Len() int
 }
 
 type defaultClientHandler struct {
@@ -41,13 +42,11 @@ func (h *defaultClientHandler) Accept(p PeerClient) error {
 	defer h.mutex.Unlock()
 
 	node := p.Node()
-	fmt.Println("On Accept ", node.String(), "peer:", p.Node(), " actual size: ", len(h.clients))
 	if _, ok := h.clients[node.String()]; ok {
 		return fmt.Errorf("Client: %s Already registered", node.String())
 	}
 	h.clients[node.String()] = p
-	fmt.Println("Accepted ", node.String(), "peer:", p.Node(), " actual size: ", len(h.clients), " - ", h.clients)
-
+	fmt.Println("XX Accepted Client type:", p.Mode(), " from: ", p.Node())
 	return nil
 }
 
@@ -77,4 +76,8 @@ func (h *defaultClientHandler) check() {
 	for k, v := range h.clients {
 		fmt.Println("Clients: id ", k, " v ", v)
 	}
+}
+
+func (h *defaultClientHandler) Len() int {
+	return len(h.clients)
 }

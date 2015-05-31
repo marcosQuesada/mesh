@@ -53,7 +53,7 @@ func (o *Orchestrator) Run() {
 	for {
 		select {
 		case m := <-o.inChan:
-			log.Println("Handle Update ", m, "State is: ", o.State())
+			//log.Println("Handle Update ", m, "State is: ", o.State())
 			switch m.event {
 			case ClientStatusConnected:
 				o.members[m.node.String()] = m.node
@@ -63,8 +63,6 @@ func (o *Orchestrator) Run() {
 			case ClientStatusError:
 				log.Println("Client Exitting", m.node)
 				return
-				/*				o.members[m.node.String()] = nil
-								o.clients[m.node.String()] = nil*/
 			}
 		case <-o.exitChan:
 			return
@@ -74,18 +72,30 @@ func (o *Orchestrator) Run() {
 }
 
 func (o *Orchestrator) State() bool {
-	for _, s := range o.clients {
-		if s == nil {
-			return false
+	log.Println("len is ", len(o.clients))
+	return o.clientHandler.Len() == (len(o.members) - 1)
+	/*
+		for k, s := range o.clients {
+			if k == o.from {
+				continue
+			}
+			if s == nil {
+				return false
+			}
 		}
-	}
 
-	return true
+		return true
+	*/
 }
 
 func (o *Orchestrator) bootClients() {
 	var done sync.WaitGroup
 	for _, node := range o.members {
+		//avoid local connexion
+		if node == o.from {
+			continue
+		}
+
 		var c *Client
 		done.Add(1)
 		go func(n Node) {
@@ -120,7 +130,7 @@ func (o *Orchestrator) bootClients() {
 
 					//aggregate receiveChan to mainChan
 					o.aggregate(c.ReceiveChan())
-					log.Println("Client Achieved: ", n)
+					log.Println("Client Achieved: ", n, "Cluster Status ", o.State())
 				}
 			case *Abort:
 				log.Println("Response Abort ", rsp.(*Abort), " remote node:", n.String())

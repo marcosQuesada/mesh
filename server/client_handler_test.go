@@ -85,3 +85,11 @@ func (f *fakeClient) SayHello() {
 }
 func (f *fakeClient) Identify(n Node) {
 }
+
+func (f *fakeClient) Mode() string {
+	return ""
+}
+
+func (f *fakeClient) From() Node {
+	return Node{Host: "fakeOrigin", Port: f.port}
+}
