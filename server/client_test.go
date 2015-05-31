@@ -50,8 +50,6 @@ func TestClientMessagingUnderPipes(t *testing.T) {
 	c1.SayHello()
 	c2.SayHello()
 
-	c1.Exit()
-	c2.Exit()
 	close(doneChan)
 
 	r := make([]Message, 0)
@@ -71,4 +69,6 @@ func TestClientMessagingUnderPipes(t *testing.T) {
 	if h2.Id != 1 {
 		t.Error("Unexpected First Id received ", h2)
 	}
+	c1.Exit()
+	c2.Exit()
 }

@@ -15,21 +15,22 @@ var done chan struct{} = make(chan struct{}, 0)
 
 func TestMain(m *testing.M) {
 	runtime.GOMAXPROCS(runtime.NumCPU())
-	go startBasicTestServer()
 
 	os.Exit(m.Run())
 }
 
 func TestBasicOrchestrator(t *testing.T) {
+	go startBasicTestServer()
 	from := Node{Host: "localhost", Port: 9000}
 	node := Node{Host: "localhost", Port: 9011}
-	members := make(map[string]Node, 1)
+	members := make(map[string]Node, 2)
 	members[node.String()] = node
+	members[from.String()] = from // as fake local node
 
 	o = StartOrchestrator(from, members, DefaultClientHandler())
 	go o.Run()
 
-	time.Sleep(time.Millisecond * 100)
+	time.Sleep(time.Millisecond * 1000)
 
 	if !o.State() {
 		t.Error("Expected estatus completed")
@@ -44,12 +45,13 @@ func TestBasicOrchestrator(t *testing.T) {
 	if !ok {
 		t.Error("Unexpected client registered", clients)
 	}
-	time.Sleep(time.Second * 1)
+	time.Sleep(time.Second * 3)
 
 	fmt.Println("Fired Ping")
 }
 
 func startBasicTestServer() error {
+	fmt.Println("Started Server")
 	port := ":9011"
 	listener, err := net.Listen("tcp", port)
 	if err != nil {
@@ -63,7 +65,7 @@ func startBasicTestServer() error {
 		}
 		defer listener.Close()
 
-		c := StartAcceptClient(conn)
+		c := StartAcceptClient(conn, Node{})
 		go c.Run()
 
 		select {

@@ -85,19 +85,27 @@ func (c *Client) Run() {
 	defer log.Println("Exiting Client Peer  type ", c.mode, "-", c.node.String())
 
 	r := make(chan interface{}, 0)
-	for {
-		go func() {
-			m, err := c.Receive()
-			if err != nil {
-				if err != io.EOF {
-					log.Println("Error Receiving: ", err, " exiting")
+	done := make(chan bool)
+	go func(d chan bool) {
+		select {
+		case <-d:
+			return
+		default:
+			for {
+				m, err := c.Receive()
+				if err != nil {
+					if err != io.EOF {
+						log.Println("Error Receiving: ", err, " exiting")
+					}
+					r <- err
+					return
 				}
-				r <- err
-				return
+				r <- m
 			}
-			r <- m
-		}()
+		}
+	}(done)
 
+	for {
 		select {
 		case msg := <-r:
 			switch t := msg.(type) {
@@ -111,6 +119,7 @@ func (c *Client) Run() {
 				log.Println("unexpected type %T", t)
 			}
 		case <-c.exitChan:
+			done <- true
 			c.message = nil
 			c.Terminate()
 			return

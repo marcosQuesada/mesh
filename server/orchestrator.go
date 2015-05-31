@@ -62,7 +62,6 @@ func (o *Orchestrator) Run() {
 				}
 			case ClientStatusError:
 				log.Println("Client Exitting", m.node)
-				return
 			}
 		case <-o.exitChan:
 			return
@@ -89,10 +88,11 @@ func (o *Orchestrator) State() bool {
 }
 
 func (o *Orchestrator) bootClients() {
+	log.Println("ORchestrartor boot clients", o.members)
 	var done sync.WaitGroup
 	for _, node := range o.members {
 		//avoid local connexion
-		if node == o.from {
+		if node.String() == o.from.String() {
 			continue
 		}
 
@@ -100,7 +100,7 @@ func (o *Orchestrator) bootClients() {
 		done.Add(1)
 		go func(n Node) {
 			//Blocking call, wait until connection success
-			//log.Println("Starting Dial Client on Node ", o.from.String(), "destination: ", n.String())
+			log.Println("Starting Dial Client on Node ", o.from.String(), "destination: ", n.String())
 			c = StartDialClient(o.from, n)
 			go c.Run()
 			done.Done()
