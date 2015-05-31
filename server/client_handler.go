@@ -42,9 +42,9 @@ func (h *defaultClientHandler) Accept(p PeerClient) error {
 
 	node := p.Node()
 	if _, ok := h.clients[node.String()]; ok {
-		return fmt.Errorf("Client Already registered")
+		return fmt.Errorf("Client: %s Already registered", node.String())
 	}
-
+	fmt.Println("Accepting ", node.String(), "peer:", p.Node())
 	h.clients[node.String()] = p
 
 	return nil

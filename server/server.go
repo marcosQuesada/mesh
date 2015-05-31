@@ -1,7 +1,7 @@
 package server
 
 import (
-	"io"
+	//"io"
 	"log"
 	"net"
 )
@@ -9,19 +9,21 @@ import (
 type Server struct {
 	Router
 
-	config *Config
-
-	node *Node
-	exit chan bool
+	config        *Config
+	clientHandler ClientHandler
+	node          Node
+	exit          chan bool
 }
 
 func New(c *Config) *Server {
-	return &Server{
-		Router: NewRouter(c.addr),
+	clientHandler := DefaultClientHandler()
 
-		config: c,
-		exit:   make(chan bool),
-		node:   c.addr,
+	return &Server{
+		Router:        NewRouter(c.addr, clientHandler),
+		clientHandler: clientHandler,
+		config:        c,
+		exit:          make(chan bool),
+		node:          c.addr,
 	}
 }
 
@@ -31,7 +33,7 @@ func (s *Server) Run() {
 	s.startServer()
 
 	// StartOrchestrator
-	st := StartOrchestrator(s.node, s.config.cluster)
+	st := StartOrchestrator(s.node, s.config.cluster, s.clientHandler)
 	go st.Run()
 
 	for {
@@ -65,33 +67,11 @@ func (s *Server) startServer() {
 				return
 			}
 
-			peer := NewJSONSocketPeer(conn)
-			go s.handleConnection(peer)
-			go s.Router.Accept(peer)
+			c := StartAcceptClient(conn)
+			go c.Run()
+			go s.Router.Accept(c)
 		}
 	}()
-}
-
-func (s *Server) handleConnection(peer *SocketPeer) {
-	defer peer.Conn.Close()
-	defer close(peer.RcvChan)
-	defer close(peer.exitChan)
-
-	log.Print("Handling Connection from: ", peer.Id())
-
-	for {
-		msg, err := peer.Receive()
-		if err != nil {
-			if err != io.EOF {
-				log.Print("Error reading connection ", err)
-			}
-			break
-			//s.PeerHandler.Notify(peer.Id(), err)
-		}
-
-		log.Println("Received Message ", msg)
-		//		peer.RcvChan <- msg
-	}
 }
 
 // Cli Socket server

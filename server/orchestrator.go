@@ -19,29 +19,29 @@ const (
 )
 
 type memberUpdate struct {
-	node  *Node
+	node  Node
 	event Status // ??
 }
 
 type Orchestrator struct {
-	from          *Node
+	from          Node
 	clientHandler ClientHandler
-	members       map[string]*Node
+	members       map[string]Node
 	clients       map[string]*Client
 	inChan        chan memberUpdate
 	mainChan      chan Message // Used as aggregated channel from Client Peers
 	exitChan      chan bool
 }
 
-func StartOrchestrator(from *Node, members map[string]*Node) *Orchestrator {
+func StartOrchestrator(from Node, members map[string]Node, clh ClientHandler) *Orchestrator {
 	return &Orchestrator{
-		clientHandler: DefaultClientHandler(),
+		clientHandler: clh,
 		members:       members,
 		clients:       make(map[string]*Client, 0),
 		inChan:        make(chan memberUpdate, 0),
 		exitChan:      make(chan bool, 0),
-
-		mainChan: make(chan Message, 0),
+		from:          from,
+		mainChan:      make(chan Message, 0),
 	}
 }
 
@@ -58,11 +58,12 @@ func (o *Orchestrator) Run() {
 			case ClientStatusConnected:
 				o.members[m.node.String()] = m.node
 				if o.State() {
-					log.Println("Cluster Completed!")
+					log.Println("Cluster Completed!", "Total Members:", len(o.members), "Total Clients:", len(o.clients))
 				}
 			case ClientStatusError:
-				o.members[m.node.String()] = nil
-				o.clients[m.node.String()] = nil
+				log.Println("Client Exitting")
+				/*				o.members[m.node.String()] = nil
+								o.clients[m.node.String()] = nil*/
 			}
 		case <-o.exitChan:
 			return
@@ -83,27 +84,36 @@ func (o *Orchestrator) State() bool {
 
 func (o *Orchestrator) bootClients() {
 	var done sync.WaitGroup
-	for node, v := range o.members {
-		if v != nil {
-			var c *Client
-			done.Add(1)
-			go func(n *Node, nodeString string) {
-				//Blocking call, wait until connection success
-				log.Println("Starting Dial Client on Node ", nodeString)
-				c = StartDialClient(o.from, n)
-				go c.Run()
-				done.Done()
+	for _, node := range o.members {
+		/*		if v != nil {*/
+		var c *Client
+		done.Add(1)
+		go func(n Node) {
+			//Blocking call, wait until connection success
+			log.Println("Starting Dial Client on Node ", o.from.String(), "destination: ", n.String())
+			c = StartDialClient(o.from, n)
+			go c.Run()
+			done.Done()
 
-				//Say Hello and wait response
-				c.SayHello()
-				//Blocking call again until response
-				rsp := <-c.ReceiveChan()
-				switch rsp.(type) {
-				case *Welcome:
-					log.Println("Client has received Welcome from", n.String(), rsp.(*Welcome))
+			//Say Hello and wait response
+			log.Println("Say Hello from ", n.String(), o.from.String())
+			c.SayHello()
+			//Blocking call again until response
+			rsp := <-c.ReceiveChan()
+			switch rsp.(type) {
+			case *Welcome:
+				log.Println("Client has received Welcome from", n.String(), rsp.(*Welcome))
+				err := o.clientHandler.Accept(c)
+				if err != nil {
+					log.Println("Error Accepting Peer, Peer dies! ", err)
+					o.inChan <- memberUpdate{
+						node:  n,
+						event: ClientStatusError,
+					}
+					return
+				} else {
 					log.Println("Assign Client node:", n.String())
 					o.clients[n.String()] = c
-					o.clientHandler.Accept(c)
 					o.inChan <- memberUpdate{
 						node:  n,
 						event: ClientStatusConnected,
@@ -112,17 +122,18 @@ func (o *Orchestrator) bootClients() {
 					//aggregate receiveChan to mainChan
 					o.aggregate(c.ReceiveChan())
 					log.Println("Client Achieved: ", n)
-				case *Abort:
-					log.Println("Response Abort ", rsp.(*Abort), " remote node:", n.String())
-					o.inChan <- memberUpdate{
-						node:  n,
-						event: ClientStatusError,
-					}
-				default:
-					log.Println("Unexpected type On response ")
 				}
-			}(v, node)
-		}
+			case *Abort:
+				log.Println("Response Abort ", rsp.(*Abort), " remote node:", n.String())
+				o.inChan <- memberUpdate{
+					node:  n,
+					event: ClientStatusError,
+				}
+			default:
+				log.Println("Unexpected type On response ")
+			}
+		}(node)
+		//}
 	}
 	done.Wait()
 }

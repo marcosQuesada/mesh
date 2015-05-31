@@ -8,8 +8,8 @@ import (
 )
 
 type Config struct {
-	addr    *Node
-	cluster map[string]*Node
+	addr    Node
+	cluster map[string]Node
 }
 
 func NewConfig(addr, cluster string) *Config {
@@ -26,9 +26,9 @@ func NewConfig(addr, cluster string) *Config {
 	}
 }
 
-func parseList(clusterList string) map[string]*Node {
+func parseList(clusterList string) map[string]Node {
 	parts := strings.Split(clusterList, ",")
-	r := make(map[string]*Node, len(parts))
+	r := make(map[string]Node, len(parts))
 	if len(parts) > 0 && len(parts[0]) > 0 {
 		log.Println("Parts are: ", parts)
 		for _, nodePart := range parts {
@@ -44,7 +44,7 @@ func parseList(clusterList string) map[string]*Node {
 	return nil
 }
 
-func parse(node string) (*Node, error) {
+func parse(node string) (Node, error) {
 	nodeParts := clear(node)
 	if len(nodeParts) != 0 {
 		node = nodeParts[0]
@@ -52,15 +52,15 @@ func parse(node string) (*Node, error) {
 	p := strings.Split(node, ":")
 	if len(p) != 2 {
 		log.Println("Error building Node on config: ", p)
-		return nil, fmt.Errorf("Error building Node on config: %s", p)
+		return Node{}, fmt.Errorf("Error building Node on config: %s", p)
 	}
 	port, err := strconv.ParseInt(p[1], 10, 64)
 	if err != nil {
 		log.Println("Error Parsing Port config: ", p, err)
-		return nil, err
+		return Node{}, err
 	}
 
-	return &Node{host: p[0], port: int(port)}, nil
+	return Node{host: p[0], port: int(port)}, nil
 }
 
 func clear(node string) []string {

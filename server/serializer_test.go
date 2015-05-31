@@ -1,12 +1,16 @@
 package server
 
 import (
+	"fmt"
 	"testing"
 )
 
 func TestJsonSerializer(t *testing.T) {
+	node := Node{host: "localhost", port: 13123}
+
 	msg := Hello{
 		Id:      10,
+		From:    node,
 		Details: map[string]interface{}{"foo": "bar"},
 	}
 
@@ -15,6 +19,7 @@ func TestJsonSerializer(t *testing.T) {
 	if err != nil {
 		t.Error("Unexpected error serializing ", err)
 	}
+	fmt.Println("Data is ", msg, string(data))
 
 	var rcvMessage Message
 	rcvMessage, err = s.Deserialize(data)
@@ -26,7 +31,7 @@ func TestJsonSerializer(t *testing.T) {
 	case *Hello:
 		h := rcvMessage.(*Hello)
 		if msg.Id != h.Id {
-			t.Error("Message Ids don't match")
+			t.Error("Message Ids don't match", msg.Id, h.Id)
 		}
 
 		if "bar" != h.Details["foo"] {

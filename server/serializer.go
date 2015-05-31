@@ -2,8 +2,9 @@ package server
 
 import (
 	"encoding/json"
-	"fmt"
+	//"fmt"
 	"github.com/mitchellh/mapstructure"
+	"log"
 )
 
 type Serializer interface {
@@ -23,22 +24,29 @@ func (s *nopSerializer) Deserialize(m []byte) Message {
 
 type JsonSerializer struct{}
 
+type payload struct {
+	msgType messageType
+	msg     Message
+}
+
 func (s *JsonSerializer) Serialize(m Message) ([]byte, error) {
 	data := map[string]interface{}{"type": m.MessageType(), "msg": m}
-
+	log.Println("Message Serialize json ", m)
+	//msg := &payload{m.MessageType(), m}
 	return json.Marshal(&data)
 }
 
 func (s *JsonSerializer) Deserialize(m []byte) (Message, error) {
 	payload := map[string]interface{}{}
+	//p := &payload{}
+	f := m
 	err := json.Unmarshal(m, &payload)
-
-	if _, ok := payload["type"].(float64); !ok {
-		return nil, fmt.Errorf("Type is not float64", payload["type"])
-	}
+	log.Println("Message json ", string(f))
 
 	mt := messageType(int(payload["type"].(float64)))
 	msg := mt.New()
+	//msg.From = Node{}
+	log.Println("Payload is ", payload["msg"], msg)
 	err = mapstructure.Decode(payload["msg"], msg)
 
 	return msg, err

@@ -21,7 +21,7 @@ type Peer interface {
 	Receive() (Message, error)
 	ReceiveTimeout() (Message, error)
 	Send(Message) error
-	ReadMessage() chan Message
+	ReceiveChan() chan Message
 	Terminate()
 }
 
@@ -127,7 +127,7 @@ func (p *SocketPeer) ReceiveTimeout() (msg Message, err error) {
 	return
 }
 
-func (p *SocketPeer) ReadMessage() chan Message {
+func (p *SocketPeer) ReceiveChan() chan Message {
 	return p.RcvChan
 }
 

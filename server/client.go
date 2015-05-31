@@ -14,7 +14,9 @@ const (
 )
 
 type PeerClient interface {
-	Node() *Node
+	Id() ID
+	Identify(Node)
+	Node() Node
 	Run()
 	Exit()
 	ReceiveChan() chan Message
@@ -24,13 +26,13 @@ type PeerClient interface {
 
 type Client struct {
 	Peer
-	from     *Node
-	node     *Node
+	from     Node
+	node     Node
 	message  chan Message
 	exitChan chan bool
 }
 
-func StartDialClient(from *Node, node *Node) *Client {
+func StartDialClient(from Node, node Node) *Client {
 	var conn net.Conn
 	var err error
 	for {
@@ -42,7 +44,7 @@ func StartDialClient(from *Node, node *Node) *Client {
 			break
 		}
 	}
-
+	fmt.Println("Start dial client from ", from.String(), "to", node.String())
 	return &Client{
 		from:     from,
 		Peer:     NewJSONSocketPeer(conn),
@@ -66,11 +68,15 @@ func (c *Client) ReceiveChan() chan Message {
 }
 
 func (c *Client) SayHello() {
+	log.Println("Say Hello from ", c.from, " to : ", c.Node())
+	var f Node = c.from
+	var n Node = c.Node()
 	msg := Hello{
 		Id:      0,
-		From:    c.from,
-		Details: map[string]interface{}{"foo": "bar"},
+		From:    f,
+		Details: map[string]interface{}{"foo": "bar", "from": f.String(), "to": n.String()},
 	}
+	log.Println("Hello Message is ", msg)
 	c.Send(msg)
 }
 
@@ -88,6 +94,7 @@ func (c *Client) Run() {
 				r <- err
 				return
 			}
+			log.Println("Received Message on Client", m)
 			r <- m
 		}()
 
@@ -96,15 +103,14 @@ func (c *Client) Run() {
 			switch t := msg.(type) {
 			case error:
 				log.Println("Error Receiving on server, err ", t)
-				if c.node != nil {
-					log.Println("Error Receiving exiting client Peer:", c.node.String())
-				}
+				log.Println("Error Receiving exiting client Peer:", c.node.String())
 				return
 			case Message:
-				log.Println("Client Message received: ", t.(Message))
-				if c.node != nil {
-					log.Println(" from: ", c.node.String())
+				log.Println("Client Message received: ", t.(Message).MessageType())
+				if t.(Message).MessageType() == 0 {
+					log.Println("Message Hello", t.(Message).(*Hello))
 				}
+				log.Println(" from: ", c.node.String())
 				c.message <- t.(Message)
 			default:
 				log.Println("unexpected type %T", t)
@@ -122,6 +128,10 @@ func (c *Client) Exit() {
 	c.exitChan <- true
 }
 
-func (c *Client) Node() *Node {
+func (c *Client) Node() Node {
 	return c.node
+}
+
+func (c *Client) Identify(n Node) {
+	c.node = n
 }

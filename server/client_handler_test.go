@@ -65,10 +65,12 @@ type fakeClient struct {
 	port int
 }
 
-func (f *fakeClient) Node() *Node {
-	return &Node{host: f.host, port: f.port}
+func (f *fakeClient) Node() Node {
+	return Node{host: f.host, port: f.port}
 }
-
+func (f *fakeClient) Id() ID {
+	return ID(0)
+}
 func (f *fakeClient) Run() {
 }
 func (f *fakeClient) Send(Message) error {
@@ -80,4 +82,6 @@ func (f *fakeClient) ReceiveChan() (v chan Message) {
 func (f *fakeClient) Exit() {
 }
 func (f *fakeClient) SayHello() {
+}
+func (f *fakeClient) Identify(n Node) {
 }
