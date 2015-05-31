@@ -5,23 +5,23 @@ import (
 )
 
 type Broker interface {
-	Accept(Peer, *Hello) Message
-	Ping(Peer, *Ping) Message
-	GoodBye(Peer, *GoodBye) Message
+	Accept(PeerClient, *Hello) Message
+	Ping(PeerClient, *Ping) Message
+	GoodBye(PeerClient, *GoodBye) Message
 }
 
 type defaultBroker struct {
-	from *Node
+	from Node
 	//PeerHandler
 }
 
-func NewBroker(from *Node) *defaultBroker {
+func NewBroker(from Node) *defaultBroker {
 	return &defaultBroker{
 		from: from,
 	}
 }
 
-func (b *defaultBroker) Accept(p Peer, h *Hello) Message {
+func (b *defaultBroker) Accept(p PeerClient, h *Hello) Message {
 	log.Println("Broker Accept: ", h)
 	/*	err := b.PeerHandler.Accept(p)
 		if err != nil {
@@ -31,11 +31,11 @@ func (b *defaultBroker) Accept(p Peer, h *Hello) Message {
 	return &Welcome{Id: h.Id, From: b.from, Details: map[string]interface{}{"foo_bar": 1231}}
 }
 
-func (b *defaultBroker) Ping(p Peer, pi *Ping) Message {
+func (b *defaultBroker) Ping(p PeerClient, pi *Ping) Message {
 	return &Pong{Id: pi.Id, From: b.from, Details: map[string]interface{}{"foo_bar": 1231}}
 }
 
-func (b *defaultBroker) GoodBye(p Peer, g *GoodBye) Message {
+func (b *defaultBroker) GoodBye(p PeerClient, g *GoodBye) Message {
 	/*	log.Println("Broker GoodBye: ", g)
 		err := b.PeerHandler.Remove(p)
 		if err != nil {

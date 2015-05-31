@@ -5,8 +5,11 @@ import (
 )
 
 func TestJsonSerializer(t *testing.T) {
+	node := Node{Host: "localhost", Port: 13123}
+
 	msg := Hello{
 		Id:      10,
+		From:    node,
 		Details: map[string]interface{}{"foo": "bar"},
 	}
 
@@ -26,7 +29,7 @@ func TestJsonSerializer(t *testing.T) {
 	case *Hello:
 		h := rcvMessage.(*Hello)
 		if msg.Id != h.Id {
-			t.Error("Message Ids don't match")
+			t.Error("Message Ids don't match", msg.Id, h.Id)
 		}
 
 		if "bar" != h.Details["foo"] {

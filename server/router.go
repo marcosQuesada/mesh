@@ -5,37 +5,41 @@ import (
 )
 
 type Router interface {
-	Accept(p Peer)
+	Accept(PeerClient)
 }
 
 type defaultRouter struct {
-	Broker
-	node *Node
-	exit chan bool
+	node          Node
+	exit          chan bool
+	clientHandler ClientHandler
 }
 
-func NewRouter(n *Node) *defaultRouter {
+func NewRouter(n Node, clh ClientHandler) *defaultRouter {
 	return &defaultRouter{
-		Broker: NewBroker(n),
-		node:   n,
-		exit:   make(chan bool),
+		node:          n,
+		exit:          make(chan bool),
+		clientHandler: clh,
 	}
 }
 
-func (r *defaultRouter) Accept(p Peer) {
-	defer close(r.exit)
-	log.Println("Router accepting peer: ", p.Id())
+func (r *defaultRouter) Accept(p PeerClient) {
 	for {
 		select {
 		case <-r.exit:
 			return
-		case msg := <-p.ReadMessage():
+		case msg := <-p.ReceiveChan():
+			log.Println("Msg Received ", msg)
 			switch msg.(type) {
 			case *Hello:
-				log.Println("Router Hello", msg.(*Hello))
-				result := r.Broker.Accept(p, msg.(*Hello))
-				p.Send(result)
+				//p.Identify(msg.(*Hello).From)
+				err := r.clientHandler.Accept(p)
+				if err != nil {
+					p.Send(&Abort{Id: msg.(*Hello).Id, From: r.node, Details: map[string]interface{}{"foo_bar": 1231}})
+					p.Exit()
 
+					return
+				}
+				p.Send(&Welcome{Id: msg.(*Hello).Id, From: r.node, Details: map[string]interface{}{"foo_bar": 1231}})
 			case *Welcome:
 				log.Println("Router Welcome: ", msg.(*Welcome))
 				a := msg.(*Welcome)
@@ -47,8 +51,8 @@ func (r *defaultRouter) Accept(p Peer) {
 				p.Send(&Error{Id: a.Id, Details: a.Details})
 
 			case *Ping:
-				result := r.Broker.Ping(p, msg.(*Ping))
-				p.Send(result)
+				//result := r.Broker.Ping(p, msg.(*Ping))
+				//p.Send(result)
 				log.Println("Router Ping: ", msg.(*Ping))
 
 			case *Pong:
@@ -57,8 +61,8 @@ func (r *defaultRouter) Accept(p Peer) {
 				p.Send(&Error{Id: pong.Id, Details: pong.Details})
 
 			case *GoodBye:
-				result := r.Broker.GoodBye(p, msg.(*GoodBye))
-				p.Send(result)
+				//result := r.Broker.GoodBye(p, msg.(*GoodBye))
+				//p.Send(result)
 
 			default:
 

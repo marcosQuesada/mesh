@@ -41,11 +41,12 @@ func (h *defaultClientHandler) Accept(p PeerClient) error {
 	defer h.mutex.Unlock()
 
 	node := p.Node()
+	fmt.Println("On Accept ", node.String(), "peer:", p.Node(), " actual size: ", len(h.clients))
 	if _, ok := h.clients[node.String()]; ok {
-		return fmt.Errorf("Client Already registered")
+		return fmt.Errorf("Client: %s Already registered", node.String())
 	}
-
 	h.clients[node.String()] = p
+	fmt.Println("Accepted ", node.String(), "peer:", p.Node(), " actual size: ", len(h.clients), " - ", h.clients)
 
 	return nil
 }

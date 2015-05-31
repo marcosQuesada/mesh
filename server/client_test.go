@@ -8,21 +8,19 @@ import (
 func TestClientMessagingUnderPipes(t *testing.T) {
 	a, b := net.Pipe()
 
-	n1 := &Node{host: "foo", port: 5678}
 	c1 := &Client{
 		Peer:     NewJSONSocketPeer(a),
-		from:     &Node{host: "192.168.1.1", port: 8000},
-		node:     n1,
+		from:     Node{Host: "192.168.1.1", Port: 8000},
+		node:     Node{Host: "foo", Port: 5678},
 		message:  make(chan Message, 0),
 		exitChan: make(chan bool),
 	}
 	go c1.Run()
 
-	n2 := &Node{host: "bar", port: 5678}
 	c2 := &Client{
 		Peer:     NewJSONSocketPeer(b),
-		from:     &Node{host: "192.168.1.10", port: 8000},
-		node:     n2,
+		from:     Node{Host: "192.168.1.10", Port: 8000},
+		node:     Node{Host: "bar", Port: 5678},
 		message:  make(chan Message, 0),
 		exitChan: make(chan bool),
 	}

@@ -5,10 +5,10 @@ import (
 )
 
 type Node struct {
-	host string
-	port int
+	Host string
+	Port int
 }
 
 func (n *Node) String() string {
-	return fmt.Sprintf("%s:%d", n.host, n.port)
+	return fmt.Sprintf("%s:%d", n.Host, n.Port)
 }
