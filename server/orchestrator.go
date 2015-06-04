@@ -2,8 +2,6 @@ package server
 
 import (
 	"log"
-	"sync"
-	//"time"
 )
 
 // Orchestrator takes cares on all cluster related tasks
@@ -24,29 +22,33 @@ type memberUpdate struct {
 }
 
 type Orchestrator struct {
-	from          Node
 	clientHandler ClientHandler
+	from          Node
 	members       map[string]Node
 	clients       map[string]*Client
 	inChan        chan memberUpdate
 	mainChan      chan Message // Used as aggregated channel from Client Peers
+	fwdChan       chan Message //Channel that gets routed to destination client
 	exitChan      chan bool
 }
 
 func StartOrchestrator(from Node, members map[string]Node, clh ClientHandler) *Orchestrator {
 	return &Orchestrator{
 		clientHandler: clh,
+		from:          from,
 		members:       members,
 		clients:       make(map[string]*Client, 0),
 		inChan:        make(chan memberUpdate, 0),
-		exitChan:      make(chan bool, 0),
-		from:          from,
 		mainChan:      make(chan Message, 0),
+		fwdChan:       make(chan Message, 0),
+		exitChan:      make(chan bool, 0),
 	}
 }
 
 func (o *Orchestrator) Run() {
 	defer log.Println("Exiting Orchestrator Run")
+	defer close(o.exitChan)
+	defer close(o.inChan)
 	go o.consumeMainChannel()
 	o.bootClients()
 	//handle updates from members
@@ -70,26 +72,17 @@ func (o *Orchestrator) Run() {
 
 }
 
+func (o *Orchestrator) Exit() {
+	o.exitChan <- true
+}
+
 func (o *Orchestrator) State() bool {
 	log.Println("len is ", len(o.clients))
-	return o.clientHandler.Len() == (len(o.members) - 1)
-	/*
-		for k, s := range o.clients {
-			if k == o.from {
-				continue
-			}
-			if s == nil {
-				return false
-			}
-		}
-
-		return true
-	*/
+	return o.clientHandler.Len() == (len(o.members) - 1) //@TODO: BAD APPROACH!
 }
 
 func (o *Orchestrator) bootClients() {
 	log.Println("ORchestrartor boot clients", o.members)
-	var done sync.WaitGroup
 	for _, node := range o.members {
 		//avoid local connexion
 		if node.String() == o.from.String() {
@@ -97,17 +90,15 @@ func (o *Orchestrator) bootClients() {
 		}
 
 		var c *Client
-		done.Add(1)
 		go func(n Node) {
-			//Blocking call, wait until connection success
 			log.Println("Starting Dial Client on Node ", o.from.String(), "destination: ", n.String())
+			//Blocking call, wait until connection success
 			c = StartDialClient(o.from, n)
 			go c.Run()
-			done.Done()
 
 			//Say Hello and wait response
-			//log.Println("Say Hello from ", o.from.String(), "to", n.String())
 			c.SayHello()
+
 			//Blocking call again until response
 			rsp := <-c.ReceiveChan()
 			switch rsp.(type) {
@@ -143,7 +134,6 @@ func (o *Orchestrator) bootClients() {
 			}
 		}(node)
 	}
-	done.Wait()
 }
 
 func (o *Orchestrator) consumeMainChannel() {

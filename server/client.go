@@ -84,11 +84,11 @@ func (c *Client) SayHello() {
 func (c *Client) Run() {
 	defer log.Println("Exiting Client Peer  type ", c.mode, "-", c.node.String())
 
-	r := make(chan interface{}, 0)
+	response := make(chan interface{}, 0)
 	done := make(chan bool)
-	go func(d chan bool) {
+	go func(exit chan bool) {
 		select {
-		case <-d:
+		case <-exit:
 			return
 		default:
 			for {
@@ -97,34 +97,39 @@ func (c *Client) Run() {
 					if err != io.EOF {
 						log.Println("Error Receiving: ", err, " exiting")
 					}
-					r <- err
+					response <- err
 					return
 				}
-				r <- m
+				response <- m
 			}
 		}
 	}(done)
 
-	for {
-		select {
-		case msg := <-r:
-			switch t := msg.(type) {
-			case error:
-				log.Println("Error Receiving on server, err ", t, "exiting client Peer:", c.node.String())
-				c.exitChan <- true
+	//Required to allow message chan readers
+	go func() {
+		for {
+			select {
+			case msg := <-response:
+				switch t := msg.(type) {
+				case error:
+					log.Println("Error Receiving on server, err ", t, "exiting client Peer:", c.node.String())
+					c.exitChan <- true
+					return
+				case Message:
+					c.message <- t.(Message)
+				default:
+					log.Println("unexpected type %T", t)
+				}
+			case <-c.exitChan:
+				done <- true
+				c.message = nil
+				c.Terminate()
+
 				return
-			case Message:
-				c.message <- t.(Message)
-			default:
-				log.Println("unexpected type %T", t)
 			}
-		case <-c.exitChan:
-			done <- true
-			c.message = nil
-			c.Terminate()
-			return
 		}
-	}
+	}()
+	//wait to start receive loop & forward loop to message chan
 }
 
 func (c *Client) Exit() {

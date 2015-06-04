@@ -68,8 +68,9 @@ func (s *Server) startServer() {
 			}
 
 			c := StartAcceptClient(conn, s.node)
+			c.Run()
+
 			go s.Router.Accept(c)
-			go c.Run()
 		}
 	}()
 }
