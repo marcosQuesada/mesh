@@ -14,6 +14,7 @@ const (
 	ClusterStatusStarting  = Status("starting")
 	ClusterStatusInService = Status("in service")
 	ClusterStatusDegraded  = Status("degraded")
+	ClusterStatusExit      = Status("exit")
 )
 
 type memberUpdate struct {
@@ -27,7 +28,7 @@ type Orchestrator struct {
 	members       map[string]Node
 	clients       map[string]*Client
 	inChan        chan memberUpdate
-	mainChan      chan Message // Used as aggregated channel from Client Peers
+	MainChan      chan Message // Used as aggregated channel from Client Peers
 	fwdChan       chan Message //Channel that gets routed to destination client
 	exitChan      chan bool
 }
@@ -39,7 +40,7 @@ func StartOrchestrator(from Node, members map[string]Node, clh ClientHandler) *O
 		members:       members,
 		clients:       make(map[string]*Client, 0),
 		inChan:        make(chan memberUpdate, 0),
-		mainChan:      make(chan Message, 0),
+		MainChan:      make(chan Message, 0),
 		fwdChan:       make(chan Message, 0),
 		exitChan:      make(chan bool, 0),
 	}
@@ -49,7 +50,7 @@ func (o *Orchestrator) Run() {
 	defer log.Println("Exiting Orchestrator Run")
 	defer close(o.exitChan)
 	defer close(o.inChan)
-	go o.consumeMainChannel()
+
 	o.bootClients()
 	//handle updates from members
 	for {
@@ -82,7 +83,7 @@ func (o *Orchestrator) State() bool {
 }
 
 func (o *Orchestrator) bootClients() {
-	log.Println("ORchestrartor boot clients", o.members)
+	log.Println("ORchestrartor boot clients", len(o.members), o.members)
 	for _, node := range o.members {
 		//avoid local connexion
 		if node.String() == o.from.String() {
@@ -94,11 +95,12 @@ func (o *Orchestrator) bootClients() {
 			log.Println("Starting Dial Client on Node ", o.from.String(), "destination: ", n.String())
 			//Blocking call, wait until connection success
 			c = StartDialClient(o.from, n)
-			go c.Run()
+			c.Run()
 
 			//Say Hello and wait response
 			c.SayHello()
 
+			//Handle Response
 			//Blocking call again until response
 			rsp := <-c.ReceiveChan()
 			switch rsp.(type) {
@@ -136,15 +138,41 @@ func (o *Orchestrator) bootClients() {
 	}
 }
 
-func (o *Orchestrator) consumeMainChannel() {
-	for {
-		select {
-		case m := <-o.mainChan:
-			log.Println("Received Message on Main Channel ", m)
-			//
-			// Consumers may be exported
+func (o *Orchestrator) Accept(p PeerClient) (response Status) {
+	select {
+	case msg := <-p.ReceiveChan():
+		log.Println("Msg Received ", msg)
+
+		switch msg.(type) {
+		case *Hello:
+			p.Identify(msg.(*Hello).From)
+			err := o.clientHandler.Accept(p)
+			if err != nil {
+				p.Send(&Abort{Id: msg.(*Hello).Id, From: o.from, Details: map[string]interface{}{"foo_bar": 1231}})
+				p.Exit()
+
+				response = ClientStatusAbort
+			}
+			p.Send(&Welcome{Id: msg.(*Hello).Id, From: o.from, Details: map[string]interface{}{"foo_bar": 1231}})
+
+			response = ClientStatusConnected
+			/*		case *Ping:
+						log.Println("Router Ping: ", msg.(*Ping))
+						p.Send(&Pong{Id: msg.(*Ping).Id, From: o.from, Details: map[string]interface{}{}})
+
+					case *Pong:
+						log.Println("Router Pong: ", msg.(*Pong))
+						pong := msg.(*Pong)
+						p.Send(&Error{Id: pong.Id, Details: pong.Details})
+			*/
 		}
 	}
+
+	return
+}
+
+func (o *Orchestrator) Route(m Message) {
+
 }
 
 func (o *Orchestrator) aggregate(c chan Message) {
@@ -152,7 +180,7 @@ func (o *Orchestrator) aggregate(c chan Message) {
 		for {
 			select {
 			case m := <-c:
-				o.mainChan <- m
+				o.MainChan <- m
 			}
 		}
 	}()

@@ -10,6 +10,7 @@ import (
 
 const (
 	ClientStatusConnected = Status("connected")
+	ClientStatusAbort     = Status("abort")
 	ClientStatusError     = Status("error")
 )
 
@@ -82,7 +83,7 @@ func (c *Client) SayHello() {
 }
 
 func (c *Client) Run() {
-	defer log.Println("Exiting Client Peer  type ", c.mode, "-", c.node.String())
+	defer log.Println("Exiting Client Peer type ", c.mode, "-", c.node.String())
 
 	response := make(chan interface{}, 0)
 	done := make(chan bool)

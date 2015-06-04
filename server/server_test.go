@@ -13,7 +13,7 @@ func TestBasicServerClient(t *testing.T) {
 	}
 
 	srv := New(config)
-	srv.startServer()
+	srv.startServer(&Orchestrator{})
 	time.Sleep(time.Millisecond * 100)
 
 	done := make(chan bool)

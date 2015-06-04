@@ -7,8 +7,6 @@ import (
 )
 
 type Server struct {
-	Router
-
 	config        *Config
 	clientHandler ClientHandler
 	node          Node
@@ -19,7 +17,6 @@ func New(c *Config) *Server {
 	clientHandler := DefaultClientHandler()
 
 	return &Server{
-		Router:        NewRouter(c.addr, clientHandler),
 		clientHandler: clientHandler,
 		config:        c,
 		exit:          make(chan bool),
@@ -30,19 +27,19 @@ func New(c *Config) *Server {
 func (s *Server) Run() {
 	defer close(s.exit)
 
-	s.startServer()
-
 	// StartOrchestrator
-	st := StartOrchestrator(s.node, s.config.cluster, s.clientHandler)
-	go st.Run()
+	o := StartOrchestrator(s.node, s.config.cluster, s.clientHandler)
+	go o.Run()
+
+	s.startServer(o)
 
 	for {
 		select {
+		case m := <-o.MainChan:
+			log.Println("SERVER: Received Message on Main Channel ", m)
 		case <-s.exit:
 			//Notify Exit to remote Peer
-			//Shutdown peer connections
 			return
-		default:
 		}
 	}
 }
@@ -51,9 +48,7 @@ func (s *Server) Close() {
 	s.exit <- true
 }
 
-func (s *Server) startServer() {
-	log.Print("Starting server: ", s.config.addr.String())
-
+func (s *Server) startServer(o *Orchestrator) {
 	listener, err := net.Listen("tcp", string(s.config.addr.String()))
 	if err != nil {
 		log.Println("Error starting Socket Server: ", err)
@@ -70,7 +65,8 @@ func (s *Server) startServer() {
 			c := StartAcceptClient(conn, s.node)
 			c.Run()
 
-			go s.Router.Accept(c)
+			r := o.Accept(c)
+			log.Println("Result from Accept is ", r)
 		}
 	}()
 }
