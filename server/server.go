@@ -14,10 +14,8 @@ type Server struct {
 }
 
 func New(c *Config) *Server {
-	clientHandler := DefaultClientHandler()
-
 	return &Server{
-		clientHandler: clientHandler,
+		clientHandler: DefaultClientHandler(),
 		config:        c,
 		exit:          make(chan bool),
 		node:          c.addr,

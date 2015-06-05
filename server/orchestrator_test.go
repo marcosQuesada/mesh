@@ -13,24 +13,6 @@ var o *Orchestrator
 
 var done chan struct{} = make(chan struct{}, 0)
 
-/*func TestMain(m *testing.M) {
-	runtime.GOMAXPROCS(runtime.NumCPU())
-	os.Exit(m.Run())
-}
-*/
-/*func TestForwardingChannel(t *testing.T) {
-	from := Node{Host: "localhost", Port: 9000}
-	node := Node{Host: "localhost", Port: 9011}
-	members := make(map[string]Node, 2)
-	members[node.String()] = node
-	members[from.String()] = from // as fake local node
-
-	o = StartOrchestrator(from, members, DefaultClientHandler())
-	o.Run()
-	time.Sleep(time.Second)
-	o.Exit()
-}*/
-
 func TestBasicOrchestrator(t *testing.T) {
 	go startBasicTestServer()
 	from := Node{Host: "localhost", Port: 9000}
@@ -107,4 +89,17 @@ func startBasicTestServer() error {
 			return nil
 		}
 	}
+}
+
+func TestForwardingChannel(t *testing.T) {
+	from := Node{Host: "localhost", Port: 9000}
+	node := Node{Host: "localhost", Port: 9011}
+	members := make(map[string]Node, 2)
+	members[node.String()] = node
+	members[from.String()] = from // as fake local node
+
+	o = StartOrchestrator(from, members, DefaultClientHandler())
+	go o.Run()
+	time.Sleep(time.Second)
+	o.Exit()
 }

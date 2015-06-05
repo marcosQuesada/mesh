@@ -1,6 +1,7 @@
 package server
 
 import (
+	"reflect"
 	"testing"
 )
 
@@ -61,8 +62,9 @@ func TestErrorOnRemoveInexistentCLient(t *testing.T) {
 }
 
 type fakeClient struct {
-	host string
-	port int
+	host    string
+	port    int
+	msgChan chan Message
 }
 
 func (f *fakeClient) Node() Node {
@@ -73,12 +75,14 @@ func (f *fakeClient) Id() ID {
 }
 func (f *fakeClient) Run() {
 }
-func (f *fakeClient) Send(Message) error {
+func (f *fakeClient) Send(m Message) error {
+	f.msgChan <- m
 	return nil
 }
 func (f *fakeClient) ReceiveChan() (v chan Message) {
-	return v
+	return f.msgChan
 }
+
 func (f *fakeClient) Exit() {
 }
 func (f *fakeClient) SayHello() {
@@ -91,5 +95,23 @@ func (f *fakeClient) Mode() string {
 }
 
 func (f *fakeClient) From() Node {
-	return Node{Host: "fakeOrigin", Port: f.port}
+	return Node{Host: f.host, Port: f.port}
+}
+
+func TestBasicFakeClientTest(t *testing.T) {
+	ch := make(chan Message, 10)
+	fkc := &fakeClient{"localhost", 9000, ch}
+
+	msg := Hello{
+		Id:      999,
+		From:    Node{"localhost", 9000},
+		Details: map[string]interface{}{"foo": "bar"},
+	}
+
+	fkc.Send(msg)
+
+	rcvMsg := <-fkc.ReceiveChan()
+	if !reflect.DeepEqual(msg, rcvMsg) {
+		t.Errorf("Expected %s, got %s", msg, rcvMsg)
+	}
 }
