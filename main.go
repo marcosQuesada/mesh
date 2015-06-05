@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"github.com/marcosQuesada/mesh/config"
 	"github.com/marcosQuesada/mesh/server"
 	"log"
 	"os"
@@ -26,7 +27,7 @@ func main() {
 	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
 
 	//Create COnfiguration
-	config := server.NewConfig(*addr, *cluster)
+	config := config.NewConfig(*addr, *cluster)
 	//Define serfer from config
 	s := server.New(config)
 	c := make(chan os.Signal, 1)

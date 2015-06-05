@@ -1,24 +1,28 @@
 package server
 
 import (
-	//"io"
+	"github.com/marcosQuesada/mesh/cli"
+	"github.com/marcosQuesada/mesh/client"
+	"github.com/marcosQuesada/mesh/cluster"
+	"github.com/marcosQuesada/mesh/config"
+	n "github.com/marcosQuesada/mesh/node"
 	"log"
 	"net"
 )
 
 type Server struct {
-	config        *Config
-	clientHandler ClientHandler
-	node          Node
+	config        *config.Config
+	clientHandler client.ClientHandler
+	node          n.Node
 	exit          chan bool
 }
 
-func New(c *Config) *Server {
+func New(c *config.Config) *Server {
 	return &Server{
-		clientHandler: DefaultClientHandler(),
+		clientHandler: client.DefaultClientHandler(),
 		config:        c,
 		exit:          make(chan bool),
-		node:          c.addr,
+		node:          c.Addr,
 	}
 }
 
@@ -26,7 +30,7 @@ func (s *Server) Run() {
 	defer close(s.exit)
 
 	// StartOrchestrator
-	o := StartOrchestrator(s.node, s.config.cluster, s.clientHandler)
+	o := cluster.StartOrchestrator(s.node, s.config.Cluster, s.clientHandler)
 	go o.Run()
 
 	s.startServer(o)
@@ -46,8 +50,8 @@ func (s *Server) Close() {
 	s.exit <- true
 }
 
-func (s *Server) startServer(o *Orchestrator) {
-	listener, err := net.Listen("tcp", string(s.config.addr.String()))
+func (s *Server) startServer(o *cluster.Orchestrator) {
+	listener, err := net.Listen("tcp", string(s.config.Addr.String()))
 	if err != nil {
 		log.Println("Error starting Socket Server: ", err)
 		return
@@ -60,7 +64,7 @@ func (s *Server) startServer(o *Orchestrator) {
 				return
 			}
 
-			c := StartAcceptClient(conn, s.node)
+			c := client.StartAccept(conn, s.node)
 			c.Run()
 
 			r := o.Accept(c)
@@ -71,7 +75,7 @@ func (s *Server) startServer(o *Orchestrator) {
 
 // Cli Socket server
 func (s *Server) startCliServer() error {
-	listener, err := net.Listen("tcp", s.config.addr.String())
+	listener, err := net.Listen("tcp", s.config.Addr.String())
 	if err != nil {
 		log.Println("Error Listening Cli Server")
 		return err
@@ -92,12 +96,12 @@ func (s *Server) startCliServer() error {
 }
 
 // Socket Client access
-func (s *Server) handleCliConnection(c net.Conn) {
-	defer c.Close()
+func (s *Server) handleCliConnection(conn net.Conn) {
+	defer conn.Close()
 
-	cli := &CliSession{
-		conn:   c,
-		server: s,
+	c := &cli.CliSession{
+		Conn: conn,
+		//server: s,
 	}
-	cli.handle()
+	c.Handle()
 }

@@ -1,21 +1,22 @@
-package server
+package cluster
 
 import (
 	"fmt"
+	m "github.com/marcosQuesada/mesh/message"
 	"log"
 	"time"
 )
 
 type coordinator struct {
-	rcvChan chan Message
-	sndChan chan Message
+	rcvChan chan m.Message
+	sndChan chan m.Message
 	stop    bool
 }
 
 func Start() *coordinator {
 	coordinator := &coordinator{
-		rcvChan: make(chan Message),
-		sndChan: make(chan Message),
+		rcvChan: make(chan m.Message),
+		sndChan: make(chan m.Message),
 		stop:    false,
 	}
 
@@ -24,11 +25,11 @@ func Start() *coordinator {
 	return coordinator
 }
 
-func (c *coordinator) Send(m Message) {
-	c.rcvChan <- m
+func (c *coordinator) Send(msg m.Message) {
+	c.rcvChan <- msg
 }
 
-func (c *coordinator) Receive() Message {
+func (c *coordinator) Receive() m.Message {
 	timeout := time.NewTimer(time.Second * 1)
 	select {
 	case response := <-c.sndChan:
@@ -44,14 +45,14 @@ func (c *coordinator) run() {
 		select {
 		case msg := <-c.rcvChan:
 			switch msg.MessageType() {
-			case HELLO:
-				cmd := msg.(*Hello)
+			case m.HELLO:
+				cmd := msg.(*m.Hello)
 				log.Println("HELLO Message", cmd.Id)
-			case WELCOME:
-				cmd := msg.(*Welcome)
+			case m.WELCOME:
+				cmd := msg.(*m.Welcome)
 				log.Println("Welcome Message", cmd.Id)
-			case ABORT:
-				cmd := msg.(*Abort)
+			case m.ABORT:
+				cmd := msg.(*m.Abort)
 				log.Println("Abort Message", cmd.Id)
 			}
 		}

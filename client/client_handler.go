@@ -1,11 +1,11 @@
-package server
+package client
 
 import (
 	"fmt"
+	n "github.com/marcosQuesada/mesh/node"
+	//w "github.com/marcosQuesada/mesh/watcher"
 	"sync"
 )
-
-type Status string
 
 /*const (
 	ClientStatusNew        = Status("new")
@@ -19,13 +19,13 @@ type Status string
 type ClientHandler interface {
 	Accept(PeerClient) error
 	Remove(PeerClient) error
-	Notify(Node, error) //Used to get notifications of Client conn failures
+	Notify(n.Node, error) //Used to get notifications of Client conn failures
 	Clients() map[string]PeerClient
 	Len() int
 }
 
 type defaultClientHandler struct {
-	watcher Watcher
+	//watcher w.Watcher
 	clients map[string]PeerClient
 	mutex   sync.Mutex
 }
@@ -50,7 +50,7 @@ func (h *defaultClientHandler) Accept(p PeerClient) error {
 	return nil
 }
 
-func (h *defaultClientHandler) Notify(n Node, err error) {
+func (h *defaultClientHandler) Notify(n n.Node, err error) {
 
 }
 

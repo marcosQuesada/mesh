@@ -1,11 +1,12 @@
-package server
+package config
 
 import (
+	n "github.com/marcosQuesada/mesh/node"
 	"testing"
 )
 
 func TestNodeAddress(t *testing.T) {
-	node := &Node{Host: "localhost", Port: 1234}
+	node := &n.Node{Host: "localhost", Port: 1234}
 	if node.String() != "localhost:1234" {
 		t.Error("Config Error Generating string address")
 	}

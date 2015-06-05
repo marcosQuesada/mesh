@@ -1,6 +1,9 @@
-package server
+package cluster
 
 import (
+	"github.com/marcosQuesada/mesh/client"
+	"github.com/marcosQuesada/mesh/message"
+	n "github.com/marcosQuesada/mesh/node"
 	"log"
 )
 
@@ -11,37 +14,37 @@ import (
 // Execute Pool mechanisms and consesus resolution
 
 const (
-	ClusterStatusStarting  = Status("starting")
-	ClusterStatusInService = Status("in service")
-	ClusterStatusDegraded  = Status("degraded")
-	ClusterStatusExit      = Status("exit")
+	ClusterStatusStarting  = message.Status("starting")
+	ClusterStatusInService = message.Status("in service")
+	ClusterStatusDegraded  = message.Status("degraded")
+	ClusterStatusExit      = message.Status("exit")
 )
 
 type memberUpdate struct {
-	node  Node
-	event Status // ??
+	node  n.Node
+	event message.Status // ??
 }
 
 type Orchestrator struct {
-	clientHandler ClientHandler
-	from          Node
-	members       map[string]Node
-	clients       map[string]*Client
+	clientHandler client.ClientHandler
+	from          n.Node
+	members       map[string]n.Node
+	clients       map[string]*client.Client
 	inChan        chan memberUpdate
-	MainChan      chan Message // Used as aggregated channel from Client Peers
-	fwdChan       chan Message //Channel that gets routed to destination client
+	MainChan      chan message.Message // Used as aggregated channel from Client Peers
+	fwdChan       chan message.Message //Channel that gets routed to destination client
 	exitChan      chan bool
 }
 
-func StartOrchestrator(from Node, members map[string]Node, clh ClientHandler) *Orchestrator {
+func StartOrchestrator(from n.Node, members map[string]n.Node, clh client.ClientHandler) *Orchestrator {
 	return &Orchestrator{
 		clientHandler: clh,
 		from:          from,
 		members:       members,
-		clients:       make(map[string]*Client, 0),
+		clients:       make(map[string]*client.Client, 0),
 		inChan:        make(chan memberUpdate, 0),
-		MainChan:      make(chan Message, 0),
-		fwdChan:       make(chan Message, 0),
+		MainChan:      make(chan message.Message, 0),
+		fwdChan:       make(chan message.Message, 0),
 		exitChan:      make(chan bool, 0),
 	}
 }
@@ -55,16 +58,16 @@ func (o *Orchestrator) Run() {
 	//handle updates from members
 	for {
 		select {
-		case m := <-o.inChan:
+		case msg := <-o.inChan:
 			//log.Println("Handle Update ", m, "State is: ", o.State())
-			switch m.event {
-			case ClientStatusConnected:
-				o.members[m.node.String()] = m.node
+			switch msg.event {
+			case client.ClientStatusConnected:
+				o.members[msg.node.String()] = msg.node
 				if o.State() {
 					log.Println("Cluster Completed!", "Total Members:", len(o.members), "Total Clients:", len(o.clients))
 				}
-			case ClientStatusError:
-				log.Println("Client Exitting", m.node)
+			case client.ClientStatusError:
+				log.Println("Client Exitting", msg.node)
 			}
 		case <-o.exitChan:
 			return
@@ -90,11 +93,11 @@ func (o *Orchestrator) bootClients() {
 			continue
 		}
 
-		var c *Client
-		go func(n Node) {
+		var c *client.Client
+		go func(n n.Node) {
 			log.Println("Starting Dial Client on Node ", o.from.String(), "destination: ", n.String())
 			//Blocking call, wait until connection success
-			c = StartDialClient(o.from, n)
+			c = client.StartDial(o.from, n)
 			c.Run()
 
 			//Say Hello and wait response
@@ -104,32 +107,32 @@ func (o *Orchestrator) bootClients() {
 			//Blocking call again until response
 			rsp := <-c.ReceiveChan()
 			switch rsp.(type) {
-			case *Welcome:
-				log.Println("Client has received Welcome from", n.String(), rsp.(*Welcome))
+			case *message.Welcome:
+				log.Println("Client has received Welcome from", n.String(), rsp.(*message.Welcome))
 				err := o.clientHandler.Accept(c)
 				if err != nil {
 					log.Println("Error Accepting Peer, Peer dies! ", err)
 					o.inChan <- memberUpdate{
 						node:  n,
-						event: ClientStatusError,
+						event: client.ClientStatusError,
 					}
 					return
 				} else {
 					o.clients[n.String()] = c
 					o.inChan <- memberUpdate{
 						node:  n,
-						event: ClientStatusConnected,
+						event: client.ClientStatusConnected,
 					}
 
 					//aggregate receiveChan to mainChan
 					o.aggregate(c.ReceiveChan())
 					log.Println("Client Achieved: ", n, "Cluster Status ", o.State())
 				}
-			case *Abort:
-				log.Println("Response Abort ", rsp.(*Abort), " remote node:", n.String())
+			case *message.Abort:
+				log.Println("Response Abort ", rsp.(*message.Abort), " remote node:", n.String())
 				o.inChan <- memberUpdate{
 					node:  n,
-					event: ClientStatusError,
+					event: client.ClientStatusError,
 				}
 			default:
 				log.Println("Unexpected type On response ")
@@ -138,24 +141,24 @@ func (o *Orchestrator) bootClients() {
 	}
 }
 
-func (o *Orchestrator) Accept(p PeerClient) (response Status) {
+func (o *Orchestrator) Accept(p client.PeerClient) (response message.Status) {
 	select {
 	case msg := <-p.ReceiveChan():
 		log.Println("Msg Received ", msg)
 
 		switch msg.(type) {
-		case *Hello:
-			p.Identify(msg.(*Hello).From)
+		case *message.Hello:
+			p.Identify(msg.(*message.Hello).From)
 			err := o.clientHandler.Accept(p)
 			if err != nil {
-				p.Send(&Abort{Id: msg.(*Hello).Id, From: o.from, Details: map[string]interface{}{"foo_bar": 1231}})
+				p.Send(&message.Abort{Id: msg.(*message.Hello).Id, From: o.from, Details: map[string]interface{}{"foo_bar": 1231}})
 				p.Exit()
 
-				response = ClientStatusAbort
+				response = client.ClientStatusAbort
 			}
-			p.Send(&Welcome{Id: msg.(*Hello).Id, From: o.from, Details: map[string]interface{}{"foo_bar": 1231}})
+			p.Send(&message.Welcome{Id: msg.(*message.Hello).Id, From: o.from, Details: map[string]interface{}{"foo_bar": 1231}})
 
-			response = ClientStatusConnected
+			response = client.ClientStatusConnected
 			/*		case *Ping:
 						log.Println("Router Ping: ", msg.(*Ping))
 						p.Send(&Pong{Id: msg.(*Ping).Id, From: o.from, Details: map[string]interface{}{}})
@@ -171,11 +174,11 @@ func (o *Orchestrator) Accept(p PeerClient) (response Status) {
 	return
 }
 
-func (o *Orchestrator) Route(m Message) {
+func (o *Orchestrator) Route(m message.Message) {
 
 }
 
-func (o *Orchestrator) aggregate(c chan Message) {
+func (o *Orchestrator) aggregate(c chan message.Message) {
 	go func() {
 		for {
 			select {

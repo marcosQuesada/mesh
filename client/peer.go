@@ -1,4 +1,4 @@
-package server
+package client
 
 //A Peer is a representation of a remote node
 
@@ -8,6 +8,9 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"github.com/marcosQuesada/mesh/message"
+	"github.com/marcosQuesada/mesh/node"
+	"github.com/marcosQuesada/mesh/serializer"
 	"github.com/nu7hatch/gouuid"
 	"io"
 	"log"
@@ -18,10 +21,10 @@ import (
 type Peer interface {
 	Id() ID
 	Remote() net.Addr //.String()
-	Receive() (Message, error)
-	ReceiveTimeout() (Message, error)
-	Send(Message) error
-	ReceiveChan() chan Message
+	Receive() (message.Message, error)
+	ReceiveTimeout() (message.Message, error)
+	Send(message.Message) error
+	ReceiveChan() chan message.Message
 	Terminate()
 }
 
@@ -30,9 +33,9 @@ type ID string
 type SocketPeer struct {
 	Conn       net.Conn
 	id         ID
-	Node       Node
-	serializer Serializer
-	RcvChan    chan Message
+	Node       node.Node
+	serializer serializer.Serializer
+	RcvChan    chan message.Message
 	exitChan   chan bool
 }
 
@@ -45,8 +48,8 @@ func NewJSONSocketPeer(conn net.Conn) *SocketPeer {
 	return &SocketPeer{
 		id:         ID(id.String()),
 		Conn:       conn,
-		serializer: &JsonSerializer{}, //@TODO: Must be plugable!
-		RcvChan:    make(chan Message),
+		serializer: &serializer.JsonSerializer{}, //@TODO: Must be plugable!
+		RcvChan:    make(chan message.Message),
 		exitChan:   make(chan bool),
 	}
 }
@@ -59,7 +62,7 @@ func (p *SocketPeer) Remote() net.Addr {
 	return p.Conn.RemoteAddr()
 }
 
-func (p *SocketPeer) Send(msg Message) error {
+func (p *SocketPeer) Send(msg message.Message) error {
 	rawMsg, err := p.serializer.Serialize(msg)
 	if err != nil {
 		return err
@@ -76,11 +79,11 @@ func (p *SocketPeer) Send(msg Message) error {
 }
 
 type response struct {
-	Msg Message
+	Msg message.Message
 	Err error
 }
 
-func (p *SocketPeer) Receive() (msg Message, err error) {
+func (p *SocketPeer) Receive() (msg message.Message, err error) {
 	b := bufio.NewReader(p.Conn)
 	buffer, err := b.ReadBytes('\n')
 	if err != nil {
@@ -97,7 +100,7 @@ func (p *SocketPeer) Receive() (msg Message, err error) {
 	return
 }
 
-func (p *SocketPeer) ReceiveTimeout() (msg Message, err error) {
+func (p *SocketPeer) ReceiveTimeout() (msg message.Message, err error) {
 	r := make(chan response)
 
 	go func(rsp chan response) {
@@ -127,7 +130,7 @@ func (p *SocketPeer) ReceiveTimeout() (msg Message, err error) {
 	return
 }
 
-func (p *SocketPeer) ReceiveChan() chan Message {
+func (p *SocketPeer) ReceiveChan() chan message.Message {
 	return p.RcvChan
 }
 

@@ -1,6 +1,8 @@
-package server
+package client
 
 import (
+	m "github.com/marcosQuesada/mesh/message"
+	n "github.com/marcosQuesada/mesh/node"
 	"reflect"
 	"testing"
 )
@@ -64,22 +66,22 @@ func TestErrorOnRemoveInexistentCLient(t *testing.T) {
 type fakeClient struct {
 	host    string
 	port    int
-	msgChan chan Message
+	msgChan chan m.Message
 }
 
-func (f *fakeClient) Node() Node {
-	return Node{Host: f.host, Port: f.port}
+func (f *fakeClient) Node() n.Node {
+	return n.Node{Host: f.host, Port: f.port}
 }
 func (f *fakeClient) Id() ID {
 	return ID(0)
 }
 func (f *fakeClient) Run() {
 }
-func (f *fakeClient) Send(m Message) error {
+func (f *fakeClient) Send(m m.Message) error {
 	f.msgChan <- m
 	return nil
 }
-func (f *fakeClient) ReceiveChan() (v chan Message) {
+func (f *fakeClient) ReceiveChan() (v chan m.Message) {
 	return f.msgChan
 }
 
@@ -87,24 +89,24 @@ func (f *fakeClient) Exit() {
 }
 func (f *fakeClient) SayHello() {
 }
-func (f *fakeClient) Identify(n Node) {
+func (f *fakeClient) Identify(n n.Node) {
 }
 
 func (f *fakeClient) Mode() string {
 	return ""
 }
 
-func (f *fakeClient) From() Node {
-	return Node{Host: f.host, Port: f.port}
+func (f *fakeClient) From() n.Node {
+	return n.Node{Host: f.host, Port: f.port}
 }
 
 func TestBasicFakeClientTest(t *testing.T) {
-	ch := make(chan Message, 10)
+	ch := make(chan m.Message, 10)
 	fkc := &fakeClient{"localhost", 9000, ch}
 
-	msg := Hello{
+	msg := m.Hello{
 		Id:      999,
-		From:    Node{"localhost", 9000},
+		From:    n.Node{"localhost", 9000},
 		Details: map[string]interface{}{"foo": "bar"},
 	}
 

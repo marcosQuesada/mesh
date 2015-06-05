@@ -1,10 +1,11 @@
-package server
+package cluster
 
 import (
 	"fmt"
+	"github.com/marcosQuesada/mesh/client"
+	"github.com/marcosQuesada/mesh/message"
+	"github.com/marcosQuesada/mesh/node"
 	"net"
-	/*	"os"
-		"runtime"*/
 	"testing"
 	"time"
 )
@@ -15,13 +16,13 @@ var done chan struct{} = make(chan struct{}, 0)
 
 func TestBasicOrchestrator(t *testing.T) {
 	go startBasicTestServer()
-	from := Node{Host: "localhost", Port: 9000}
-	node := Node{Host: "localhost", Port: 9011}
-	members := make(map[string]Node, 2)
-	members[node.String()] = node
+	from := node.Node{Host: "localhost", Port: 9000}
+	n := node.Node{Host: "localhost", Port: 9011}
+	members := make(map[string]node.Node, 2)
+	members[n.String()] = n
 	members[from.String()] = from // as fake local node
 
-	o = StartOrchestrator(from, members, DefaultClientHandler())
+	o = StartOrchestrator(from, members, client.DefaultClientHandler())
 	go o.Run()
 
 	time.Sleep(time.Millisecond * 100)
@@ -60,15 +61,15 @@ func startBasicTestServer() error {
 		}
 		defer listener.Close()
 
-		c := StartAcceptClient(conn, Node{})
+		c := client.StartAccept(conn, node.Node{})
 		go c.Run()
 
 		select {
 		case m := <-c.ReceiveChan():
 			fmt.Println("Server received m ", m)
-			msg := &Welcome{
-				Id:      m.(*Hello).Id,
-				Details: m.(*Hello).Details,
+			msg := &message.Welcome{
+				Id:      m.(*message.Hello).Id,
+				Details: m.(*message.Hello).Details,
 			}
 			err = c.Send(msg)
 			if err != nil {
@@ -78,9 +79,9 @@ func startBasicTestServer() error {
 
 			time.Sleep(time.Millisecond * 100)
 			//say ping to test what happen
-			pingMsg := &Ping{
+			pingMsg := &message.Ping{
 				Id:      123,
-				From:    Node{},
+				From:    node.Node{},
 				Details: map[string]interface{}{"foo": "bar"},
 			}
 			c.Send(pingMsg)
@@ -92,13 +93,13 @@ func startBasicTestServer() error {
 }
 
 func TestForwardingChannel(t *testing.T) {
-	from := Node{Host: "localhost", Port: 9000}
-	node := Node{Host: "localhost", Port: 9011}
-	members := make(map[string]Node, 2)
-	members[node.String()] = node
+	from := node.Node{Host: "localhost", Port: 9000}
+	n := node.Node{Host: "localhost", Port: 9011}
+	members := make(map[string]node.Node, 2)
+	members[n.String()] = n
 	members[from.String()] = from // as fake local node
 
-	o = StartOrchestrator(from, members, DefaultClientHandler())
+	o = StartOrchestrator(from, members, client.DefaultClientHandler())
 	go o.Run()
 	time.Sleep(time.Second)
 	o.Exit()

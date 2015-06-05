@@ -1,15 +1,16 @@
-package server
+package config
 
 import (
 	"fmt"
+	n "github.com/marcosQuesada/mesh/node"
 	"log"
 	"strconv"
 	"strings"
 )
 
 type Config struct {
-	addr    Node
-	cluster map[string]Node
+	Addr    n.Node
+	Cluster map[string]n.Node
 }
 
 func NewConfig(addr, cluster string) *Config {
@@ -21,14 +22,14 @@ func NewConfig(addr, cluster string) *Config {
 	}
 
 	return &Config{
-		addr:    addrNode,
-		cluster: parseList(cluster),
+		Addr:    addrNode,
+		Cluster: parseList(cluster),
 	}
 }
 
-func parseList(clusterList string) map[string]Node {
+func parseList(clusterList string) map[string]n.Node {
 	parts := strings.Split(clusterList, ",")
-	r := make(map[string]Node, len(parts))
+	r := make(map[string]n.Node, len(parts))
 	if len(parts) > 0 && len(parts[0]) > 0 {
 		log.Println("Parts are: ", parts)
 		for _, nodePart := range parts {
@@ -44,7 +45,7 @@ func parseList(clusterList string) map[string]Node {
 	return nil
 }
 
-func parse(node string) (Node, error) {
+func parse(node string) (n.Node, error) {
 	nodeParts := clear(node)
 	if len(nodeParts) != 0 {
 		node = nodeParts[0]
@@ -52,15 +53,15 @@ func parse(node string) (Node, error) {
 	p := strings.Split(node, ":")
 	if len(p) != 2 {
 		log.Println("Error building Node on config: ", p)
-		return Node{}, fmt.Errorf("Error building Node on config: %s", p)
+		return n.Node{}, fmt.Errorf("Error building Node on config: %s", p)
 	}
 	port, err := strconv.ParseInt(p[1], 10, 64)
 	if err != nil {
 		log.Println("Error Parsing Port config: ", p, err)
-		return Node{}, err
+		return n.Node{}, err
 	}
 
-	return Node{Host: p[0], Port: int(port)}, nil
+	return n.Node{Host: p[0], Port: int(port)}, nil
 }
 
 func clear(node string) []string {

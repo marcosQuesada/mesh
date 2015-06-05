@@ -2,18 +2,23 @@ package server
 
 import (
 	"fmt"
+	"github.com/marcosQuesada/mesh/client"
+	"github.com/marcosQuesada/mesh/cluster"
+	"github.com/marcosQuesada/mesh/config"
+	"github.com/marcosQuesada/mesh/message"
+	"github.com/marcosQuesada/mesh/node"
 	"net"
 	"testing"
 	"time"
 )
 
 func TestBasicServerClient(t *testing.T) {
-	config := &Config{
-		addr: Node{Host: "localhost", Port: 8001},
+	config := &config.Config{
+		Addr: node.Node{Host: "localhost", Port: 8001},
 	}
 
 	srv := New(config)
-	srv.startServer(&Orchestrator{})
+	srv.startServer(&cluster.Orchestrator{})
 	time.Sleep(time.Millisecond * 100)
 
 	done := make(chan bool)
@@ -25,9 +30,9 @@ func TestBasicServerClient(t *testing.T) {
 		}
 		defer conn.Close()
 
-		peerA := NewJSONSocketPeer(conn)
+		peerA := client.NewJSONSocketPeer(conn)
 
-		msg := Hello{
+		msg := message.Hello{
 			Id:      10,
 			Details: map[string]interface{}{"foo": "bar"},
 		}

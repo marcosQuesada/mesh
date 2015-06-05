@@ -1,7 +1,9 @@
-package server
+package client
 
 import (
 	"fmt"
+	"github.com/marcosQuesada/mesh/message"
+	"github.com/marcosQuesada/mesh/node"
 	"io"
 	"net"
 	"testing"
@@ -9,8 +11,8 @@ import (
 )
 
 type testPeerHandler struct {
-	lastMsg *Hello
-	outChan chan *Hello
+	lastMsg *message.Hello
+	outChan chan *message.Hello
 	exit    bool
 }
 
@@ -23,15 +25,15 @@ func TestPeersOnPipes(t *testing.T) {
 	defer peerB.Conn.Close()
 
 	tp := &testPeerHandler{
-		outChan: make(chan *Hello, 1),
+		outChan: make(chan *message.Hello, 1),
 	}
-	go tp.handlePeer(peerA, Node{Host: "localhost", Port: 5000})
-	go tp.handlePeer(peerB, Node{Host: "localhost", Port: 5005})
+	go tp.handlePeer(peerA, node.Node{Host: "localhost", Port: 5000})
+	go tp.handlePeer(peerB, node.Node{Host: "localhost", Port: 5005})
 
 	//first message
-	msg := Hello{
+	msg := message.Hello{
 		Id:      0,
-		From:    Node{Host: "localhost", Port: 5000},
+		From:    node.Node{Host: "localhost", Port: 5000},
 		Details: map[string]interface{}{"foo": "bar"},
 	}
 	peerA.Send(msg)
@@ -50,24 +52,24 @@ func TestPeersOnPipes(t *testing.T) {
 	}
 }
 
-func (ph *testPeerHandler) handlePeer(p *SocketPeer, from Node) {
+func (ph *testPeerHandler) handlePeer(p *SocketPeer, from node.Node) {
 	defer func() {
 		ph.outChan <- ph.lastMsg
 	}()
 
 	for !ph.exit {
-		m, err := p.Receive()
+		msg, err := p.Receive()
 		if err != nil {
 			fmt.Println("Error Receiving on server, err ", err)
 			return
 		}
 
-		if m.MessageType() != 0 {
-			fmt.Println("Error on received Hello Message ", m)
+		if msg.MessageType() != 0 {
+			fmt.Println("Error on received Hello Message ", msg)
 			return
 		}
 
-		newMsg := m.(*Hello)
+		newMsg := msg.(*message.Hello)
 		if newMsg.Details["foo"].(string) == "PONG" {
 			newMsg.Details["foo"] = "PING"
 		} else {
@@ -98,29 +100,29 @@ func TestBasicPeersOnServerClient(t *testing.T) {
 
 	peerA := NewJSONSocketPeer(conn)
 
-	msg := Hello{
+	msg := message.Hello{
 		Id:      10,
 		Details: map[string]interface{}{"foo": "bar"},
 	}
 	peerA.Send(msg)
 
-	m, err := peerA.Receive()
+	msgA, err := peerA.Receive()
 	if err != nil {
 		t.Error("Error on received Hello Message ", err)
 	}
 
-	fmt.Println("Message is ", m, "err", err)
-	if m.MessageType() != 0 {
-		t.Error("Error on received Hello Message ", m)
+	fmt.Println("Message is ", msgA, "err", err)
+	if msgA.MessageType() != 0 {
+		t.Error("Error on received Hello Message ", msgA)
 	}
 
-	newMsg := m.(*Hello)
+	newMsg := msgA.(*message.Hello)
 	if newMsg.Id != 10 {
-		t.Error("Error on received Hello Message ", m)
+		t.Error("Error on received Hello Message ", msgA)
 	}
 
 	if newMsg.Details["foo"].(string) != "bar" {
-		t.Error("Error on received Hello Message ", m)
+		t.Error("Error on received Hello Message ", msgA)
 	}
 }
 
