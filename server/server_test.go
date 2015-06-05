@@ -2,11 +2,11 @@ package server
 
 import (
 	"fmt"
-	"github.com/marcosQuesada/mesh/client"
 	"github.com/marcosQuesada/mesh/cluster"
 	"github.com/marcosQuesada/mesh/config"
 	"github.com/marcosQuesada/mesh/message"
 	"github.com/marcosQuesada/mesh/node"
+	"github.com/marcosQuesada/mesh/peer"
 	"net"
 	"testing"
 	"time"
@@ -30,13 +30,13 @@ func TestBasicServerClient(t *testing.T) {
 		}
 		defer conn.Close()
 
-		peerA := client.NewJSONSocketPeer(conn)
+		linkA := peer.NewJSONSocketLink(conn)
 
 		msg := message.Hello{
 			Id:      10,
 			Details: map[string]interface{}{"foo": "bar"},
 		}
-		peerA.Send(msg)
+		linkA.Send(msg)
 		done <- true
 	}(done)
 

@@ -2,27 +2,27 @@ package server
 
 import (
 	"github.com/marcosQuesada/mesh/cli"
-	"github.com/marcosQuesada/mesh/client"
 	"github.com/marcosQuesada/mesh/cluster"
 	"github.com/marcosQuesada/mesh/config"
 	n "github.com/marcosQuesada/mesh/node"
+	"github.com/marcosQuesada/mesh/peer"
 	"log"
 	"net"
 )
 
 type Server struct {
-	config        *config.Config
-	clientHandler client.ClientHandler
-	node          n.Node
-	exit          chan bool
+	config      *config.Config
+	peerHandler peer.PeerHandler
+	node        n.Node
+	exit        chan bool
 }
 
 func New(c *config.Config) *Server {
 	return &Server{
-		clientHandler: client.DefaultClientHandler(),
-		config:        c,
-		exit:          make(chan bool),
-		node:          c.Addr,
+		peerHandler: peer.DefaultPeerHandler(),
+		config:      c,
+		exit:        make(chan bool),
+		node:        c.Addr,
 	}
 }
 
@@ -30,7 +30,7 @@ func (s *Server) Run() {
 	defer close(s.exit)
 
 	// StartOrchestrator
-	o := cluster.StartOrchestrator(s.node, s.config.Cluster, s.clientHandler)
+	o := cluster.StartOrchestrator(s.node, s.config.Cluster, s.peerHandler)
 	go o.Run()
 
 	s.startServer(o)
@@ -64,7 +64,7 @@ func (s *Server) startServer(o *cluster.Orchestrator) {
 				return
 			}
 
-			c := client.StartAccept(conn, s.node)
+			c := peer.NewAcceptor(conn, s.node)
 			c.Run()
 
 			r := o.Accept(c)

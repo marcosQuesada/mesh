@@ -1,8 +1,4 @@
-package client
-
-//A Peer is a representation of a remote node
-
-//It handles connection state supervision
+package peer
 
 import (
 	"bufio"
@@ -18,7 +14,7 @@ import (
 	"time"
 )
 
-type Peer interface {
+type Link interface {
 	Id() ID
 	Remote() net.Addr //.String()
 	Receive() (message.Message, error)
@@ -30,7 +26,7 @@ type Peer interface {
 
 type ID string
 
-type SocketPeer struct {
+type SocketLink struct {
 	Conn       net.Conn
 	id         ID
 	Node       node.Node
@@ -39,13 +35,13 @@ type SocketPeer struct {
 	exitChan   chan bool
 }
 
-func NewJSONSocketPeer(conn net.Conn) *SocketPeer {
+func NewJSONSocketLink(conn net.Conn) *SocketLink {
 	id, err := uuid.NewV4()
 	if err != nil {
 		log.Println("error:", err)
 		return nil
 	}
-	return &SocketPeer{
+	return &SocketLink{
 		id:         ID(id.String()),
 		Conn:       conn,
 		serializer: &serializer.JsonSerializer{}, //@TODO: Must be plugable!
@@ -54,15 +50,15 @@ func NewJSONSocketPeer(conn net.Conn) *SocketPeer {
 	}
 }
 
-func (p *SocketPeer) Id() ID {
+func (p *SocketLink) Id() ID {
 	return p.id
 }
 
-func (p *SocketPeer) Remote() net.Addr {
+func (p *SocketLink) Remote() net.Addr {
 	return p.Conn.RemoteAddr()
 }
 
-func (p *SocketPeer) Send(msg message.Message) error {
+func (p *SocketLink) Send(msg message.Message) error {
 	rawMsg, err := p.serializer.Serialize(msg)
 	if err != nil {
 		return err
@@ -83,7 +79,7 @@ type response struct {
 	Err error
 }
 
-func (p *SocketPeer) Receive() (msg message.Message, err error) {
+func (p *SocketLink) Receive() (msg message.Message, err error) {
 	b := bufio.NewReader(p.Conn)
 	buffer, err := b.ReadBytes('\n')
 	if err != nil {
@@ -100,7 +96,7 @@ func (p *SocketPeer) Receive() (msg message.Message, err error) {
 	return
 }
 
-func (p *SocketPeer) ReceiveTimeout() (msg message.Message, err error) {
+func (p *SocketLink) ReceiveTimeout() (msg message.Message, err error) {
 	r := make(chan response)
 
 	go func(rsp chan response) {
@@ -125,16 +121,16 @@ func (p *SocketPeer) ReceiveTimeout() (msg message.Message, err error) {
 	case m := <-r:
 		return m.Msg, m.Err
 	case <-timeout.C:
-		return nil, fmt.Errorf("Timeout receiving peer response")
+		return nil, fmt.Errorf("Timeout receiving Link response")
 	}
 	return
 }
 
-func (p *SocketPeer) ReceiveChan() chan message.Message {
+func (p *SocketLink) ReceiveChan() chan message.Message {
 	return p.RcvChan
 }
 
-func (p *SocketPeer) Terminate() {
+func (p *SocketLink) Terminate() {
 	p.Conn.Close()
 	close(p.RcvChan)
 	close(p.exitChan)

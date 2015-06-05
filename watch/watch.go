@@ -1,4 +1,4 @@
-package watcher
+package watch
 
 //Takes care to regular pull peers to update its link state
 // Adds a ticker on each peer added,
@@ -9,14 +9,13 @@ package watcher
 
 import (
 	"fmt"
-	"github.com/marcosQuesada/mesh/client"
 	"github.com/marcosQuesada/mesh/message"
 	"github.com/marcosQuesada/mesh/node"
 	"time"
 )
 
 type Watcher interface {
-	Care(p *client.Peer)
+	Care(node.Node)
 }
 
 type defaultWatcher struct {
@@ -34,13 +33,17 @@ type updateMessage struct {
 
 //a child to take care
 type subject struct {
-	peer    *client.Peer
+	node    node.Node
 	exit    chan bool
 	ticker  *time.Ticker
 	request int //last request id
 }
 
-func (w *defaultWatcher) Care(p *client.Peer) {
+func New() *defaultWatcher {
+	return &defaultWatcher{}
+}
+
+func (w *defaultWatcher) Care(n node.Node) {
 	/*	s := &subject{
 		peer:   p,
 		exit:   make(chan bool),

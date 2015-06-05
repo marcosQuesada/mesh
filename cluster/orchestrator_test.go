@@ -2,9 +2,9 @@ package cluster
 
 import (
 	"fmt"
-	"github.com/marcosQuesada/mesh/client"
 	"github.com/marcosQuesada/mesh/message"
 	"github.com/marcosQuesada/mesh/node"
+	"github.com/marcosQuesada/mesh/peer"
 	"net"
 	"testing"
 	"time"
@@ -22,7 +22,7 @@ func TestBasicOrchestrator(t *testing.T) {
 	members[n.String()] = n
 	members[from.String()] = from // as fake local node
 
-	o = StartOrchestrator(from, members, client.DefaultClientHandler())
+	o = StartOrchestrator(from, members, peer.DefaultPeerHandler())
 	go o.Run()
 
 	time.Sleep(time.Millisecond * 100)
@@ -31,7 +31,7 @@ func TestBasicOrchestrator(t *testing.T) {
 		t.Error("Expected estatus completed")
 	}
 
-	clients := o.clientHandler.Clients()
+	clients := o.peerHandler.Peers()
 	if len(clients) != 1 {
 		t.Error("Unexpected client registered size", clients)
 	}
@@ -61,7 +61,7 @@ func startBasicTestServer() error {
 		}
 		defer listener.Close()
 
-		c := client.StartAccept(conn, node.Node{})
+		c := peer.NewAcceptor(conn, node.Node{})
 		go c.Run()
 
 		select {
@@ -99,7 +99,7 @@ func TestForwardingChannel(t *testing.T) {
 	members[n.String()] = n
 	members[from.String()] = from // as fake local node
 
-	o = StartOrchestrator(from, members, client.DefaultClientHandler())
+	o = StartOrchestrator(from, members, peer.DefaultPeerHandler())
 	go o.Run()
 	time.Sleep(time.Second)
 	o.Exit()

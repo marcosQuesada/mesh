@@ -1,4 +1,4 @@
-package client
+package peer
 
 import (
 	"fmt"
@@ -10,25 +10,25 @@ import (
 	"time"
 )
 
-type testPeerHandler struct {
+type testLinkHandler struct {
 	lastMsg *message.Hello
 	outChan chan *message.Hello
 	exit    bool
 }
 
-func TestPeersOnPipes(t *testing.T) {
+func TestLinksOnPipes(t *testing.T) {
 	a, b := net.Pipe()
 
-	peerA := NewJSONSocketPeer(a)
-	peerB := NewJSONSocketPeer(b)
-	defer peerA.Conn.Close()
-	defer peerB.Conn.Close()
+	linkA := NewJSONSocketLink(a)
+	linkB := NewJSONSocketLink(b)
+	defer linkA.Conn.Close()
+	defer linkB.Conn.Close()
 
-	tp := &testPeerHandler{
+	tp := &testLinkHandler{
 		outChan: make(chan *message.Hello, 1),
 	}
-	go tp.handlePeer(peerA, node.Node{Host: "localhost", Port: 5000})
-	go tp.handlePeer(peerB, node.Node{Host: "localhost", Port: 5005})
+	go tp.handleLink(linkA, node.Node{Host: "localhost", Port: 5000})
+	go tp.handleLink(linkB, node.Node{Host: "localhost", Port: 5005})
 
 	//first message
 	msg := message.Hello{
@@ -36,7 +36,7 @@ func TestPeersOnPipes(t *testing.T) {
 		From:    node.Node{Host: "localhost", Port: 5000},
 		Details: map[string]interface{}{"foo": "bar"},
 	}
-	peerA.Send(msg)
+	linkA.Send(msg)
 
 	time.Sleep(time.Millisecond * 300)
 	tp.exit = true
@@ -52,7 +52,7 @@ func TestPeersOnPipes(t *testing.T) {
 	}
 }
 
-func (ph *testPeerHandler) handlePeer(p *SocketPeer, from node.Node) {
+func (ph *testLinkHandler) handleLink(p *SocketLink, from node.Node) {
 	defer func() {
 		ph.outChan <- ph.lastMsg
 	}()
@@ -87,7 +87,7 @@ func (ph *testPeerHandler) handlePeer(p *SocketPeer, from node.Node) {
 	}
 }
 
-func TestBasicPeersOnServerClient(t *testing.T) {
+func TestBasicLinksOnServerClient(t *testing.T) {
 	go startTestServer()
 	time.Sleep(time.Second * 1)
 
@@ -98,15 +98,15 @@ func TestBasicPeersOnServerClient(t *testing.T) {
 	}
 	defer conn.Close()
 
-	peerA := NewJSONSocketPeer(conn)
+	linkA := NewJSONSocketLink(conn)
 
 	msg := message.Hello{
 		Id:      10,
 		Details: map[string]interface{}{"foo": "bar"},
 	}
-	peerA.Send(msg)
+	linkA.Send(msg)
 
-	msgA, err := peerA.Receive()
+	msgA, err := linkA.Receive()
 	if err != nil {
 		t.Error("Error on received Hello Message ", err)
 	}
@@ -142,27 +142,27 @@ func startTestServer() {
 			continue
 		}
 		defer listener.Close()
-		peer := NewJSONSocketPeer(conn)
-		go handleConnection(peer)
+		Link := NewJSONSocketLink(conn)
+		go handleConnection(Link)
 	}
 }
 
-func handleConnection(peer *SocketPeer) {
-	fmt.Printf("Client %v connected.", peer.Conn.RemoteAddr(), "\n")
+func handleConnection(link *SocketLink) {
+	fmt.Printf("Client %v connected.", link.Conn.RemoteAddr(), "\n")
 	for {
-		m, err := peer.Receive()
+		m, err := link.Receive()
 		if err != nil {
 			if err != io.EOF {
 				fmt.Println("Error Receiving: ", err)
 			}
-			peer.Conn.Close()
+			link.Conn.Close()
 			break
 		}
-		err = peer.Send(m)
+		err = link.Send(m)
 		if err != nil {
 			fmt.Println("Error Receiving: ", err)
 		}
 	}
 
-	fmt.Println("Connection from %v closed.", peer.Conn.RemoteAddr())
+	fmt.Println("Connection from %v closed.", link.Conn.RemoteAddr())
 }
