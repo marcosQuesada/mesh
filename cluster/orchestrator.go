@@ -5,6 +5,7 @@ import (
 	n "github.com/marcosQuesada/mesh/node"
 	"github.com/marcosQuesada/mesh/peer"
 	"log"
+	"time"
 )
 
 // Orchestrator takes cares on all cluster related tasks
@@ -54,8 +55,16 @@ func (o *Orchestrator) Run() {
 	defer close(o.exitChan)
 	defer close(o.inChan)
 
-	o.bootClients()
-	//handle updates from members
+	for _, node := range o.members {
+		//avoid local connexion
+		if node.String() == o.from.String() {
+			continue
+		}
+
+		go o.bootClient(node)
+	}
+
+	//Member Updates to Coordinator?  handle updates from members
 	for {
 		select {
 		case msg := <-o.inChan:
@@ -111,59 +120,56 @@ func (o *Orchestrator) Exit() {
 	o.exitChan <- true
 }
 
-func (o *Orchestrator) bootClients() {
-	log.Println("Orchestrartor boot clients", len(o.members), o.members)
-	for _, node := range o.members {
-		//avoid local connexion
-		if node.String() == o.from.String() {
-			continue
-		}
+func (o *Orchestrator) bootClient(node n.Node) {
+	log.Println("Orchestrartor boot client", node)
 
-		var c *peer.Peer
-		go func(n n.Node) {
-			log.Println("Starting Dial Client on Node ", o.from.String(), "destination: ", n.String())
-			//Blocking call, wait until connection success
-			c = peer.NewDialer(o.from, n)
-			c.Run()
+	var c *peer.Peer
+	log.Println("Starting Dial Client on Node ", o.from.String(), "destination: ", node.String())
+	//Blocking call, wait until connection success
+	c = peer.NewDialer(o.from, node)
+	c.Run()
 
-			//Say Hello and wait response
-			c.SayHello()
+	//Say Hello and wait response
+	c.SayHello()
 
-			//Blocking call again until response
-			rsp := <-c.ReceiveChan()
-			switch rsp.(type) {
-			case *message.Welcome:
-				log.Println("Client has received Welcome from", n.String(), rsp.(*message.Welcome))
-				err := o.peerHandler.Accept(c)
-				if err != nil {
-					log.Println("Error Accepting Peer, Peer dies! ", err)
-					o.inChan <- memberUpdate{
-						node:  n,
-						event: peer.PeerStatusError,
-					}
-					return
-				} else {
-					o.clients[n.String()] = c
-					o.inChan <- memberUpdate{
-						node:  n,
-						event: peer.PeerStatusConnected,
-					}
-
-					//aggregate receiveChan to mainChan
-					o.aggregate(c.ReceiveChan())
-					log.Println("Client Achieved: ", n, "Cluster Status ", o.State())
-				}
-			case *message.Abort:
-				log.Println("Response Abort ", rsp.(*message.Abort), " remote node:", n.String())
+	select {
+	case <-time.NewTimer(time.Second).C:
+		log.Println("Client has not receive response, Timeout")
+		return
+	case rsp := <-c.ReceiveChan():
+		switch rsp.(type) {
+		case *message.Welcome:
+			log.Println("Client has received Welcome from", node.String(), rsp.(*message.Welcome))
+			err := o.peerHandler.Accept(c)
+			if err != nil {
+				log.Println("Error Accepting Peer, Peer dies! ", err)
 				o.inChan <- memberUpdate{
-					node:  n,
+					node:  node,
 					event: peer.PeerStatusError,
 				}
-			default:
-				log.Println("Unexpected type On response ")
+				return
+			} else {
+				o.clients[node.String()] = c
+				o.inChan <- memberUpdate{
+					node:  node,
+					event: peer.PeerStatusConnected,
+				}
+
+				//aggregate receiveChan to mainChan
+				o.aggregate(c.ReceiveChan())
+				log.Println("Client Achieved: ", node, "Cluster Status ", o.State())
 			}
-		}(node)
+		case *message.Abort:
+			log.Println("Response Abort ", rsp.(*message.Abort), " remote node:", node.String())
+			o.inChan <- memberUpdate{
+				node:  node,
+				event: peer.PeerStatusError,
+			}
+		default:
+			log.Println("Unexpected type On response ")
+		}
 	}
+
 }
 
 func (o *Orchestrator) aggregate(c chan message.Message) {

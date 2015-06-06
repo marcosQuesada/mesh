@@ -164,5 +164,5 @@ func handleConnection(link *SocketLink) {
 		}
 	}
 
-	fmt.Println("Connection from %v closed.", link.Conn.RemoteAddr())
+	fmt.Printf("Connection from %v closed \n", link.Conn.RemoteAddr())
 }
