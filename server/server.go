@@ -19,7 +19,7 @@ type Server struct {
 
 func New(c *config.Config) *Server {
 	return &Server{
-		peerHandler: peer.DefaultPeerHandler(),
+		peerHandler: peer.DefaultPeerHandler(c.Addr),
 		config:      c,
 		exit:        make(chan bool),
 		node:        c.Addr,

@@ -1,24 +1,25 @@
 package peer
 
 import (
+	n "github.com/marcosQuesada/mesh/node"
 	"testing"
 )
 
 var c1 *NopPeer
 var c2 *NopPeer
-var clh PeerHandler
+var clh *defaultPeerHandler
 
 func TestBasicPeerHandler(t *testing.T) {
 	c1 = &NopPeer{host: "foo", port: 1234}
 	c2 = &NopPeer{host: "bar", port: 1234}
 
-	clh = DefaultPeerHandler()
-	err := clh.Accept(c1)
+	clh = DefaultPeerHandler(n.Node{})
+	err := clh.accept(c1)
 	if err != nil {
 		t.Error("Unexpected Error Accepting PeerNode")
 	}
 
-	err = clh.Accept(c2)
+	err = clh.accept(c2)
 	if err != nil {
 		t.Error("Unexpected Error Accepting PeerNode")
 	}
@@ -29,7 +30,7 @@ func TestBasicPeerHandler(t *testing.T) {
 	}
 }
 func TestErrorOnAddTwiceSameClient(t *testing.T) {
-	err := clh.Accept(c2)
+	err := clh.accept(c2)
 	if err == nil {
 		t.Error("Unexpected Error Accepting PeerNode", err)
 	}
@@ -39,7 +40,7 @@ func TestErrorOnAddTwiceSameClient(t *testing.T) {
 }
 
 func TestToRemoveCLientFromPeerHandler(t *testing.T) {
-	err := clh.Remove(c2)
+	err := clh.remove(c2)
 	if err != nil {
 		t.Error("Unexpected Error Removing PeerNode", err)
 	}
@@ -51,7 +52,7 @@ func TestToRemoveCLientFromPeerHandler(t *testing.T) {
 }
 
 func TestErrorOnRemoveInexistentCLient(t *testing.T) {
-	err := clh.Remove(c2)
+	err := clh.remove(c2)
 	if err == nil {
 		t.Error("Unexpected Error Remove PeerNode", err)
 	}

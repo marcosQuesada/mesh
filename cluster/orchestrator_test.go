@@ -22,7 +22,7 @@ func TestBasicOrchestrator(t *testing.T) {
 	members[n.String()] = n
 	members[from.String()] = from // as fake local node
 
-	o = StartOrchestrator(from, members, peer.DefaultPeerHandler())
+	o = StartOrchestrator(from, members, peer.DefaultPeerHandler(from))
 	go o.Run()
 
 	time.Sleep(time.Millisecond * 100)
@@ -99,7 +99,7 @@ func TestForwardingChannel(t *testing.T) {
 	members[n.String()] = n
 	members[from.String()] = from // as fake local node
 
-	o = StartOrchestrator(from, members, peer.DefaultPeerHandler())
+	o = StartOrchestrator(from, members, peer.DefaultPeerHandler(from))
 	go o.Run()
 	time.Sleep(time.Second)
 	o.Exit()

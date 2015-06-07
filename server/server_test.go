@@ -13,12 +13,15 @@ import (
 )
 
 func TestBasicServerClient(t *testing.T) {
+	org := node.Node{Host: "localhost", Port: 8001}
 	config := &config.Config{
-		Addr: node.Node{Host: "localhost", Port: 8001},
+		Addr: org,
 	}
 
 	srv := New(config)
-	srv.startServer(&cluster.Orchestrator{})
+	members := map[string]node.Node{}
+	orch := cluster.StartOrchestrator(node.Node{}, members, peer.DefaultPeerHandler(node.Node{}))
+	srv.startServer(orch)
 	time.Sleep(time.Millisecond * 100)
 
 	done := make(chan bool)
@@ -37,6 +40,7 @@ func TestBasicServerClient(t *testing.T) {
 			Details: map[string]interface{}{"foo": "bar"},
 		}
 		linkA.Send(msg)
+		time.Sleep(time.Second)
 		done <- true
 	}(done)
 
