@@ -30,8 +30,6 @@ type Orchestrator struct {
 	peerHandler peer.PeerHandler
 	from        n.Node
 	members     map[string]n.Node
-	clients     map[string]*peer.Peer
-	inChan      chan memberUpdate
 	MainChan    chan message.Message // Used as aggregated channel from Client Peers
 	fwdChan     chan message.Message //Channel that gets routed to destination client
 	exitChan    chan bool
@@ -42,8 +40,6 @@ func StartOrchestrator(from n.Node, members map[string]n.Node, clh peer.PeerHand
 		peerHandler: clh,
 		from:        from,
 		members:     members,
-		clients:     make(map[string]*peer.Peer, 0),
-		inChan:      make(chan memberUpdate, 0),
 		MainChan:    make(chan message.Message, 0),
 		fwdChan:     make(chan message.Message, 0),
 		exitChan:    make(chan bool, 0),
@@ -53,7 +49,6 @@ func StartOrchestrator(from n.Node, members map[string]n.Node, clh peer.PeerHand
 func (o *Orchestrator) Run() {
 	defer log.Println("Exiting Orchestrator Run")
 	defer close(o.exitChan)
-	defer close(o.inChan)
 
 	for _, node := range o.members {
 		//avoid local connexion
@@ -67,30 +62,28 @@ func (o *Orchestrator) Run() {
 	//Member Updates to Coordinator?  handle updates from members
 	for {
 		select {
-		case msg := <-o.inChan:
-			switch msg.event {
+		case msg := <-o.peerHandler.Updates():
+			switch msg.Event {
 			case peer.PeerStatusConnected:
-				o.members[msg.node.String()] = msg.node
+				log.Println("XXX  Peer Status Connected")
+				//aggregate receiveChan to mainChan
+				o.aggregate(msg.Peer.ReceiveChan())
+				o.members[msg.Node.String()] = msg.Node
 				if o.State() {
-					log.Println("Cluster Completed!", "Total Members:", len(o.members), "Total Clients:", len(o.clients))
+					log.Println("Cluster Completed!", "Total Members:", len(o.members))
 				}
+
 			case peer.PeerStatusError:
-				log.Println("Client Exitting", msg.node)
+				log.Println("Client Exitting", msg.Node)
 			}
 		case <-o.exitChan:
 			return
 		}
 	}
-
 }
 
 func (o *Orchestrator) State() bool {
-	log.Println("len is ", len(o.clients))
 	return o.peerHandler.Len() == (len(o.members) - 1) //@TODO: BAD APPROACH!
-}
-
-func (o *Orchestrator) Accept(p peer.NodePeer) (response message.Status) {
-	return o.peerHandler.AcceptClient(p)
 }
 
 func (o *Orchestrator) Exit() {
@@ -98,6 +91,7 @@ func (o *Orchestrator) Exit() {
 }
 
 func (o *Orchestrator) aggregate(c chan message.Message) {
+	log.Println("Aggregate")
 	go func() {
 		for {
 			select {

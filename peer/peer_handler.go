@@ -16,7 +16,7 @@ type PeerHandler interface {
 	BootClient(n.Node) //message.Status
 	AcceptClient(NodePeer) message.Status
 	Route(message.Message)
-
+	Updates() chan MemberUpdate
 	Notify(n.Node, error) //Used to get notifications of Client conn failures
 	Peers() map[string]NodePeer
 	Len() int
@@ -27,6 +27,12 @@ type defaultPeerHandler struct {
 	peers   map[string]NodePeer
 	mutex   sync.Mutex
 	from    n.Node
+	inChan  chan MemberUpdate
+}
+type MemberUpdate struct {
+	Node  n.Node
+	Event message.Status
+	Peer  NodePeer
 }
 
 func DefaultPeerHandler(node n.Node) *defaultPeerHandler {
@@ -34,6 +40,7 @@ func DefaultPeerHandler(node n.Node) *defaultPeerHandler {
 		watcher: watch.New(),
 		peers:   make(map[string]NodePeer),
 		from:    node,
+		inChan:  make(chan MemberUpdate, 0),
 	}
 }
 
@@ -60,28 +67,27 @@ func (n *defaultPeerHandler) BootClient(node n.Node) {
 			err := n.accept(c)
 			if err != nil {
 				log.Println("Error Accepting Peer, Peer dies! ", err)
-				/*				n.inChan <- memberUpdate{
-								node:  node,
-								event: PeerStatusError,
-							}*/
+				n.inChan <- MemberUpdate{
+					Node:  node,
+					Event: PeerStatusError,
+				}
 				return
 			} else {
 				//o.clients[node.String()] = c
-				/*				o.inChan <- memberUpdate{
-								node:  node,
-								event: PeerStatusConnected,
-							}*/
+				n.inChan <- MemberUpdate{
+					Node:  node,
+					Event: PeerStatusConnected,
+					Peer:  c,
+				}
 
-				//aggregate receiveChan to mainChan
-				//o.aggregate(c.ReceiveChan())
 				log.Println("Client Achieved: ", node)
 			}
 		case *message.Abort:
 			log.Println("Response Abort ", rsp.(*message.Abort), " remote node:", node.String())
-			/*			o.inChan <- memberUpdate{
-						node:  node,
-						event: PeerStatusError,
-					}*/
+			n.inChan <- MemberUpdate{
+				Node:  node,
+				Event: PeerStatusError,
+			}
 		default:
 			log.Println("Unexpected type On response ")
 		}
@@ -92,8 +98,6 @@ func (n *defaultPeerHandler) BootClient(node n.Node) {
 func (n *defaultPeerHandler) AcceptClient(p NodePeer) (response message.Status) {
 	select {
 	case msg := <-p.ReceiveChan():
-		log.Println("Msg Received ", msg)
-
 		switch msg.(type) {
 		case *message.Hello:
 			p.Identify(msg.(*message.Hello).From)
@@ -103,10 +107,22 @@ func (n *defaultPeerHandler) AcceptClient(p NodePeer) (response message.Status) 
 				p.Exit()
 
 				response = PeerStatusAbort
+				n.inChan <- MemberUpdate{
+					Node:  msg.(*message.Hello).From,
+					Event: PeerStatusError,
+				}
+				return
 			}
 			p.Send(&message.Welcome{Id: msg.(*message.Hello).Id, From: n.from, Details: map[string]interface{}{"foo_bar": 1231}})
 
 			response = PeerStatusConnected
+			n.inChan <- MemberUpdate{
+				Node:  msg.(*message.Hello).From, //Sure??
+				Event: PeerStatusConnected,
+				Peer:  p,
+			}
+
+			log.Println("Client Achieved: ", msg.(*message.Hello).From)
 		case *message.Ping:
 			log.Println("Router Ping: ", msg.(*message.Ping))
 			p.Send(&message.Pong{Id: msg.(*message.Ping).Id, From: n.from, Details: map[string]interface{}{}})
@@ -114,6 +130,10 @@ func (n *defaultPeerHandler) AcceptClient(p NodePeer) (response message.Status) 
 	}
 
 	return
+}
+
+func (h *defaultPeerHandler) Updates() chan MemberUpdate {
+	return h.inChan
 }
 
 func (h *defaultPeerHandler) Notify(n n.Node, err error) {

@@ -12,24 +12,24 @@ import (
 
 type Server struct {
 	config      *config.Config
-	peerHandler peer.PeerHandler
 	node        n.Node
+	peerHandler peer.PeerHandler
 	exit        chan bool
 }
 
 func New(c *config.Config) *Server {
 	return &Server{
-		peerHandler: peer.DefaultPeerHandler(c.Addr),
 		config:      c,
 		exit:        make(chan bool),
 		node:        c.Addr,
+		peerHandler: peer.DefaultPeerHandler(c.Addr),
 	}
 }
 
 func (s *Server) Run() {
 	defer close(s.exit)
 
-	// StartOrchestrator
+	//@TODO: StartCoordinator
 	o := cluster.StartOrchestrator(s.node, s.config.Cluster, s.peerHandler)
 	go o.Run()
 
@@ -67,7 +67,7 @@ func (s *Server) startServer(o *cluster.Orchestrator) {
 			c := peer.NewAcceptor(conn, s.node)
 			c.Run()
 
-			r := o.Accept(c)
+			r := s.peerHandler.AcceptClient(c)
 			log.Println("Result from Accept is ", r)
 		}
 	}()
