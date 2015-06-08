@@ -24,9 +24,8 @@ func TestBasicPeerHandler(t *testing.T) {
 		t.Error("Unexpected Error Accepting PeerNode")
 	}
 
-	peers := clh.Peers()
-	if len(peers) != 2 {
-		t.Error("Unexpected client size ", clh.Peers())
+	if len(clh.peers) != 2 {
+		t.Error("Unexpected client size ", clh.peers)
 	}
 }
 func TestErrorOnAddTwiceSameClient(t *testing.T) {
@@ -45,9 +44,8 @@ func TestToRemoveCLientFromPeerHandler(t *testing.T) {
 		t.Error("Unexpected Error Removing PeerNode", err)
 	}
 
-	peers := clh.Peers()
-	if len(peers) != 1 {
-		t.Error("Unexpected client size ", clh.Peers())
+	if len(clh.peers) != 1 {
+		t.Error("Unexpected client size ", clh.peers)
 	}
 }
 

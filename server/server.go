@@ -68,7 +68,7 @@ func (s *Server) startServer(o *cluster.Orchestrator) {
 			c.Run()
 
 			r := s.peerHandler.Handle(c)
-			log.Println("Result from Accept is ", r)
+			log.Println("Server link from:", c.Node(), " result: ", r)
 		}
 	}()
 }

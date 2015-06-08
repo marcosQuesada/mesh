@@ -86,7 +86,7 @@ func (p *Peer) SayHello() {
 }
 
 func (p *Peer) Run() {
-	defer log.Println("Exiting Peer Link type ", p.mode, "-", p.node.String())
+	//defer log.Println("Exiting Peer Link type ", p.mode, "-", p.node.String())
 
 	response := make(chan interface{}, 0)
 	done := make(chan bool)
@@ -154,9 +154,9 @@ func (p *Peer) Mode() string {
 
 func (p *Peer) Identify(n n.Node) {
 	p.node = n
-	log.Println("Identified Server Link as ", n.String())
 }
 
+// Nop Peer is Used on testing
 type NopPeer struct {
 	host    string
 	port    int

@@ -64,26 +64,22 @@ func (o *Orchestrator) Run() {
 			//Say Hello and wait response
 			c.SayHello()
 			r := o.peerHandler.Handle(c)
-			log.Println("Result from Dial is ", r)
+			log.Println("Dial link to to:", c.Node(), "result: ", r)
 		}(node)
 	}
 
-	//Member Updates to Coordinator?  handle updates from members
+	//@TODO: Member Events to Coordinator?  handle updates from members
 	for {
 		select {
-		case msg := <-o.peerHandler.Updates():
+		case msg := <-o.peerHandler.Events():
 			switch msg.Event {
 			case peer.PeerStatusConnected:
-				log.Println("XXX  Peer Status Connected")
-				//aggregate receiveChan to mainChan
+				//aggregate Peer receiveChan to mainChan
 				o.aggregate(msg.Peer.ReceiveChan())
+				//add member
 				o.members[msg.Node.String()] = msg.Node
-				if o.State() {
-					log.Println("Cluster Completed!", "Total Members:", len(o.members))
-				}
-
 			case peer.PeerStatusError:
-				log.Println("Client Exitting", msg.Node)
+				//log.Println("Client Exitting", msg.Node)
 			}
 		case <-o.exitChan:
 			return
@@ -91,16 +87,11 @@ func (o *Orchestrator) Run() {
 	}
 }
 
-func (o *Orchestrator) State() bool {
-	return o.peerHandler.Len() == (len(o.members) - 1) //@TODO: BAD APPROACH!
-}
-
 func (o *Orchestrator) Exit() {
 	o.exitChan <- true
 }
 
 func (o *Orchestrator) aggregate(c chan message.Message) {
-	log.Println("Aggregate")
 	go func() {
 		for {
 			select {

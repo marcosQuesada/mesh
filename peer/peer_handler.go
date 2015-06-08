@@ -15,18 +15,16 @@ import (
 type PeerHandler interface {
 	Handle(NodePeer) message.Status
 	Route(message.Message)
-	Updates() chan MemberUpdate
-	Notify(n.Node, error) //Used to get notifications of Client conn failures
-	Peers() map[string]NodePeer
+	Events() chan MemberUpdate
 	Len() int
 }
 
 type defaultPeerHandler struct {
-	watcher watch.Watcher
-	peers   map[string]NodePeer
-	mutex   sync.Mutex
-	from    n.Node
-	inChan  chan MemberUpdate
+	watcher   watch.Watcher
+	peers     map[string]NodePeer
+	mutex     sync.Mutex
+	from      n.Node
+	eventChan chan MemberUpdate
 }
 type MemberUpdate struct {
 	Node  n.Node
@@ -36,10 +34,10 @@ type MemberUpdate struct {
 
 func DefaultPeerHandler(node n.Node) *defaultPeerHandler {
 	return &defaultPeerHandler{
-		watcher: watch.New(),
-		peers:   make(map[string]NodePeer),
-		from:    node,
-		inChan:  make(chan MemberUpdate, 0),
+		watcher:   watch.New(),
+		peers:     make(map[string]NodePeer),
+		from:      node,
+		eventChan: make(chan MemberUpdate, 0),
 	}
 }
 
@@ -58,7 +56,7 @@ func (d *defaultPeerHandler) Handle(c NodePeer) (response message.Status) {
 				c.Send(&message.Abort{Id: msg.(*message.Hello).Id, From: d.from, Details: map[string]interface{}{"foo_bar": 1231}})
 				c.Exit()
 
-				d.inChan <- MemberUpdate{
+				d.eventChan <- MemberUpdate{
 					Node:  msg.(*message.Hello).From,
 					Event: PeerStatusError,
 				}
@@ -68,20 +66,19 @@ func (d *defaultPeerHandler) Handle(c NodePeer) (response message.Status) {
 			}
 			c.Send(&message.Welcome{Id: msg.(*message.Hello).Id, From: d.from, Details: map[string]interface{}{"foo_bar": 1231}})
 
-			d.inChan <- MemberUpdate{
+			d.eventChan <- MemberUpdate{
 				Node:  msg.(*message.Hello).From, //Sure??
 				Event: PeerStatusConnected,
 				Peer:  c,
 			}
-
 			response = PeerStatusConnected
-			log.Println("Client Achieved: ", msg.(*message.Hello).From)
+			//log.Println("Client Achieved: ", msg.(*message.Hello).From)
 		case *message.Welcome:
-			log.Println("Client has received Welcome from", node.String(), msg.(*message.Welcome))
+			//log.Println("Client has received Welcome from", node.String(), msg.(*message.Welcome))
 			err := d.accept(c)
 			if err != nil {
-				log.Println("Error Accepting Peer, Peer dies! ", err)
-				d.inChan <- MemberUpdate{
+				//log.Println("Error Accepting Peer, Peer dies! ", err)
+				d.eventChan <- MemberUpdate{
 					Node:  node,
 					Event: PeerStatusError,
 				}
@@ -89,17 +86,17 @@ func (d *defaultPeerHandler) Handle(c NodePeer) (response message.Status) {
 				response = PeerStatusError
 				return
 			} else {
-				d.inChan <- MemberUpdate{
+				d.eventChan <- MemberUpdate{
 					Node:  node,
 					Event: PeerStatusConnected,
 					Peer:  c,
 				}
 				response = PeerStatusConnected
-				log.Println("Client Achieved: ", node)
+				//log.Println("Client Achieved: ", node)
 			}
 		case *message.Abort:
-			log.Println("Response Abort ", msg.(*message.Abort), " remote node:", node.String())
-			d.inChan <- MemberUpdate{
+			//log.Println("Response Abort ", msg.(*message.Abort), " remote node:", node.String())
+			d.eventChan <- MemberUpdate{
 				Node:  node,
 				Event: PeerStatusAbort,
 			}
@@ -112,16 +109,8 @@ func (d *defaultPeerHandler) Handle(c NodePeer) (response message.Status) {
 	return
 }
 
-func (h *defaultPeerHandler) Updates() chan MemberUpdate {
-	return h.inChan
-}
-
-func (h *defaultPeerHandler) Notify(n n.Node, err error) {
-
-}
-
-func (h *defaultPeerHandler) Peers() map[string]NodePeer {
-	return h.peers
+func (h *defaultPeerHandler) Events() chan MemberUpdate {
+	return h.eventChan
 }
 
 func (h *defaultPeerHandler) Route(m message.Message) {
@@ -131,6 +120,7 @@ func (h *defaultPeerHandler) Route(m message.Message) {
 func (h *defaultPeerHandler) Len() int {
 	return len(h.peers)
 }
+
 func (h *defaultPeerHandler) accept(p NodePeer) error {
 	h.mutex.Lock()
 	defer h.mutex.Unlock()
@@ -140,7 +130,7 @@ func (h *defaultPeerHandler) accept(p NodePeer) error {
 		return fmt.Errorf("Peer: %s Already registered", node.String())
 	}
 	h.peers[node.String()] = p
-	fmt.Println("XX Accepted Peer type:", p.Mode(), " from: ", p.Node())
+
 	return nil
 }
 
