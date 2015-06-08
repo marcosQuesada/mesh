@@ -56,7 +56,16 @@ func (o *Orchestrator) Run() {
 			continue
 		}
 
-		go o.peerHandler.BootClient(node)
+		go func(d n.Node) {
+			log.Println("Starting Dial Client on Node ", o.from.String(), "destination: ", node.String())
+			//Blocking call, wait until connection success
+			c := peer.NewDialer(o.from, d)
+			c.Run()
+			//Say Hello and wait response
+			c.SayHello()
+			r := o.peerHandler.Handle(c)
+			log.Println("Result from Dial is ", r)
+		}(node)
 	}
 
 	//Member Updates to Coordinator?  handle updates from members

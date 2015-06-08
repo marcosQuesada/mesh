@@ -1,17 +1,18 @@
 package cluster
 
 import (
-	"fmt"
-	"github.com/marcosQuesada/mesh/message"
+	//"fmt"
+	//"github.com/marcosQuesada/mesh/message"
 	"github.com/marcosQuesada/mesh/node"
 	"github.com/marcosQuesada/mesh/peer"
-	"net"
+	//"net"
 	"testing"
 	"time"
 )
 
 var o *Orchestrator
 
+/*
 var done chan struct{} = make(chan struct{}, 0)
 
 func TestBasicOrchestrator(t *testing.T) {
@@ -90,7 +91,7 @@ func startBasicTestServer() error {
 			return nil
 		}
 	}
-}
+}*/
 
 func TestForwardingChannel(t *testing.T) {
 	from := node.Node{Host: "localhost", Port: 9000}

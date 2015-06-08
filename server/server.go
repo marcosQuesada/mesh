@@ -67,7 +67,7 @@ func (s *Server) startServer(o *cluster.Orchestrator) {
 			c := peer.NewAcceptor(conn, s.node)
 			c.Run()
 
-			r := s.peerHandler.AcceptClient(c)
+			r := s.peerHandler.Handle(c)
 			log.Println("Result from Accept is ", r)
 		}
 	}()

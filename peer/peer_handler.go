@@ -13,8 +13,7 @@ import (
 //PeerHandler is in charge of Handle Client Lifecycle
 //Sends pings on ticker to check remote state
 type PeerHandler interface {
-	BootClient(n.Node) //message.Status
-	AcceptClient(NodePeer) message.Status
+	Handle(NodePeer) message.Status
 	Route(message.Message)
 	Updates() chan MemberUpdate
 	Notify(n.Node, error) //Used to get notifications of Client conn failures
@@ -44,88 +43,69 @@ func DefaultPeerHandler(node n.Node) *defaultPeerHandler {
 	}
 }
 
-func (n *defaultPeerHandler) BootClient(node n.Node) {
-	log.Println("Orchestrartor boot client", node)
-
-	var c *Peer
-	log.Println("Starting Dial Client on Node ", n.from.String(), "destination: ", node.String())
-	//Blocking call, wait until connection success
-	c = NewDialer(n.from, node)
-	c.Run()
-
-	//Say Hello and wait response
-	c.SayHello()
-
+func (d *defaultPeerHandler) Handle(c NodePeer) (response message.Status) {
+	node := c.Node()
 	select {
 	case <-time.NewTimer(time.Second).C:
 		log.Println("Client has not receive response, Timeout")
 		return
-	case rsp := <-c.ReceiveChan():
-		switch rsp.(type) {
+	case msg := <-c.ReceiveChan():
+		switch msg.(type) {
+		case *message.Hello:
+			c.Identify(msg.(*message.Hello).From)
+			err := d.accept(c)
+			if err != nil {
+				c.Send(&message.Abort{Id: msg.(*message.Hello).Id, From: d.from, Details: map[string]interface{}{"foo_bar": 1231}})
+				c.Exit()
+
+				d.inChan <- MemberUpdate{
+					Node:  msg.(*message.Hello).From,
+					Event: PeerStatusError,
+				}
+
+				response = PeerStatusAbort
+				return
+			}
+			c.Send(&message.Welcome{Id: msg.(*message.Hello).Id, From: d.from, Details: map[string]interface{}{"foo_bar": 1231}})
+
+			d.inChan <- MemberUpdate{
+				Node:  msg.(*message.Hello).From, //Sure??
+				Event: PeerStatusConnected,
+				Peer:  c,
+			}
+
+			response = PeerStatusConnected
+			log.Println("Client Achieved: ", msg.(*message.Hello).From)
 		case *message.Welcome:
-			log.Println("Client has received Welcome from", node.String(), rsp.(*message.Welcome))
-			err := n.accept(c)
+			log.Println("Client has received Welcome from", node.String(), msg.(*message.Welcome))
+			err := d.accept(c)
 			if err != nil {
 				log.Println("Error Accepting Peer, Peer dies! ", err)
-				n.inChan <- MemberUpdate{
+				d.inChan <- MemberUpdate{
 					Node:  node,
 					Event: PeerStatusError,
 				}
+
+				response = PeerStatusError
 				return
 			} else {
-				//o.clients[node.String()] = c
-				n.inChan <- MemberUpdate{
+				d.inChan <- MemberUpdate{
 					Node:  node,
 					Event: PeerStatusConnected,
 					Peer:  c,
 				}
-
+				response = PeerStatusConnected
 				log.Println("Client Achieved: ", node)
 			}
 		case *message.Abort:
-			log.Println("Response Abort ", rsp.(*message.Abort), " remote node:", node.String())
-			n.inChan <- MemberUpdate{
+			log.Println("Response Abort ", msg.(*message.Abort), " remote node:", node.String())
+			d.inChan <- MemberUpdate{
 				Node:  node,
-				Event: PeerStatusError,
+				Event: PeerStatusAbort,
 			}
+			response = PeerStatusAbort
 		default:
 			log.Println("Unexpected type On response ")
-		}
-	}
-
-}
-
-func (n *defaultPeerHandler) AcceptClient(p NodePeer) (response message.Status) {
-	select {
-	case msg := <-p.ReceiveChan():
-		switch msg.(type) {
-		case *message.Hello:
-			p.Identify(msg.(*message.Hello).From)
-			err := n.accept(p)
-			if err != nil {
-				p.Send(&message.Abort{Id: msg.(*message.Hello).Id, From: n.from, Details: map[string]interface{}{"foo_bar": 1231}})
-				p.Exit()
-
-				response = PeerStatusAbort
-				n.inChan <- MemberUpdate{
-					Node:  msg.(*message.Hello).From,
-					Event: PeerStatusError,
-				}
-				return
-			}
-			p.Send(&message.Welcome{Id: msg.(*message.Hello).Id, From: n.from, Details: map[string]interface{}{"foo_bar": 1231}})
-
-			response = PeerStatusConnected
-			n.inChan <- MemberUpdate{
-				Node:  msg.(*message.Hello).From, //Sure??
-				Event: PeerStatusConnected,
-				Peer:  p,
-			}
-
-			log.Println("Client Achieved: ", msg.(*message.Hello).From)
-		case *message.Ping:
-			log.Println("Router Ping: ", msg.(*message.Ping))
-			p.Send(&message.Pong{Id: msg.(*message.Ping).Id, From: n.from, Details: map[string]interface{}{}})
 		}
 	}
 
