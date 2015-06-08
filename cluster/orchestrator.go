@@ -104,7 +104,10 @@ func (o *Orchestrator) aggregate(c chan message.Message) {
 	go func() {
 		for {
 			select {
-			case m := <-c:
+			case m, open := <-c:
+				if !open {
+					return
+				}
 				o.MainChan <- m
 			}
 		}
