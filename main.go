@@ -48,7 +48,7 @@ func main() {
 	}()
 
 	//Server Run
-	s.Run()
+	s.Start()
 }
 
 func handleFile(logFile string) (f *os.File) {

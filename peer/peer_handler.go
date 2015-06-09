@@ -2,6 +2,7 @@ package peer
 
 import (
 	"fmt"
+	"github.com/marcosQuesada/mesh/dispatcher"
 	"github.com/marcosQuesada/mesh/message"
 	n "github.com/marcosQuesada/mesh/node"
 	"github.com/marcosQuesada/mesh/watch"
@@ -15,7 +16,7 @@ import (
 type PeerHandler interface {
 	Handle(NodePeer) message.Status
 	Route(message.Message)
-	Events() chan MemberUpdate
+	Events() chan dispatcher.Event
 	Len() int
 }
 
@@ -24,12 +25,17 @@ type defaultPeerHandler struct {
 	peers     map[string]NodePeer
 	mutex     sync.Mutex
 	from      n.Node
-	eventChan chan MemberUpdate
+	eventChan chan dispatcher.Event
 }
+
 type MemberUpdate struct {
 	Node  n.Node
 	Event message.Status
 	Peer  NodePeer
+}
+
+func (m MemberUpdate) GetEventType() dispatcher.EventType {
+	return "PeerUpdate" //@TODO: Migrate to status!
 }
 
 func DefaultPeerHandler(node n.Node) *defaultPeerHandler {
@@ -37,7 +43,7 @@ func DefaultPeerHandler(node n.Node) *defaultPeerHandler {
 		watcher:   watch.New(),
 		peers:     make(map[string]NodePeer),
 		from:      node,
-		eventChan: make(chan MemberUpdate, 0),
+		eventChan: make(chan dispatcher.Event, 0),
 	}
 }
 
@@ -56,7 +62,7 @@ func (d *defaultPeerHandler) Handle(c NodePeer) (response message.Status) {
 				c.Send(&message.Abort{Id: msg.(*message.Hello).Id, From: d.from, Details: map[string]interface{}{"foo_bar": 1231}})
 				c.Exit()
 
-				d.eventChan <- MemberUpdate{
+				d.eventChan <- &MemberUpdate{
 					Node:  msg.(*message.Hello).From,
 					Event: PeerStatusError,
 				}
@@ -66,7 +72,7 @@ func (d *defaultPeerHandler) Handle(c NodePeer) (response message.Status) {
 			}
 			c.Send(&message.Welcome{Id: msg.(*message.Hello).Id, From: d.from, Details: map[string]interface{}{"foo_bar": 1231}})
 
-			d.eventChan <- MemberUpdate{
+			d.eventChan <- &MemberUpdate{
 				Node:  msg.(*message.Hello).From, //Sure??
 				Event: PeerStatusConnected,
 				Peer:  c,
@@ -78,7 +84,7 @@ func (d *defaultPeerHandler) Handle(c NodePeer) (response message.Status) {
 			err := d.accept(c)
 			if err != nil {
 				//log.Println("Error Accepting Peer, Peer dies! ", err)
-				d.eventChan <- MemberUpdate{
+				d.eventChan <- &MemberUpdate{
 					Node:  node,
 					Event: PeerStatusError,
 				}
@@ -86,7 +92,7 @@ func (d *defaultPeerHandler) Handle(c NodePeer) (response message.Status) {
 				response = PeerStatusError
 				return
 			} else {
-				d.eventChan <- MemberUpdate{
+				d.eventChan <- &MemberUpdate{
 					Node:  node,
 					Event: PeerStatusConnected,
 					Peer:  c,
@@ -96,7 +102,7 @@ func (d *defaultPeerHandler) Handle(c NodePeer) (response message.Status) {
 			}
 		case *message.Abort:
 			//log.Println("Response Abort ", msg.(*message.Abort), " remote node:", node.String())
-			d.eventChan <- MemberUpdate{
+			d.eventChan <- &MemberUpdate{
 				Node:  node,
 				Event: PeerStatusAbort,
 			}
@@ -109,7 +115,7 @@ func (d *defaultPeerHandler) Handle(c NodePeer) (response message.Status) {
 	return
 }
 
-func (h *defaultPeerHandler) Events() chan MemberUpdate {
+func (h *defaultPeerHandler) Events() chan dispatcher.Event {
 	return h.eventChan
 }
 

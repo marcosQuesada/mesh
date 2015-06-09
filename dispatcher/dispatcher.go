@@ -1,7 +1,6 @@
 package dispatcher
 
 import (
-	"fmt"
 	"log"
 	"sync"
 )
@@ -57,7 +56,6 @@ func (d *defaultDispatcher) Run() {
 }
 
 func (d *defaultDispatcher) Dispatch(e Event) {
-	fmt.Println("Dispatch event ", e)
 	if _, ok := d.listeners[e.GetEventType()]; !ok {
 		return
 	}
@@ -69,15 +67,15 @@ func (d *defaultDispatcher) Dispatch(e Event) {
 
 //Enable event channel aggregation
 func (d *defaultDispatcher) Aggregate(e chan Event) {
-	fmt.Println("Aggregate ")
+	log.Println("Aggregate Event Channel")
 	go func() {
 		for {
 			select {
 			case m, open := <-e:
-				fmt.Println("Aggregate rcv ", m, open)
 				if !open {
 					return
 				}
+				log.Println("Event received: ", m)
 				d.EventChan <- m
 			}
 		}

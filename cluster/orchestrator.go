@@ -50,6 +50,7 @@ func (o *Orchestrator) Run() {
 	defer log.Println("Exiting Orchestrator Run")
 	defer close(o.exitChan)
 
+	//Start Dial Peers
 	for _, node := range o.members {
 		//avoid local connexion
 		if node.String() == o.from.String() {
@@ -71,7 +72,12 @@ func (o *Orchestrator) Run() {
 	//@TODO: Member Events to Coordinator?  handle updates from members
 	for {
 		select {
-		case msg := <-o.peerHandler.Events():
+		case m := <-o.peerHandler.Events():
+			msg, ok := m.(*peer.MemberUpdate) //@TODO: PROVISIONAL!!
+			if !ok {
+				log.Println("Panic Casting Update")
+				continue
+			}
 			switch msg.Event {
 			case peer.PeerStatusConnected:
 				//aggregate Peer receiveChan to mainChan

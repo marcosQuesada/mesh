@@ -4,6 +4,7 @@ import (
 	"github.com/marcosQuesada/mesh/cli"
 	"github.com/marcosQuesada/mesh/cluster"
 	"github.com/marcosQuesada/mesh/config"
+	"github.com/marcosQuesada/mesh/dispatcher"
 	n "github.com/marcosQuesada/mesh/node"
 	"github.com/marcosQuesada/mesh/peer"
 	"log"
@@ -26,15 +27,25 @@ func New(c *config.Config) *Server {
 	}
 }
 
-func (s *Server) Run() {
+func (s *Server) Start() {
 	defer close(s.exit)
 
+	d := dispatcher.New()
+	//d.RegisterListener(&OnFakeEvent{}, l.Listener)
+
+	d.Run()
+	d.Aggregate(s.peerHandler.Events())
+
+	//Events()
 	//@TODO: StartCoordinator
 	o := cluster.StartOrchestrator(s.node, s.config.Cluster, s.peerHandler)
 	go o.Run()
 
 	s.startServer(o)
+	s.run(o)
+}
 
+func (s *Server) run(o *cluster.Orchestrator) {
 	for {
 		select {
 		case m := <-o.MainChan:
