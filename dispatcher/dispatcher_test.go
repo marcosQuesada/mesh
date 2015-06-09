@@ -1,14 +1,15 @@
 package dispatcher
 
 import (
+	"fmt"
 	"testing"
+	"time"
 )
 
 func TestBasicDispatcher(t *testing.T) {
 	l := &fakeListener{}
 
 	d := New()
-
 	d.RegisterListener(&OnFakeEvent{}, l.Listener)
 
 	if len(d.listeners["OnFakeEvent"]) != 1 {
@@ -23,6 +24,36 @@ func TestBasicDispatcher(t *testing.T) {
 	}
 
 	d.Dispatch(&OnInexistentEvent{})
+}
+
+func TestDispatcherRun(t *testing.T) {
+	l := &fakeListener{}
+
+	d := New()
+	d.RegisterListener(&OnFakeEvent{}, l.Listener)
+	d.Run()
+
+	event := &OnFakeEvent{Id: 123}
+	d.EventChan <- event
+	if event.Result != "Listener Called" {
+		t.Error("Result Not modified")
+	}
+
+	e := make(chan Event, 0)
+	d.Aggregate(e)
+	eventB := &OnFakeEvent{Id: 456}
+	e <- eventB
+
+	//channel agregation needs adds minimum delay
+	time.Sleep(time.Millisecond * 10)
+
+	if eventB.Result != "Listener Called" {
+		t.Error("Result Not modified")
+	}
+
+	close(d.EventChan)
+	close(e)
+
 }
 
 type OnFakeEvent struct {
@@ -46,6 +77,7 @@ type fakeListener struct {
 }
 
 func (f *fakeListener) Listener(e Event) {
+	fmt.Println("Listener called")
 	realEvent := e.(*OnFakeEvent)
 	realEvent.Result = "Listener Called"
 }

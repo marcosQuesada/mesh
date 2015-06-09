@@ -3,5 +3,5 @@ package dispatcher
 type EventType string
 
 type Event interface {
-	GetEventType() EventType
+	GetEventType() EventType //message.Status?
 }
