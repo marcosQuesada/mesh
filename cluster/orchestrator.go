@@ -80,11 +80,13 @@ func (o *Orchestrator) Run() {
 			}
 			switch msg.Event {
 			case peer.PeerStatusConnected:
+				log.Println("Connected")
 				//aggregate Peer receiveChan to mainChan
 				o.aggregate(msg.Peer.ReceiveChan())
 				//add member
 				o.members[msg.Node.String()] = msg.Node
 			case peer.PeerStatusError:
+				log.Println("DISConnected")
 				//log.Println("Client Exitting", msg.Node)
 			}
 		case <-o.exitChan:

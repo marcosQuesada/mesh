@@ -34,7 +34,8 @@ func (s *Server) Start() {
 	//d.RegisterListener(&OnFakeEvent{}, l.Listener)
 
 	d.Run()
-	d.Aggregate(s.peerHandler.Events())
+	//@TODO!!! What about Orchestrator Events() !!!
+	//d.Aggregate(s.peerHandler.Events())
 
 	//Events()
 	//@TODO: StartCoordinator
