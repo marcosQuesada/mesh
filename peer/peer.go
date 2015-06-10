@@ -126,6 +126,7 @@ func (p *Peer) Run() {
 				}
 			case <-p.exitChan:
 				done <- true
+				close(p.messageChan)
 				p.messageChan = nil
 				p.Terminate()
 

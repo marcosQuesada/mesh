@@ -17,6 +17,7 @@ type PeerHandler interface {
 	Handle(NodePeer) message.Status
 	Route(message.Message)
 	Events() chan dispatcher.Event
+	AggregatedChan() chan message.Message
 	Len() int
 }
 
@@ -26,15 +27,16 @@ type defaultPeerHandler struct {
 	mutex     sync.Mutex
 	from      n.Node
 	eventChan chan dispatcher.Event
+	peerChan  chan message.Message
 }
 
-type MemberUpdate struct {
+type PeerEvent struct {
 	Node  n.Node
 	Event message.Status
 	Peer  NodePeer
 }
 
-func (m MemberUpdate) GetEventType() dispatcher.EventType {
+func (m PeerEvent) GetEventType() dispatcher.EventType {
 	return "PeerUpdate" //@TODO: Migrate to status!
 }
 
@@ -44,6 +46,7 @@ func DefaultPeerHandler(node n.Node) *defaultPeerHandler {
 		peers:     make(map[string]NodePeer),
 		from:      node,
 		eventChan: make(chan dispatcher.Event, 0),
+		peerChan:  make(chan message.Message, 0),
 	}
 }
 
@@ -62,29 +65,27 @@ func (d *defaultPeerHandler) Handle(c NodePeer) (response message.Status) {
 				c.Send(&message.Abort{Id: msg.(*message.Hello).Id, From: d.from, Details: map[string]interface{}{"foo_bar": 1231}})
 				c.Exit()
 
-				d.eventChan <- &MemberUpdate{
+				d.eventChan <- &PeerEvent{
 					Node:  msg.(*message.Hello).From,
 					Event: PeerStatusError,
 				}
-
 				response = PeerStatusAbort
+
 				return
 			}
 			c.Send(&message.Welcome{Id: msg.(*message.Hello).Id, From: d.from, Details: map[string]interface{}{"foo_bar": 1231}})
 
-			d.eventChan <- &MemberUpdate{
-				Node:  msg.(*message.Hello).From, //Sure??
+			d.eventChan <- &PeerEvent{
+				Node:  msg.(*message.Hello).From,
 				Event: PeerStatusConnected,
 				Peer:  c,
 			}
 			response = PeerStatusConnected
-			//log.Println("Client Achieved: ", msg.(*message.Hello).From)
+
 		case *message.Welcome:
-			//log.Println("Client has received Welcome from", node.String(), msg.(*message.Welcome))
 			err := d.accept(c)
 			if err != nil {
-				//log.Println("Error Accepting Peer, Peer dies! ", err)
-				d.eventChan <- &MemberUpdate{
+				d.eventChan <- &PeerEvent{
 					Node:  node,
 					Event: PeerStatusError,
 				}
@@ -92,17 +93,15 @@ func (d *defaultPeerHandler) Handle(c NodePeer) (response message.Status) {
 				response = PeerStatusError
 				return
 			} else {
-				d.eventChan <- &MemberUpdate{
+				d.eventChan <- &PeerEvent{
 					Node:  node,
 					Event: PeerStatusConnected,
 					Peer:  c,
 				}
 				response = PeerStatusConnected
-				//log.Println("Client Achieved: ", node)
 			}
 		case *message.Abort:
-			//log.Println("Response Abort ", msg.(*message.Abort), " remote node:", node.String())
-			d.eventChan <- &MemberUpdate{
+			d.eventChan <- &PeerEvent{
 				Node:  node,
 				Event: PeerStatusAbort,
 			}
@@ -123,6 +122,10 @@ func (h *defaultPeerHandler) Route(m message.Message) {
 
 }
 
+func (h *defaultPeerHandler) AggregatedChan() chan message.Message {
+	return h.peerChan
+}
+
 func (h *defaultPeerHandler) Len() int {
 	return len(h.peers)
 }
@@ -136,6 +139,8 @@ func (h *defaultPeerHandler) accept(p NodePeer) error {
 		return fmt.Errorf("Peer: %s Already registered", node.String())
 	}
 	h.peers[node.String()] = p
+	//Agregate receiving Chann
+	h.aggregate(p.ReceiveChan())
 
 	return nil
 }
@@ -150,6 +155,21 @@ func (h *defaultPeerHandler) remove(p NodePeer) error {
 	}
 
 	delete(h.peers, node.String())
+	//@TODO: Close aggregated channel
 
 	return nil
+}
+
+func (h *defaultPeerHandler) aggregate(c chan message.Message) {
+	go func() {
+		for {
+			select {
+			case m, open := <-c:
+				if !open {
+					return
+				}
+				h.peerChan <- m
+			}
+		}
+	}()
 }

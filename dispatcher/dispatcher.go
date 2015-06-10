@@ -67,7 +67,6 @@ func (d *defaultDispatcher) Dispatch(e Event) {
 
 //Enable event channel aggregation
 func (d *defaultDispatcher) Aggregate(e chan Event) {
-	log.Println("Aggregate Event Channel")
 	go func() {
 		for {
 			select {

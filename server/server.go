@@ -34,22 +34,19 @@ func (s *Server) Start() {
 	//d.RegisterListener(&OnFakeEvent{}, l.Listener)
 
 	d.Run()
-	//@TODO!!! What about Orchestrator Events() !!!
-	//d.Aggregate(s.peerHandler.Events())
+	d.Aggregate(s.peerHandler.Events())
 
-	//Events()
-	//@TODO: StartCoordinator
 	o := cluster.StartOrchestrator(s.node, s.config.Cluster, s.peerHandler)
 	go o.Run()
 
 	s.startServer(o)
-	s.run(o)
+	s.run()
 }
 
-func (s *Server) run(o *cluster.Orchestrator) {
+func (s *Server) run() {
 	for {
 		select {
-		case m := <-o.MainChan:
+		case m := <-s.peerHandler.AggregatedChan():
 			log.Println("SERVER: Received Message on Main Channel ", m)
 		case <-s.exit:
 			//Notify Exit to remote Peer

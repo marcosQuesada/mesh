@@ -5,7 +5,6 @@ import (
 	n "github.com/marcosQuesada/mesh/node"
 	"github.com/marcosQuesada/mesh/peer"
 	"log"
-	//"time"
 )
 
 // Orchestrator takes cares on all cluster related tasks
@@ -21,17 +20,10 @@ const (
 	ClusterStatusExit      = message.Status("exit")
 )
 
-type memberUpdate struct {
-	node  n.Node
-	event message.Status
-}
-
 type Orchestrator struct {
 	peerHandler peer.PeerHandler
 	from        n.Node
 	members     map[string]n.Node
-	MainChan    chan message.Message // Used as aggregated channel from Client Peers
-	fwdChan     chan message.Message //Channel that gets routed to destination client
 	exitChan    chan bool
 }
 
@@ -40,8 +32,6 @@ func StartOrchestrator(from n.Node, members map[string]n.Node, clh peer.PeerHand
 		peerHandler: clh,
 		from:        from,
 		members:     members,
-		MainChan:    make(chan message.Message, 0),
-		fwdChan:     make(chan message.Message, 0),
 		exitChan:    make(chan bool, 0),
 	}
 }
@@ -68,47 +58,8 @@ func (o *Orchestrator) Run() {
 			log.Println("Dial link to to:", c.Node(), "result: ", r)
 		}(node)
 	}
-
-	//@TODO: Member Events to Coordinator?  handle updates from members
-	for {
-		select {
-		case m := <-o.peerHandler.Events():
-			msg, ok := m.(*peer.MemberUpdate) //@TODO: PROVISIONAL!!
-			if !ok {
-				log.Println("Panic Casting Update")
-				continue
-			}
-			switch msg.Event {
-			case peer.PeerStatusConnected:
-				log.Println("Connected")
-				//aggregate Peer receiveChan to mainChan
-				o.aggregate(msg.Peer.ReceiveChan())
-				//add member
-				o.members[msg.Node.String()] = msg.Node
-			case peer.PeerStatusError:
-				log.Println("DISConnected")
-				//log.Println("Client Exitting", msg.Node)
-			}
-		case <-o.exitChan:
-			return
-		}
-	}
 }
 
 func (o *Orchestrator) Exit() {
 	o.exitChan <- true
-}
-
-func (o *Orchestrator) aggregate(c chan message.Message) {
-	go func() {
-		for {
-			select {
-			case m, open := <-c:
-				if !open {
-					return
-				}
-				o.MainChan <- m
-			}
-		}
-	}()
 }
