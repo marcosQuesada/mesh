@@ -103,5 +103,5 @@ func TestForwardingChannel(t *testing.T) {
 	o = StartOrchestrator(from, members, peer.DefaultPeerHandler(from))
 	go o.Run()
 	time.Sleep(time.Second)
-	o.Exit()
+	//o.Exit()
 }

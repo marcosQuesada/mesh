@@ -30,14 +30,15 @@ func New(c *config.Config) *Server {
 func (s *Server) Start() {
 	defer close(s.exit)
 
+	o := cluster.StartOrchestrator(s.node, s.config.Cluster, s.peerHandler)
+	go o.Run()
+
 	d := dispatcher.New()
-	//d.RegisterListener(&OnFakeEvent{}, l.Listener)
+	d.RegisterListener(&peer.OnPeerConnectedEvent{}, o.OnPeerConnectedEvent)
+	d.RegisterListener(&peer.OnPeerDisconnectedEvent{}, o.OnPeerDisconnected)
 
 	d.Run()
 	d.Aggregate(s.peerHandler.Events())
-
-	o := cluster.StartOrchestrator(s.node, s.config.Cluster, s.peerHandler)
-	go o.Run()
 
 	s.startServer(o)
 	s.run()

@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"github.com/marcosQuesada/mesh/dispatcher"
 	"github.com/marcosQuesada/mesh/message"
 	n "github.com/marcosQuesada/mesh/node"
 	"github.com/marcosQuesada/mesh/peer"
@@ -62,4 +63,16 @@ func (o *Orchestrator) Run() {
 
 func (o *Orchestrator) Exit() {
 	o.exitChan <- true
+}
+
+func (o *Orchestrator) OnPeerConnectedEvent(e dispatcher.Event) {
+	n := e.(*peer.OnPeerConnectedEvent)
+	o.members[n.Node.String()] = n.Node
+	log.Println("Called Orchestrator OnPeerConnectedEvent", e)
+}
+
+func (o *Orchestrator) OnPeerDisconnected(e dispatcher.Event) {
+	n := e.(*peer.OnPeerDisconnectedEvent)
+	//o.members[msg.Node.String()] = msg.Node
+	log.Println("Called Orchestrator OnPeerDisconnectedEvent", n)
 }

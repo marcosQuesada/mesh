@@ -30,14 +30,24 @@ type defaultPeerHandler struct {
 	peerChan  chan message.Message
 }
 
-type PeerEvent struct {
+type OnPeerConnectedEvent struct {
 	Node  n.Node
 	Event message.Status
 	Peer  NodePeer
 }
 
-func (m PeerEvent) GetEventType() dispatcher.EventType {
-	return "PeerUpdate" //@TODO: Migrate to status!
+func (m OnPeerConnectedEvent) GetEventType() dispatcher.EventType {
+	return "OnPeerConnectedEvent" //@TODO: Migrate to status!
+}
+
+type OnPeerDisconnectedEvent struct {
+	Node  n.Node
+	Event message.Status
+	Peer  NodePeer
+}
+
+func (m OnPeerDisconnectedEvent) GetEventType() dispatcher.EventType {
+	return "OnPeerDisconnectedEvent" //@TODO: Migrate to status!
 }
 
 func DefaultPeerHandler(node n.Node) *defaultPeerHandler {
@@ -65,7 +75,7 @@ func (d *defaultPeerHandler) Handle(c NodePeer) (response message.Status) {
 				c.Send(&message.Abort{Id: msg.(*message.Hello).Id, From: d.from, Details: map[string]interface{}{"foo_bar": 1231}})
 				c.Exit()
 
-				d.eventChan <- &PeerEvent{
+				d.eventChan <- &OnPeerDisconnectedEvent{
 					Node:  msg.(*message.Hello).From,
 					Event: PeerStatusError,
 				}
@@ -75,7 +85,7 @@ func (d *defaultPeerHandler) Handle(c NodePeer) (response message.Status) {
 			}
 			c.Send(&message.Welcome{Id: msg.(*message.Hello).Id, From: d.from, Details: map[string]interface{}{"foo_bar": 1231}})
 
-			d.eventChan <- &PeerEvent{
+			d.eventChan <- &OnPeerConnectedEvent{
 				Node:  msg.(*message.Hello).From,
 				Event: PeerStatusConnected,
 				Peer:  c,
@@ -85,7 +95,7 @@ func (d *defaultPeerHandler) Handle(c NodePeer) (response message.Status) {
 		case *message.Welcome:
 			err := d.accept(c)
 			if err != nil {
-				d.eventChan <- &PeerEvent{
+				d.eventChan <- &OnPeerDisconnectedEvent{
 					Node:  node,
 					Event: PeerStatusError,
 				}
@@ -93,7 +103,7 @@ func (d *defaultPeerHandler) Handle(c NodePeer) (response message.Status) {
 				response = PeerStatusError
 				return
 			} else {
-				d.eventChan <- &PeerEvent{
+				d.eventChan <- &OnPeerConnectedEvent{
 					Node:  node,
 					Event: PeerStatusConnected,
 					Peer:  c,
@@ -101,7 +111,7 @@ func (d *defaultPeerHandler) Handle(c NodePeer) (response message.Status) {
 				response = PeerStatusConnected
 			}
 		case *message.Abort:
-			d.eventChan <- &PeerEvent{
+			d.eventChan <- &OnPeerDisconnectedEvent{
 				Node:  node,
 				Event: PeerStatusAbort,
 			}
