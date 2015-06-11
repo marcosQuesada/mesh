@@ -76,3 +76,15 @@ func (o *Orchestrator) OnPeerDisconnected(e dispatcher.Event) {
 	//o.members[msg.Node.String()] = msg.Node
 	log.Println("Called Orchestrator OnPeerDisconnectedEvent", n)
 }
+
+func (o *Orchestrator) OnPeerAborted(e dispatcher.Event) {
+	n := e.(*peer.OnPeerAbortedEvent)
+	//o.members[msg.Node.String()] = msg.Node
+	log.Println("Called Orchestrator OnPeerAbortedEvent", n)
+}
+
+func (o *Orchestrator) OnPeerErrored(e dispatcher.Event) {
+	n := e.(*peer.OnPeerErroredEvent)
+	//o.members[msg.Node.String()] = msg.Node
+	log.Println("Called Orchestrator OnPeerErroredEvent", n)
+}

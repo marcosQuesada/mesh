@@ -36,6 +36,8 @@ func (s *Server) Start() {
 	d := dispatcher.New()
 	d.RegisterListener(&peer.OnPeerConnectedEvent{}, o.OnPeerConnectedEvent)
 	d.RegisterListener(&peer.OnPeerDisconnectedEvent{}, o.OnPeerDisconnected)
+	d.RegisterListener(&peer.OnPeerAbortedEvent{}, o.OnPeerAborted)
+	d.RegisterListener(&peer.OnPeerErroredEvent{}, o.OnPeerErrored)
 
 	d.Run()
 	d.Aggregate(s.peerHandler.Events())

@@ -74,7 +74,6 @@ func (d *defaultDispatcher) Aggregate(e chan Event) {
 				if !open {
 					return
 				}
-				log.Println("Event received: ", m)
 				d.EventChan <- m
 			}
 		}
