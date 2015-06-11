@@ -1,60 +1,77 @@
 package cluster
 
 import (
-	"fmt"
-	m "github.com/marcosQuesada/mesh/message"
+	"github.com/marcosQuesada/mesh/dispatcher"
+	"github.com/marcosQuesada/mesh/message"
+	n "github.com/marcosQuesada/mesh/node"
+	"github.com/marcosQuesada/mesh/peer"
 	"log"
-	"time"
 )
 
-type coordinator struct {
-	rcvChan chan m.Message
-	sndChan chan m.Message
-	stop    bool
+// Coordinator takes cares on all cluster related tasks
+// Peer election & registration (could be delegated to PeerHandler)
+// Cluster member definition & cluster status
+// Leader election
+// Execute Pool mechanisms and consesus resolution
+
+const (
+	ClusterStatusStarting  = message.Status("starting")
+	ClusterStatusInService = message.Status("in service")
+	ClusterStatusDegraded  = message.Status("degraded")
+	ClusterStatusExit      = message.Status("exit")
+)
+
+type Coordinator struct {
+	peerHandler peer.PeerHandler
+	from        n.Node
+	members     map[string]n.Node
+	exitChan    chan bool
 }
 
-func Start() *coordinator {
-	coordinator := &coordinator{
-		rcvChan: make(chan m.Message),
-		sndChan: make(chan m.Message),
-		stop:    false,
-	}
-
-	go coordinator.run()
-
-	return coordinator
-}
-
-func (c *coordinator) Send(msg m.Message) {
-	c.rcvChan <- msg
-}
-
-func (c *coordinator) Receive() m.Message {
-	timeout := time.NewTimer(time.Second * 1)
-	select {
-	case response := <-c.sndChan:
-		return response
-	case <-timeout.C:
-		fmt.Printf("Receive Timeout \n")
-		return nil
+func StartCoordinator(from n.Node, members map[string]n.Node, clh peer.PeerHandler) *Coordinator {
+	return &Coordinator{
+		peerHandler: clh,
+		from:        from,
+		members:     members,
+		exitChan:    make(chan bool, 0),
 	}
 }
 
-func (c *coordinator) run() {
-	for !c.stop {
-		select {
-		case msg := <-c.rcvChan:
-			switch msg.MessageType() {
-			case m.HELLO:
-				cmd := msg.(*m.Hello)
-				log.Println("HELLO Message", cmd.Id)
-			case m.WELCOME:
-				cmd := msg.(*m.Welcome)
-				log.Println("Welcome Message", cmd.Id)
-			case m.ABORT:
-				cmd := msg.(*m.Abort)
-				log.Println("Abort Message", cmd.Id)
+func (c *Coordinator) Run() {
+	go func() {
+		for {
+			select {
+			case <-c.exitChan:
+				return
+			case m := <-c.peerHandler.AggregatedChan():
+				log.Println("SERVER: Received Message on Main Channel ", m)
 			}
 		}
-	}
+	}()
+}
+
+func (c *Coordinator) Exit() {
+	c.exitChan <- true
+}
+
+func (c *Coordinator) OnPeerConnectedEvent(e dispatcher.Event) {
+	n := e.(*peer.OnPeerConnectedEvent)
+	c.members[n.Node.String()] = n.Node
+	log.Println("Called Coordinator OnPeerConnectedEvent, adding peer", n.Node.String())
+}
+
+func (c *Coordinator) OnPeerDisconnected(e dispatcher.Event) {
+	n := e.(*peer.OnPeerDisconnectedEvent)
+	c.members[n.Node.String()] = n.Node
+	log.Println("Called Coordinator OnPeerDisconnectedEvent, removing peer", n.Node.String())
+}
+
+func (c *Coordinator) OnPeerAborted(e dispatcher.Event) {
+	n := e.(*peer.OnPeerAbortedEvent)
+	log.Println("Called Coordinator OnPeerAbortedEvent", n.Node.String())
+}
+
+func (c *Coordinator) OnPeerErrored(e dispatcher.Event) {
+	n := e.(*peer.OnPeerErroredEvent)
+	log.Println("Called Coordinator OnPeerErroredEvent", n.Node.String())
 }

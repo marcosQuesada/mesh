@@ -2,7 +2,6 @@ package server
 
 import (
 	"fmt"
-	"github.com/marcosQuesada/mesh/cluster"
 	"github.com/marcosQuesada/mesh/config"
 	"github.com/marcosQuesada/mesh/message"
 	"github.com/marcosQuesada/mesh/node"
@@ -19,9 +18,7 @@ func TestBasicServerClient(t *testing.T) {
 	}
 
 	srv := New(config)
-	members := map[string]node.Node{}
-	orch := cluster.StartOrchestrator(node.Node{}, members, peer.DefaultPeerHandler(node.Node{}))
-	srv.startServer(orch)
+	srv.startServer()
 	time.Sleep(time.Millisecond * 100)
 
 	done := make(chan bool)

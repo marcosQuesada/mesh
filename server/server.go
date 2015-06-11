@@ -30,27 +30,30 @@ func New(c *config.Config) *Server {
 func (s *Server) Start() {
 	defer close(s.exit)
 
-	o := cluster.StartOrchestrator(s.node, s.config.Cluster, s.peerHandler)
-	go o.Run()
+	c := cluster.StartCoordinator(s.node, s.config.Cluster, s.peerHandler)
+	c.Run()
 
 	d := dispatcher.New()
-	d.RegisterListener(&peer.OnPeerConnectedEvent{}, o.OnPeerConnectedEvent)
-	d.RegisterListener(&peer.OnPeerDisconnectedEvent{}, o.OnPeerDisconnected)
-	d.RegisterListener(&peer.OnPeerAbortedEvent{}, o.OnPeerAborted)
-	d.RegisterListener(&peer.OnPeerErroredEvent{}, o.OnPeerErrored)
+	d.RegisterListener(&peer.OnPeerConnectedEvent{}, c.OnPeerConnectedEvent)
+	d.RegisterListener(&peer.OnPeerDisconnectedEvent{}, c.OnPeerDisconnected)
+	d.RegisterListener(&peer.OnPeerAbortedEvent{}, c.OnPeerAborted)
+	d.RegisterListener(&peer.OnPeerErroredEvent{}, c.OnPeerErrored)
 
 	d.Run()
 	d.Aggregate(s.peerHandler.Events())
 
-	s.startServer(o)
+	s.startClientPeers()
+	s.startServer()
 	s.run()
+}
+
+func (s *Server) Close() {
+	s.exit <- true
 }
 
 func (s *Server) run() {
 	for {
 		select {
-		case m := <-s.peerHandler.AggregatedChan():
-			log.Println("SERVER: Received Message on Main Channel ", m)
 		case <-s.exit:
 			//Notify Exit to remote Peer
 			return
@@ -58,11 +61,7 @@ func (s *Server) run() {
 	}
 }
 
-func (s *Server) Close() {
-	s.exit <- true
-}
-
-func (s *Server) startServer(o *cluster.Orchestrator) {
+func (s *Server) startServer() {
 	listener, err := net.Listen("tcp", string(s.config.Addr.String()))
 	if err != nil {
 		log.Println("Error starting Socket Server: ", err)
@@ -80,9 +79,32 @@ func (s *Server) startServer(o *cluster.Orchestrator) {
 			c.Run()
 
 			r := s.peerHandler.Handle(c)
-			log.Println("Server link from:", c.Node(), " result: ", r)
+			rn := c.Node()
+			log.Println("Server link from:", rn.String(), " result: ", r)
 		}
 	}()
+}
+
+func (s *Server) startClientPeers() {
+	//Start Dial Peers
+	for _, node := range s.config.Cluster {
+		//avoid local connexion
+		if node.String() == s.node.String() {
+			continue
+		}
+
+		go func(destination n.Node) {
+			log.Println("Starting Dial Client from Node ", s.node.String(), "destination: ", node.String())
+			//Blocking call, wait until connection success
+			c := peer.NewDialer(s.node, destination)
+			c.Run()
+			//Say Hello and wait response
+			c.SayHello()
+			r := s.peerHandler.Handle(c)
+			rn := c.Node()
+			log.Println("Dial link to to:", rn.String(), "result: ", r)
+		}(node)
+	}
 }
 
 // Cli Socket server
