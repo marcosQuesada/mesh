@@ -70,7 +70,6 @@ func NewDialer(from n.Node, destination n.Node) *Peer {
 }
 
 func NewAcceptor(conn net.Conn, server n.Node) *Peer {
-
 	return &Peer{
 		Link:        NewJSONSocketLink(conn),
 		from:        server,
@@ -104,8 +103,6 @@ func (p *Peer) SayHello() {
 }
 
 func (p *Peer) Run() {
-	//defer log.Println("Exiting Peer Link type ", p.mode, "-", p.node.String())
-
 	response := make(chan interface{}, 0)
 	done := make(chan bool)
 	go func(exit chan bool) {
@@ -142,14 +139,13 @@ func (p *Peer) Run() {
 					switch m.(type) {
 					case *message.Ping:
 						p.pingChan <- m
-						log.Println("Peer RVC Ping", m.(*message.Ping).Id, "to ", m.(*message.Ping).From.String())
+						//log.Println("Peer RVC Ping", m.(*message.Ping).Id, "to ", m.(*message.Ping).From.String())
 						continue
 					case *message.Pong:
 						p.pongChan <- m
-						log.Println("Peer RVC Pong", m.(*message.Pong).Id, "to ", m.(*message.Pong).From.String())
+						//log.Println("Peer RVC Pong", m.(*message.Pong).Id, "to ", m.(*message.Pong).From.String())
 						continue
 					default:
-						//log.Println("Default message: ", t.(message.Message))
 						p.messageChan <- m
 					}
 				default:
@@ -158,6 +154,8 @@ func (p *Peer) Run() {
 			case <-p.exitChan:
 				done <- true
 				close(p.messageChan)
+				close(p.pingChan)
+				close(p.pongChan)
 				p.messageChan = nil
 				p.Terminate()
 

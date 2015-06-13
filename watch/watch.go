@@ -37,8 +37,10 @@ func New(evCh chan dispatcher.Event, interval int) *defaultWatcher {
 }
 
 func (w *defaultWatcher) Watch(p peer.NodePeer) {
+	log.Println("XXX Watch from ", p.From(), "to", p.Node())
 	var id = 0
-	go func() {
+	go func(c peer.NodePeer) {
+		log.Println("XXX---XXX Watch from ", c.From(), "to", c.Node())
 		//@TODO: Randomize this
 		ticker := newTicker(w.pingInterval)
 		for {
@@ -63,12 +65,12 @@ func (w *defaultWatcher) Watch(p peer.NodePeer) {
 
 			case <-ticker.C:
 				//Send Ping to Peer
-				ping := &message.Ping{Id: id, From: p.From(), To: p.Node()}
-				p.Send(ping)
-				node := p.Node()
+				ping := &message.Ping{Id: id, From: c.From(), To: c.Node()}
+				c.Send(ping)
+				node := c.Node()
 				log.Println("Sended Ticker PING ", ping.Id, "from ", ping.From.String(), "to ", node.String())
 				select {
-				case msg := <-p.PongChan():
+				case msg := <-c.PongChan():
 					pong := msg.(*message.Pong)
 					if pong.Id != ping.Id {
 						log.Println("XXX Unexpected ID pong", pong.Id, " ping", ping.Id)
@@ -85,7 +87,7 @@ func (w *defaultWatcher) Watch(p peer.NodePeer) {
 					fmt.Println("-- Declare Dead Pear ", node.String())
 
 					w.eventChan <- &peer.OnPeerDisconnectedEvent{
-						Node:  p.Node(),
+						Node:  c.Node(),
 						Event: peer.PeerStatusDisconnected,
 						Peer:  p,
 					}
@@ -95,7 +97,11 @@ func (w *defaultWatcher) Watch(p peer.NodePeer) {
 				}
 			}
 		}
-	}()
+	}(p)
+}
+
+func (w *defaultWatcher) Exit() {
+	w.exit <- true
 }
 
 func newTicker(pingInterval int) *time.Ticker {

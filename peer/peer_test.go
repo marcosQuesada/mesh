@@ -111,28 +111,10 @@ func TestBasicNopPeerTest(t *testing.T) {
 func TestBasicPingPongChannel(t *testing.T) {
 	a, b := net.Pipe()
 
-	c1 := &Peer{
-		Link:        NewJSONSocketLink(a),
-		from:        node.Node{},
-		to:          node.Node{},
-		messageChan: make(chan message.Message, 0),
-		pingChan:    make(chan message.Message, 0),
-		pongChan:    make(chan message.Message, 0),
-		exitChan:    make(chan bool),
-		mode:        "pipe",
-	}
+	c1 := NewAcceptor(a, node.Node{})
 	c1.Run()
 
-	c2 := &Peer{
-		Link:        NewJSONSocketLink(b),
-		from:        node.Node{},
-		to:          node.Node{},
-		messageChan: make(chan message.Message, 0),
-		pingChan:    make(chan message.Message, 0),
-		pongChan:    make(chan message.Message, 0),
-		exitChan:    make(chan bool),
-		mode:        "pipe",
-	}
+	c2 := NewAcceptor(b, node.Node{})
 	c2.Run()
 
 	resChan := make(chan message.Message, 4)
@@ -142,19 +124,15 @@ func TestBasicPingPongChannel(t *testing.T) {
 			select {
 			case r := <-c1.PingChan():
 				msg := r.(*message.Ping)
-				fmt.Println("PING  ", msg)
 				resChan <- msg
 			case r := <-c1.PongChan():
 				msg := r.(*message.Pong)
-				fmt.Println("PONG  ", msg)
 				resChan <- msg
 			case r := <-c2.PingChan():
 				msg := r.(*message.Ping)
-				fmt.Println("PING  ", msg)
 				resChan <- msg
 			case r := <-c2.PongChan():
 				msg := r.(*message.Pong)
-				fmt.Println("PONG  ", msg)
 				resChan <- msg
 			case <-doneChan:
 				close(resChan)
