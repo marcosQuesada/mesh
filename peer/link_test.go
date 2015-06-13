@@ -26,7 +26,7 @@ func TestLinksOnPipes(t *testing.T) {
 
 	tp := &testLinkHandler{
 		outChan: make(chan *message.Hello, 1),
-		exit: make(chan bool, 1),
+		exit:    make(chan bool, 1),
 	}
 	go tp.handleLink(linkA, node.Node{Host: "localhost", Port: 5000})
 	go tp.handleLink(linkB, node.Node{Host: "localhost", Port: 5005})
@@ -59,8 +59,8 @@ func (ph *testLinkHandler) handleLink(p *SocketLink, from node.Node) {
 	}()
 
 	for {
-		select{
-		case <- ph.exit:
+		select {
+		case <-ph.exit:
 			return
 		default:
 			msg, err := p.Receive()
