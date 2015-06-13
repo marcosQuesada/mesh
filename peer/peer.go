@@ -10,11 +10,12 @@ import (
 )
 
 const (
-	PeerStatusConnecting = message.Status("connecting")
-	PeerStatusConnected  = message.Status("connected")
-	PeerStatusAbort      = message.Status("abort")
-	PeerStatusError      = message.Status("error")
-	PeerStatusUnknown    = message.Status("unknown")
+	PeerStatusConnecting   = message.Status("connecting")
+	PeerStatusConnected    = message.Status("connected")
+	PeerStatusDisconnected = message.Status("disconnected")
+	PeerStatusAbort        = message.Status("abort")
+	PeerStatusError        = message.Status("error")
+	PeerStatusUnknown      = message.Status("unknown")
 )
 
 type NodePeer interface {
@@ -141,13 +142,15 @@ func (p *Peer) Run() {
 					switch m.(type) {
 					case *message.Ping:
 						p.pingChan <- m
+						log.Println("Peer RVC Ping", m.(*message.Ping).Id, "to ", m.(*message.Ping).From.String())
 						continue
 					case *message.Pong:
 						p.pongChan <- m
+						log.Println("Peer RVC Pong", m.(*message.Pong).Id, "to ", m.(*message.Pong).From.String())
 						continue
 					default:
-						log.Println("Default")
-						p.messageChan <- t.(message.Message)
+						//log.Println("Default message: ", t.(message.Message))
+						p.messageChan <- m
 					}
 				default:
 					log.Println("unexpected type %T", t)

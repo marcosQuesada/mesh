@@ -9,10 +9,11 @@ package watch
 
 import (
 	"fmt"
+	"github.com/marcosQuesada/mesh/dispatcher"
 	"github.com/marcosQuesada/mesh/message"
-	"github.com/marcosQuesada/mesh/node"
 	"github.com/marcosQuesada/mesh/peer"
 	"log"
+	"sync"
 	"time"
 )
 
@@ -21,35 +22,25 @@ type Watcher interface {
 }
 
 type defaultWatcher struct {
-	commChan     chan updateMessage
-	childs       map[*subject]message.Status //state
+	eventChan    chan dispatcher.Event
 	exit         chan bool
 	pingInterval int
+	mutex        sync.Mutex
 }
 
-//Used as a message from subjects to watcher
-type updateMessage struct {
-	id          int
-	destination *node.Node
-	state       message.Status
-}
-
-//a child to take care
-type subject struct {
-	node    node.Node
-	exit    chan bool
-	ticker  *time.Ticker
-	request int //last request id
-}
-
-func New(interval int) *defaultWatcher {
-	return &defaultWatcher{pingInterval: interval}
+func New(evCh chan dispatcher.Event, interval int) *defaultWatcher {
+	return &defaultWatcher{
+		eventChan:    evCh,
+		exit:         make(chan bool, 0),
+		pingInterval: interval,
+	}
 }
 
 func (w *defaultWatcher) Watch(p peer.NodePeer) {
 	var id = 0
-
 	go func() {
+		//@TODO: Randomize this
+		ticker := newTicker(w.pingInterval)
 		for {
 			select {
 			case <-w.exit:
@@ -59,19 +50,17 @@ func (w *defaultWatcher) Watch(p peer.NodePeer) {
 				ping := msg.(*message.Ping)
 				log.Println("--- Received Ping", ping.Id, "from ", ping.From.String())
 				pong := &message.Pong{Id: ping.Id, From: ping.To, To: ping.From}
-				id = ping.Id + 1
-				p.Send(pong)
-			}
-		}
-	}()
 
-	go func() {
-		//@TODO: Randomize this
-		ticker := time.NewTicker(time.Duration(w.pingInterval) * time.Second)
-		for {
-			select {
-			case <-w.exit:
-				return
+				w.mutex.Lock()
+				id = ping.Id + 1
+				w.mutex.Unlock()
+
+				p.Send(pong)
+				log.Println("--- Sended Pong", pong.Id, "to ", ping.From.String())
+				ticker.Stop()
+				ticker = newTicker(w.pingInterval)
+				log.Println("--- Restarting ticker")
+
 			case <-ticker.C:
 				//Send Ping to Peer
 				ping := &message.Ping{Id: id, From: p.From(), To: p.Node()}
@@ -82,17 +71,33 @@ func (w *defaultWatcher) Watch(p peer.NodePeer) {
 				case msg := <-p.PongChan():
 					pong := msg.(*message.Pong)
 					if pong.Id != ping.Id {
-						log.Println("Unexpected ID pong", pong.Id, " ping", ping.Id)
+						log.Println("XXX Unexpected ID pong", pong.Id, " ping", ping.Id)
+						w.exit <- true
 					}
 					log.Println("Received Pong ", pong.Id, "from ", pong.From.String())
 
-				case <-time.NewTimer(time.Second * 1).C:
+					w.mutex.Lock()
+					id = ping.Id + 1
+					w.mutex.Unlock()
+
+				case <-time.NewTimer(time.Second * 5).C:
 					fmt.Println("Waiting Pong: Timeout from ", node.String())
 					fmt.Println("-- Declare Dead Pear ", node.String())
 
+					w.eventChan <- &peer.OnPeerDisconnectedEvent{
+						Node:  p.Node(),
+						Event: peer.PeerStatusDisconnected,
+						Peer:  p,
+					}
+
 					p.Exit()
+					w.exit <- true
 				}
 			}
 		}
 	}()
+}
+
+func newTicker(pingInterval int) *time.Ticker {
+	return time.NewTicker(time.Duration(pingInterval) * time.Second)
 }

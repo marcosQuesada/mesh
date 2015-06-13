@@ -40,7 +40,7 @@ func TestErrorOnAddTwiceSameClient(t *testing.T) {
 }
 
 func TestToRemoveCLientFromPeerHandler(t *testing.T) {
-	err := clh.remove(c2)
+	err := clh.Remove(c2)
 	if err != nil {
 		t.Error("Unexpected Error Removing PeerNode", err)
 	}
@@ -51,7 +51,7 @@ func TestToRemoveCLientFromPeerHandler(t *testing.T) {
 }
 
 func TestErrorOnRemoveInexistentCLient(t *testing.T) {
-	err := clh.remove(c2)
+	err := clh.Remove(c2)
 	if err == nil {
 		t.Error("Unexpected Error Remove PeerNode", err)
 	}

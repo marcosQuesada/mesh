@@ -16,6 +16,7 @@ import (
 //Sends pings on ticker to check remote state
 type PeerHandler interface {
 	Handle(peer.NodePeer) message.Status
+	Remove(peer.NodePeer) error
 	Route(message.Message)
 	Events() chan dispatcher.Event
 	AggregatedChan() chan message.Message
@@ -25,18 +26,19 @@ type PeerHandler interface {
 type defaultPeerHandler struct {
 	watcher   watch.Watcher
 	peers     map[string]peer.NodePeer
-	mutex     sync.Mutex
 	from      n.Node
 	eventChan chan dispatcher.Event
 	peerChan  chan message.Message
+	mutex     sync.Mutex
 }
 
 func DefaultPeerHandler(node n.Node) *defaultPeerHandler {
+	evCh := make(chan dispatcher.Event, 0)
 	return &defaultPeerHandler{
-		watcher:   watch.New(5),
+		watcher:   watch.New(evCh, 2),
 		peers:     make(map[string]peer.NodePeer),
 		from:      node,
-		eventChan: make(chan dispatcher.Event, 0),
+		eventChan: evCh,
 		peerChan:  make(chan message.Message, 0),
 	}
 }
@@ -79,6 +81,7 @@ func (d *defaultPeerHandler) Handle(c peer.NodePeer) (response message.Status) {
 				d.eventChan <- &peer.OnPeerErroredEvent{
 					Node:  c.Node(),
 					Event: peer.PeerStatusError,
+					Error: err,
 				}
 
 				response = peer.PeerStatusError
@@ -137,7 +140,7 @@ func (h *defaultPeerHandler) accept(p peer.NodePeer) error {
 	return nil
 }
 
-func (h *defaultPeerHandler) remove(p peer.NodePeer) error {
+func (h *defaultPeerHandler) Remove(p peer.NodePeer) error {
 	h.mutex.Lock()
 	defer h.mutex.Unlock()
 

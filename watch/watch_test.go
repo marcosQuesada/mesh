@@ -1,11 +1,14 @@
 package watch
 
 import (
+	//"fmt"
+	"github.com/marcosQuesada/mesh/dispatcher"
 	"github.com/marcosQuesada/mesh/message"
 	"github.com/marcosQuesada/mesh/node"
 	"github.com/marcosQuesada/mesh/peer"
 	"reflect"
 	"testing"
+	//"time"
 )
 
 var fkCh1 = make(chan message.Message, 10)
@@ -78,8 +81,19 @@ func TestBasicWatchOverFakeNopPeers(t *testing.T) {
 	fakePeerA.Run()
 	fakePeerB.Run()
 
-	w := New(1)
+	evCh := make(chan dispatcher.Event, 0)
+	w := New(evCh, 1)
 
 	w.Watch(fakePeerA)
 	w.Watch(fakePeerB)
+
+	/*	for {
+		select {
+		case m := <-fakePeerA.PingChan():
+		case m := <-fakePeerB.PingChan():
+
+		case <-exit:
+			return
+		}
+	}*/
 }

@@ -62,9 +62,23 @@ func (c *Coordinator) OnPeerConnectedEvent(e dispatcher.Event) {
 }
 
 func (c *Coordinator) OnPeerDisconnected(e dispatcher.Event) {
-	n := e.(*peer.OnPeerDisconnectedEvent)
-	c.members[n.Node.String()] = n.Node
-	log.Println("Called Coordinator OnPeerDisconnectedEvent, removing peer", n.Node.String())
+	event := e.(*peer.OnPeerDisconnectedEvent)
+	c.members[event.Node.String()] = event.Node
+	log.Println("Called Coordinator OnPeerDisconnectedEvent, removing peer", event.Node.String())
+
+	c.peerHandler.Remove(event.Peer)
+
+	go func(destination n.Node) {
+		log.Println("Starting Dial Client from Node ", c.from.String(), "destination: ", destination.String())
+		//Blocking call, wait until connection success
+		p := peer.NewDialer(c.from, destination)
+		p.Run()
+		//Say Hello and wait response
+		p.SayHello()
+		r := c.peerHandler.Handle(p)
+		rn := p.Node()
+		log.Println("Dial link to to:", rn.String(), "result: ", r)
+	}(event.Node)
 }
 
 func (c *Coordinator) OnPeerAborted(e dispatcher.Event) {

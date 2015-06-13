@@ -28,6 +28,7 @@ func (m OnPeerAbortedEvent) GetEventType() dispatcher.EventType {
 type OnPeerErroredEvent struct {
 	Node  node.Node
 	Event message.Status
+	Error error
 }
 
 func (m OnPeerErroredEvent) GetEventType() dispatcher.EventType {
