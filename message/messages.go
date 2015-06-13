@@ -105,10 +105,9 @@ func (h Abort) Destination() n.Node {
 
 // Ping request to a remote node
 type Ping struct {
-	Id      int
-	From    n.Node
-	To      n.Node
-	Details map[string]interface{}
+	Id   int
+	From n.Node
+	To   n.Node
 }
 
 func (p Ping) MessageType() MsgType {
@@ -125,10 +124,9 @@ func (h Ping) Destination() n.Node {
 
 // Pong response as a ping request
 type Pong struct {
-	Id      int
-	From    n.Node
-	To      n.Node
-	Details map[string]interface{}
+	Id   int
+	From n.Node
+	To   n.Node
 }
 
 func (p Pong) MessageType() MsgType {

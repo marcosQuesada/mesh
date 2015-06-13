@@ -83,7 +83,6 @@ func startBasicTestServer() error {
 			pingMsg := &message.Ping{
 				Id:      123,
 				From:    node.Node{},
-				Details: map[string]interface{}{"foo": "bar"},
 			}
 			c.Send(pingMsg)
 			fmt.Println("XX Fired Ping")

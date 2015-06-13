@@ -12,13 +12,13 @@ import (
 	"github.com/marcosQuesada/mesh/dispatcher"
 	"github.com/marcosQuesada/mesh/message"
 	"github.com/marcosQuesada/mesh/node"
-	//"github.com/marcosQuesada/mesh/peer"
+	"github.com/marcosQuesada/mesh/peer"
 	"log"
 	"time"
 )
 
 type Watcher interface {
-	Watch(node.Node)
+	Watch(peer.NodePeer)
 }
 
 type defaultWatcher struct {
@@ -53,7 +53,7 @@ func (w *defaultWatcher) OnPeerConnectedEvent(e dispatcher.Event) {
 }
 
 //func (w *defaultWatcher) Watch(p peer.Peer) {
-func (w *defaultWatcher) Watch(n node.Node) {
+func (w *defaultWatcher) Watch(peer.NodePeer) {
 	/*	s := &subject{
 		peer:   p,
 		exit:   make(chan bool),
