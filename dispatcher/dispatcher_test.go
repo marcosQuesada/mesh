@@ -2,6 +2,7 @@ package dispatcher
 
 import (
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 )
@@ -17,13 +18,13 @@ func TestBasicDispatcher(t *testing.T) {
 	}
 
 	e := &OnFakeEvent{Id: 123}
-	d.Dispatch(e)
+	d.dispatch(e)
 
 	if e.Result != "Listener Called" {
 		t.Error("Result Not modified")
 	}
 
-	d.Dispatch(&OnInexistentEvent{})
+	d.dispatch(&OnInexistentEvent{})
 }
 
 func TestDispatcherRun(t *testing.T) {
@@ -74,11 +75,14 @@ func (e *OnInexistentEvent) GetEventType() EventType {
 }
 
 type fakeListener struct {
-	foo int
+	foo   int
+	mutex sync.Mutex
 }
 
 func (f *fakeListener) Listener(e Event) {
 	fmt.Println("Listener called")
 	realEvent := e.(*OnFakeEvent)
+	f.mutex.Lock()
+	defer f.mutex.Unlock()
 	realEvent.Result = "Listener Called"
 }

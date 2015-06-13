@@ -49,13 +49,13 @@ func (d *defaultDispatcher) Run() {
 					return
 				}
 
-				d.Dispatch(e)
+				d.dispatch(e)
 			}
 		}
 	}()
 }
 
-func (d *defaultDispatcher) Dispatch(e Event) {
+func (d *defaultDispatcher) dispatch(e Event) {
 	if _, ok := d.listeners[e.GetEventType()]; !ok {
 		return
 	}
