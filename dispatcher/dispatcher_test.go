@@ -20,7 +20,7 @@ func TestBasicDispatcher(t *testing.T) {
 	e := &OnFakeEvent{Id: 123}
 	d.dispatch(e)
 
-	if e.Result != "Listener Called" {
+	if result.get() != "Listener Called" {
 		t.Error("Result Not modified")
 	}
 
@@ -37,7 +37,7 @@ func TestDispatcherRun(t *testing.T) {
 	event := &OnFakeEvent{Id: 123}
 	d.EventChan <- event
 	time.Sleep(time.Millisecond * 100)
-	if event.Result != "Listener Called" {
+	if result.get() != "Listener Called" {
 		t.Error("Result Not modified")
 	}
 
@@ -49,7 +49,7 @@ func TestDispatcherRun(t *testing.T) {
 	//channel agregation needs adds minimum delay
 	time.Sleep(time.Millisecond * 10)
 
-	if eventB.Result != "Listener Called" {
+	if result.get() != "Listener Called" {
 		t.Error("Result Not modified")
 	}
 
@@ -81,8 +81,25 @@ type fakeListener struct {
 
 func (f *fakeListener) Listener(e Event) {
 	fmt.Println("Listener called")
-	realEvent := e.(*OnFakeEvent)
+	//realEvent := e.(*OnFakeEvent)
+	result.set("Listener Called")
+}
+
+var result fakeResult
+
+type fakeResult struct{
+	result string
+	mutex sync.Mutex
+}
+
+func (f *fakeResult)set(v string){
 	f.mutex.Lock()
 	defer f.mutex.Unlock()
-	realEvent.Result = "Listener Called"
+	f.result = v
+}
+
+func (f *fakeResult)get() string{
+	f.mutex.Lock()
+	defer f.mutex.Unlock()
+	return f.result
 }

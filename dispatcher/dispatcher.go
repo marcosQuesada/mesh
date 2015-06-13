@@ -55,16 +55,6 @@ func (d *defaultDispatcher) Run() {
 	}()
 }
 
-func (d *defaultDispatcher) dispatch(e Event) {
-	if _, ok := d.listeners[e.GetEventType()]; !ok {
-		return
-	}
-
-	for _, v := range d.listeners[e.GetEventType()] {
-		v(e)
-	}
-}
-
 //Enable event channel aggregation
 func (d *defaultDispatcher) Aggregate(e chan Event) {
 	go func() {
@@ -82,4 +72,14 @@ func (d *defaultDispatcher) Aggregate(e chan Event) {
 
 func (d *defaultDispatcher) Exit() {
 	close(d.EventChan)
+}
+
+func (d *defaultDispatcher) dispatch(e Event) {
+	if _, ok := d.listeners[e.GetEventType()]; !ok {
+		return
+	}
+
+	for _, v := range d.listeners[e.GetEventType()] {
+		v(e)
+	}
 }
