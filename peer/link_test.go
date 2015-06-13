@@ -13,7 +13,7 @@ import (
 type testLinkHandler struct {
 	lastMsg *message.Hello
 	outChan chan *message.Hello
-	exit    bool
+	exit    chan bool
 }
 
 func TestLinksOnPipes(t *testing.T) {
@@ -26,6 +26,7 @@ func TestLinksOnPipes(t *testing.T) {
 
 	tp := &testLinkHandler{
 		outChan: make(chan *message.Hello, 1),
+		exit: make(chan bool, 1),
 	}
 	go tp.handleLink(linkA, node.Node{Host: "localhost", Port: 5000})
 	go tp.handleLink(linkB, node.Node{Host: "localhost", Port: 5005})
@@ -39,7 +40,7 @@ func TestLinksOnPipes(t *testing.T) {
 	linkA.Send(msg)
 
 	time.Sleep(time.Millisecond * 300)
-	tp.exit = true
+	tp.exit <- true
 	lastMessage := <-tp.outChan
 	fmt.Println("lastMessage A", lastMessage)
 
@@ -57,33 +58,38 @@ func (ph *testLinkHandler) handleLink(p *SocketLink, from node.Node) {
 		ph.outChan <- ph.lastMsg
 	}()
 
-	for !ph.exit {
-		msg, err := p.Receive()
-		if err != nil {
-			fmt.Println("Error Receiving on server, err ", err)
+	for {
+		select{
+		case <- ph.exit:
 			return
-		}
+		default:
+			msg, err := p.Receive()
+			if err != nil {
+				fmt.Println("Error Receiving on server, err ", err)
+				return
+			}
 
-		if msg.MessageType() != 0 {
-			fmt.Println("Error on received Hello Message ", msg)
-			return
-		}
+			if msg.MessageType() != 0 {
+				fmt.Println("Error on received Hello Message ", msg)
+				return
+			}
 
-		newMsg := msg.(*message.Hello)
-		if newMsg.Details["foo"].(string) == "PONG" {
-			newMsg.Details["foo"] = "PING"
-		} else {
-			newMsg.Details["foo"] = "PONG"
-		}
-		newMsg.Id++
-		newMsg.From = from
+			newMsg := msg.(*message.Hello)
+			if newMsg.Details["foo"].(string) == "PONG" {
+				newMsg.Details["foo"] = "PING"
+			} else {
+				newMsg.Details["foo"] = "PONG"
+			}
+			newMsg.Id++
+			newMsg.From = from
 
-		err = p.Send(newMsg)
-		if err != nil {
-			//fmt.Println("Error sending: ", err)
-			return
+			err = p.Send(newMsg)
+			if err != nil {
+				//fmt.Println("Error sending: ", err)
+				return
+			}
+			ph.lastMsg = newMsg
 		}
-		ph.lastMsg = newMsg
 	}
 }
 
