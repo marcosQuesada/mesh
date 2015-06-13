@@ -34,31 +34,13 @@ func (f *FakePeerB) Send(m message.Message) error {
 func (f *FakePeerB) PingChan() chan message.Message {
 	return fkCh1
 }
-func TestWatchOverFakePipePeers(t *testing.T) {
-	mainChan := make(chan message.Message, 10)
-	pingPongCh := make(chan message.Message, 10)
-	//pingPongChB := make(chan message.Message, 10)
-
-	peerA := peer.NopPeer{
-		Host:         "localhost",
-		Port:         9000,
-		MsgChan:      mainChan,
-		PingPongChan: pingPongCh,
-	}
-
+func TestBasicPingPingOverFakeNopPeers(t *testing.T) {
 	fakePeerA := &FakePeerA{
-		peerA,
+		peer.NopPeer{},
 	}
-	peerB := peer.NopPeer{
-		Host:         "localhost",
-		Port:         9000,
-		MsgChan:      mainChan,
-		PingPongChan: pingPongCh}
 	fakePeerB := &FakePeerB{
-		peerB,
+		peer.NopPeer{},
 	}
-	fakePeerB.Run()
-	fakePeerA.Run()
 
 	msg := message.Ping{
 		Id:   999,
@@ -71,13 +53,33 @@ func TestWatchOverFakePipePeers(t *testing.T) {
 	if !reflect.DeepEqual(msg, rcvMsg) {
 		t.Errorf("Expected %s, got %s", msg, rcvMsg)
 	}
+
 	msgPong := message.Pong{
 		Id:   999,
 		From: node.Node{"localhost", 9000},
 	}
 	fakePeerB.Send(msgPong)
+
 	rcvMsg = <-fakePeerA.PingChan()
 	if !reflect.DeepEqual(msgPong, rcvMsg) {
 		t.Errorf("Expected %s, got %s", msg, rcvMsg)
 	}
+}
+
+func TestBasicWatchOverFakeNopPeers(t *testing.T) {
+	fakePeerA := &FakePeerA{
+		peer.NopPeer{},
+	}
+
+	fakePeerB := &FakePeerB{
+		peer.NopPeer{},
+	}
+
+	fakePeerA.Run()
+	fakePeerB.Run()
+
+	w := New(1)
+
+	w.Watch(fakePeerA)
+	w.Watch(fakePeerB)
 }

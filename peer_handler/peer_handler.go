@@ -33,7 +33,7 @@ type defaultPeerHandler struct {
 
 func DefaultPeerHandler(node n.Node) *defaultPeerHandler {
 	return &defaultPeerHandler{
-		watcher:   watch.New(),
+		watcher:   watch.New(5),
 		peers:     make(map[string]peer.NodePeer),
 		from:      node,
 		eventChan: make(chan dispatcher.Event, 0),

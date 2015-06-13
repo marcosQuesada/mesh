@@ -34,18 +34,18 @@ type NodePeer interface {
 type Peer struct {
 	Link
 	from        n.Node
-	node        n.Node
+	to          n.Node
 	messageChan chan message.Message
 	pingChan    chan message.Message
 	exitChan    chan bool
 	mode        string
 }
 
-func NewDialer(from n.Node, node n.Node) *Peer {
+func NewDialer(from n.Node, destination n.Node) *Peer {
 	var conn net.Conn
 	var err error
 	for {
-		conn, err = net.Dial("tcp", string(node.String()))
+		conn, err = net.Dial("tcp", string(destination.String()))
 		if err != nil {
 			log.Println("dial error:", err)
 			time.Sleep(time.Second)
@@ -57,18 +57,21 @@ func NewDialer(from n.Node, node n.Node) *Peer {
 	return &Peer{
 		from:        from,
 		Link:        NewJSONSocketLink(conn),
-		node:        node,
+		to:          destination,
 		messageChan: make(chan message.Message, 0),
+		pingChan:    make(chan message.Message, 0),
 		exitChan:    make(chan bool),
 		mode:        "client",
 	}
 }
 
-func NewAcceptor(conn net.Conn, node n.Node) *Peer {
+func NewAcceptor(conn net.Conn, destination n.Node) *Peer {
+
 	return &Peer{
 		Link:        NewJSONSocketLink(conn),
-		node:        node,
+		from:        destination,
 		messageChan: make(chan message.Message, 0),
+		pingChan:    make(chan message.Message, 0),
 		exitChan:    make(chan bool),
 		mode:        "server",
 	}
@@ -122,21 +125,20 @@ func (p *Peer) Run() {
 			case msg := <-response:
 				switch t := msg.(type) {
 				case error:
-					log.Println("Error Receiving on server, err ", t, "exiting Peer Link:", p.node.String())
+					log.Println("Error Receiving on server, err ", t, "exiting Peer Link:", p.to.String())
 					p.exitChan <- true
 					return
 				case message.Message:
 					m := t.(message.Message)
 					switch m.(type) {
 					case *message.Ping:
-						log.Println("Received Ping")
 						p.pingChan <- m
 						continue
 					case *message.Pong:
-						log.Println("Received Pong")
 						p.pingChan <- m
 						continue
 					default:
+						log.Println("Default")
 						p.messageChan <- t.(message.Message)
 					}
 				default:
@@ -159,7 +161,7 @@ func (p *Peer) Exit() {
 }
 
 func (p *Peer) Node() n.Node {
-	return p.node
+	return p.to
 }
 
 //Used on dev Only!
@@ -172,7 +174,7 @@ func (p *Peer) Mode() string {
 }
 
 func (p *Peer) Identify(n n.Node) {
-	p.node = n
+	p.to = n
 }
 
 // Nop Peer is Used on testing

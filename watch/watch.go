@@ -9,7 +9,6 @@ package watch
 
 import (
 	"fmt"
-	"github.com/marcosQuesada/mesh/dispatcher"
 	"github.com/marcosQuesada/mesh/message"
 	"github.com/marcosQuesada/mesh/node"
 	"github.com/marcosQuesada/mesh/peer"
@@ -22,9 +21,10 @@ type Watcher interface {
 }
 
 type defaultWatcher struct {
-	commChan chan updateMessage
-	childs   map[*subject]message.Status //state
-	exit     chan bool
+	commChan     chan updateMessage
+	childs       map[*subject]message.Status //state
+	exit         chan bool
+	pingInterval int
 }
 
 //Used as a message from subjects to watcher
@@ -42,54 +42,46 @@ type subject struct {
 	request int //last request id
 }
 
-func New() *defaultWatcher {
-	return &defaultWatcher{}
+func New(interval int) *defaultWatcher {
+	return &defaultWatcher{pingInterval: interval}
 }
 
-func (w *defaultWatcher) OnPeerConnectedEvent(e dispatcher.Event) {
-	//	n := e.(*peer.OnPeerConnectedEvent)
-	log.Println("Called Watcher OnPeerConnectedEvent", e) //n.Node.String()
+func (w *defaultWatcher) Watch(p peer.NodePeer) {
+	go func() {
+		//@TODO: Randomize this
+		ticker := time.NewTicker(time.Duration(5) * time.Second)
+		var id = 0
+		for {
+			select {
+			case <-w.exit:
+				return
 
-}
+			case <-ticker.C:
+				//Send Ping to Peer
+				ping := &message.Ping{Id: id, From: p.From(), To: p.Node()}
+				p.Send(ping)
+				fmt.Println("Sended PING msg ", ping)
+				//Pong response must be handled using timeouts to detect link failures
 
-//func (w *defaultWatcher) Watch(p peer.Peer) {
-func (w *defaultWatcher) Watch(peer.NodePeer) {
-	/*	s := &subject{
-		peer:   p,
-		exit:   make(chan bool),
-		ticker: time.NewTicker(time.Duration(1) * time.Millisecond),
-	}*/
+			case msg := <-p.PingChan():
+				fmt.Println("Received From PingChan ", msg)
+				//if Ping received Return Pong
+				switch msg.(type) {
+				case *message.Ping:
+					log.Println("Received Ping", msg)
+					ping := msg.(*message.Ping)
+					id = ping.Id + 1
+					pong := &message.Pong{Id: id, From: ping.To, To: ping.From}
+					p.Send(pong)
+					fmt.Println("Sended PONG msg ", pong)
 
-	//w.childs[s] = PeerStatusUnknown
-}
+				case *message.Pong:
+					pong := msg.(*message.Pong)
 
-func (w *defaultWatcher) Run() {
-	for {
-		select {
-		case <-w.exit:
-			return
-		case msg := <-w.commChan:
-			//check response received and update states
-			fmt.Println("msg ", msg)
-			//Pong message expected!
-			//check that
+					log.Println("Received Pong ", pong.Id)
+
+				}
+			}
 		}
-	}
-}
-
-func (t *subject) Watch() {
-	for {
-		select {
-		case <-t.exit:
-			return
-		case <-t.ticker.C:
-			//Send Ping to Peer
-			//ping := &Ping{}
-
-			//t.peer.SendPing(ping)
-			//case msg := <-t.peer.ReceivePong(): //as chan of messages
-			//Pong message expected!
-			//check that
-		}
-	}
+	}()
 }

@@ -15,7 +15,7 @@ func TestPeerMessagingUnderPipes(t *testing.T) {
 	c1 := &Peer{
 		Link:        NewJSONSocketLink(a),
 		from:        node.Node{Host: "192.168.1.1", Port: 8000},
-		node:        node.Node{Host: "foo", Port: 5678},
+		to:          node.Node{Host: "foo", Port: 5678},
 		messageChan: make(chan message.Message, 0),
 		exitChan:    make(chan bool),
 		mode:        "pipe",
@@ -25,7 +25,7 @@ func TestPeerMessagingUnderPipes(t *testing.T) {
 	c2 := &Peer{
 		Link:        NewJSONSocketLink(b),
 		from:        node.Node{Host: "192.168.1.10", Port: 8000},
-		node:        node.Node{Host: "bar", Port: 5678},
+		to:          node.Node{Host: "bar", Port: 5678},
 		messageChan: make(chan message.Message, 0),
 		exitChan:    make(chan bool),
 		mode:        "pipe",
