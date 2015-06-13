@@ -143,7 +143,7 @@ func TestBasicPingPongOverPipesChannel(t *testing.T) {
 	evCh := make(chan dispatcher.Event, 0)
 	defer close(evCh)
 
-	w := New(evCh, 1)
+	w := New(evCh, 2)
 	fmt.Println("C1 from ", c1.From(), c1.Node())
 	w.Watch(c1)
 

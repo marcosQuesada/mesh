@@ -40,7 +40,6 @@ func (w *defaultWatcher) Watch(p peer.NodePeer) {
 	log.Println("Begin")
 	var id = 0
 	go func(c peer.NodePeer) {
-		log.Println("from ", c.From(), "To:", c.Node())
 		//@TODO: Randomize this
 		ticker := newTicker(w.pingInterval)
 		for {
@@ -48,6 +47,7 @@ func (w *defaultWatcher) Watch(p peer.NodePeer) {
 			case <-w.exit:
 				return
 			case msg := <-p.PingChan():
+				log.Println("from ", c.From(), "To:", c.Node(), p.From())
 				//if Ping received Return Pong
 				ping := msg.(*message.Ping)
 				log.Println("--- Received Ping", ping.Id, "from ", ping.From.String(), "on: ", ping.To.String())
@@ -64,7 +64,12 @@ func (w *defaultWatcher) Watch(p peer.NodePeer) {
 				log.Println("--- Restarting ticker")
 
 			case <-ticker.C:
-				log.Println("from ", c.From(), "To:", c.Node())
+				org := c.From()
+				if org.Host == "" {
+					log.Println("Continue from ", c, p)
+					continue
+				}
+				log.Println("XXXX from ", c.From(), "To:", c.Node(), p.From())
 				//Send Ping to Peer
 				ping := &message.Ping{Id: id, From: c.From(), To: c.Node()}
 				log.Println("Sending Ping ", ping.Id, "from ", ping.From.String(), "to", ping.To.String())
