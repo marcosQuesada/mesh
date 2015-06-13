@@ -9,13 +9,16 @@ package watch
 
 import (
 	"fmt"
+	"github.com/marcosQuesada/mesh/dispatcher"
 	"github.com/marcosQuesada/mesh/message"
 	"github.com/marcosQuesada/mesh/node"
+	//"github.com/marcosQuesada/mesh/peer"
+	"log"
 	"time"
 )
 
 type Watcher interface {
-	Care(node.Node)
+	Watch(node.Node)
 }
 
 type defaultWatcher struct {
@@ -43,7 +46,14 @@ func New() *defaultWatcher {
 	return &defaultWatcher{}
 }
 
-func (w *defaultWatcher) Care(n node.Node) {
+func (w *defaultWatcher) OnPeerConnectedEvent(e dispatcher.Event) {
+	//	n := e.(*peer.OnPeerConnectedEvent)
+	log.Println("Called Watcher OnPeerConnectedEvent", e) //n.Node.String()
+
+}
+
+//func (w *defaultWatcher) Watch(p peer.Peer) {
+func (w *defaultWatcher) Watch(n node.Node) {
 	/*	s := &subject{
 		peer:   p,
 		exit:   make(chan bool),

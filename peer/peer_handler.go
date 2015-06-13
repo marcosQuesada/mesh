@@ -64,6 +64,7 @@ func (d *defaultPeerHandler) Handle(c NodePeer) (response message.Status) {
 			}
 			c.Send(&message.Welcome{Id: msg.(*message.Hello).Id, From: d.from, Details: map[string]interface{}{"foo_bar": 1231}})
 
+			//d.watcher.Watch(c)
 			d.eventChan <- &OnPeerConnectedEvent{
 				Node:  msg.(*message.Hello).From,
 				Event: PeerStatusConnected,

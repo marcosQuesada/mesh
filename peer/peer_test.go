@@ -90,7 +90,8 @@ func TestPeerMessagingUnderPipes(t *testing.T) {
 
 func TestBasicNopPeerTest(t *testing.T) {
 	ch := make(chan message.Message, 10)
-	fkc := &NopPeer{"localhost", 9000, ch}
+	pCh := make(chan message.Message, 10)
+	fkc := &NopPeer{"localhost", 9000, ch, pCh}
 
 	msg := message.Hello{
 		Id:      999,

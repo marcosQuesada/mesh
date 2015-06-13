@@ -26,6 +26,7 @@ type NodePeer interface {
 	Run()
 	Exit()
 	ReceiveChan() chan message.Message
+	PingChan() chan message.Message
 	Send(message.Message) error
 	SayHello() // Pending to remove, must be internal
 }
@@ -35,6 +36,7 @@ type Peer struct {
 	from        n.Node
 	node        n.Node
 	messageChan chan message.Message
+	pingChan    chan message.Message
 	exitChan    chan bool
 	mode        string
 }
@@ -74,6 +76,10 @@ func NewAcceptor(conn net.Conn, node n.Node) *Peer {
 
 func (p *Peer) ReceiveChan() chan message.Message {
 	return p.messageChan
+}
+
+func (p *Peer) PingChan() chan message.Message {
+	return p.pingChan
 }
 
 func (p *Peer) SayHello() {
@@ -120,7 +126,19 @@ func (p *Peer) Run() {
 					p.exitChan <- true
 					return
 				case message.Message:
-					p.messageChan <- t.(message.Message)
+					m := t.(message.Message)
+					switch m.(type) {
+					case *message.Ping:
+						log.Println("Received Ping")
+						p.pingChan <- m
+						continue
+					case *message.Pong:
+						log.Println("Received Pong")
+						p.pingChan <- m
+						continue
+					default:
+						p.messageChan <- t.(message.Message)
+					}
 				default:
 					log.Println("unexpected type %T", t)
 				}
@@ -159,9 +177,10 @@ func (p *Peer) Identify(n n.Node) {
 
 // Nop Peer is Used on testing
 type NopPeer struct {
-	host    string
-	port    int
-	msgChan chan message.Message
+	host     string
+	port     int
+	msgChan  chan message.Message
+	pingChan chan message.Message
 }
 
 func (f *NopPeer) Node() n.Node {
@@ -178,6 +197,10 @@ func (f *NopPeer) Send(m message.Message) error {
 }
 func (f *NopPeer) ReceiveChan() (v chan message.Message) {
 	return f.msgChan
+}
+
+func (f *NopPeer) PingChan() (v chan message.Message) {
+	return f.pingChan
 }
 
 func (f *NopPeer) Exit() {
