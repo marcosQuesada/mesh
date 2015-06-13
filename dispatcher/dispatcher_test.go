@@ -35,6 +35,7 @@ func TestDispatcherRun(t *testing.T) {
 
 	event := &OnFakeEvent{Id: 123}
 	d.EventChan <- event
+	time.Sleep(time.Millisecond * 100)
 	if event.Result != "Listener Called" {
 		t.Error("Result Not modified")
 	}

@@ -27,6 +27,7 @@ type NodePeer interface {
 	Exit()
 	ReceiveChan() chan message.Message
 	PingChan() chan message.Message
+	PongChan() chan message.Message
 	Send(message.Message) error
 	SayHello() // Pending to remove, must be internal
 }
@@ -37,6 +38,7 @@ type Peer struct {
 	to          n.Node
 	messageChan chan message.Message
 	pingChan    chan message.Message
+	pongChan    chan message.Message
 	exitChan    chan bool
 	mode        string
 }
@@ -60,18 +62,20 @@ func NewDialer(from n.Node, destination n.Node) *Peer {
 		to:          destination,
 		messageChan: make(chan message.Message, 0),
 		pingChan:    make(chan message.Message, 0),
+		pongChan:    make(chan message.Message, 0),
 		exitChan:    make(chan bool),
 		mode:        "client",
 	}
 }
 
-func NewAcceptor(conn net.Conn, destination n.Node) *Peer {
+func NewAcceptor(conn net.Conn, server n.Node) *Peer {
 
 	return &Peer{
 		Link:        NewJSONSocketLink(conn),
-		from:        destination,
+		from:        server,
 		messageChan: make(chan message.Message, 0),
 		pingChan:    make(chan message.Message, 0),
+		pongChan:    make(chan message.Message, 0),
 		exitChan:    make(chan bool),
 		mode:        "server",
 	}
@@ -83,6 +87,10 @@ func (p *Peer) ReceiveChan() chan message.Message {
 
 func (p *Peer) PingChan() chan message.Message {
 	return p.pingChan
+}
+
+func (p *Peer) PongChan() chan message.Message {
+	return p.pongChan
 }
 
 func (p *Peer) SayHello() {
@@ -135,7 +143,7 @@ func (p *Peer) Run() {
 						p.pingChan <- m
 						continue
 					case *message.Pong:
-						p.pingChan <- m
+						p.pongChan <- m
 						continue
 					default:
 						log.Println("Default")
@@ -204,7 +212,9 @@ func (f *NopPeer) ReceiveChan() chan message.Message {
 func (f *NopPeer) PingChan() chan message.Message {
 	return f.PingPongChan
 }
-
+func (f *NopPeer) PongChan() chan message.Message {
+	return f.PingPongChan
+}
 func (f *NopPeer) Exit() {
 }
 func (f *NopPeer) SayHello() {

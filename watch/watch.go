@@ -47,39 +47,50 @@ func New(interval int) *defaultWatcher {
 }
 
 func (w *defaultWatcher) Watch(p peer.NodePeer) {
+	var id = 0
+
 	go func() {
-		//@TODO: Randomize this
-		ticker := time.NewTicker(time.Duration(5) * time.Second)
-		var id = 0
 		for {
 			select {
 			case <-w.exit:
 				return
+			case msg := <-p.PingChan():
+				//if Ping received Return Pong
+				ping := msg.(*message.Ping)
+				log.Println("--- Received Ping", ping.Id, "from ", ping.From.String())
+				pong := &message.Pong{Id: ping.Id, From: ping.To, To: ping.From}
+				id = ping.Id + 1
+				p.Send(pong)
+			}
+		}
+	}()
 
+	go func() {
+		//@TODO: Randomize this
+		ticker := time.NewTicker(time.Duration(w.pingInterval) * time.Second)
+		for {
+			select {
+			case <-w.exit:
+				return
 			case <-ticker.C:
 				//Send Ping to Peer
 				ping := &message.Ping{Id: id, From: p.From(), To: p.Node()}
 				p.Send(ping)
-				fmt.Println("Sended PING msg ", ping)
-				//Pong response must be handled using timeouts to detect link failures
-
-			case msg := <-p.PingChan():
-				fmt.Println("Received From PingChan ", msg)
-				//if Ping received Return Pong
-				switch msg.(type) {
-				case *message.Ping:
-					log.Println("Received Ping", msg)
-					ping := msg.(*message.Ping)
-					id = ping.Id + 1
-					pong := &message.Pong{Id: id, From: ping.To, To: ping.From}
-					p.Send(pong)
-					fmt.Println("Sended PONG msg ", pong)
-
-				case *message.Pong:
+				node := p.Node()
+				log.Println("Sended Ticker PING ", ping.Id, "from ", ping.From.String(), "to ", node.String())
+				select {
+				case msg := <-p.PongChan():
 					pong := msg.(*message.Pong)
+					if pong.Id != ping.Id {
+						log.Println("Unexpected ID pong", pong.Id, " ping", ping.Id)
+					}
+					log.Println("Received Pong ", pong.Id, "from ", pong.From.String())
 
-					log.Println("Received Pong ", pong.Id)
+				case <-time.NewTimer(time.Second * 1).C:
+					fmt.Println("Waiting Pong: Timeout from ", node.String())
+					fmt.Println("-- Declare Dead Pear ", node.String())
 
+					p.Exit()
 				}
 			}
 		}
