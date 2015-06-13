@@ -116,6 +116,8 @@ func TestBasicPingPongChannel(t *testing.T) {
 		from:        node.Node{},
 		to:          node.Node{},
 		messageChan: make(chan message.Message, 0),
+		pingChan:    make(chan message.Message, 0),
+		pongChan:    make(chan message.Message, 0),
 		exitChan:    make(chan bool),
 		mode:        "pipe",
 	}
@@ -126,23 +128,33 @@ func TestBasicPingPongChannel(t *testing.T) {
 		from:        node.Node{},
 		to:          node.Node{},
 		messageChan: make(chan message.Message, 0),
+		pingChan:    make(chan message.Message, 0),
+		pongChan:    make(chan message.Message, 0),
 		exitChan:    make(chan bool),
 		mode:        "pipe",
 	}
 	c2.Run()
 
-	resChan := make(chan message.Message, 2)
+	resChan := make(chan message.Message, 4)
 	doneChan := make(chan struct{})
 	go func() {
 		for {
 			select {
-			case r := <-c1.ReceiveChan():
+			case r := <-c1.PingChan():
 				msg := r.(*message.Ping)
-				msg.Id = 1
+				fmt.Println("PING  ", msg)
 				resChan <- msg
-			case r := <-c2.ReceiveChan():
+			case r := <-c1.PongChan():
+				msg := r.(*message.Pong)
+				fmt.Println("PONG  ", msg)
+				resChan <- msg
+			case r := <-c2.PingChan():
 				msg := r.(*message.Ping)
-				msg.Id = 2
+				fmt.Println("PING  ", msg)
+				resChan <- msg
+			case r := <-c2.PongChan():
+				msg := r.(*message.Pong)
+				fmt.Println("PONG  ", msg)
 				resChan <- msg
 			case <-doneChan:
 				close(resChan)
@@ -152,15 +164,19 @@ func TestBasicPingPongChannel(t *testing.T) {
 		return
 	}()
 
-	ping := &message.Ping{}
-	c2.Send(ping)
-
+	c1.Send(message.Ping{})
+	c2.Send(message.Ping{})
+	c1.Send(message.Pong{})
+	c2.Send(message.Pong{})
 	time.Sleep(time.Millisecond * 100)
 
 	close(doneChan)
-	r := <-resChan
-
-	fmt.Println("Reschan is ", r)
+	if len(resChan) != 4 {
+		t.Error("Unexpected result chan", len(resChan))
+	}
+	for k := range resChan {
+		fmt.Println("Result Channel data: ", k)
+	}
 
 	c1.Exit()
 	c2.Exit()
