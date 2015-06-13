@@ -7,6 +7,7 @@ import (
 	"github.com/marcosQuesada/mesh/dispatcher"
 	n "github.com/marcosQuesada/mesh/node"
 	"github.com/marcosQuesada/mesh/peer"
+	"github.com/marcosQuesada/mesh/peer_handler"
 	"log"
 	"net"
 )
@@ -14,7 +15,7 @@ import (
 type Server struct {
 	config      *config.Config
 	node        n.Node
-	peerHandler peer.PeerHandler
+	peerHandler peer_handler.PeerHandler
 	exit        chan bool
 }
 
@@ -23,7 +24,7 @@ func New(c *config.Config) *Server {
 		config:      c,
 		exit:        make(chan bool),
 		node:        c.Addr,
-		peerHandler: peer.DefaultPeerHandler(c.Addr),
+		peerHandler: peer_handler.DefaultPeerHandler(c.Addr),
 	}
 }
 

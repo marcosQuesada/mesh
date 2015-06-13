@@ -4,7 +4,7 @@ import (
 	//"fmt"
 	//"github.com/marcosQuesada/mesh/message"
 	"github.com/marcosQuesada/mesh/node"
-	"github.com/marcosQuesada/mesh/peer"
+	"github.com/marcosQuesada/mesh/peer_handler"
 	//"net"
 	"testing"
 	"time"
@@ -100,7 +100,7 @@ func TestForwardingChannel(t *testing.T) {
 	members[n.String()] = n
 	members[from.String()] = from // as fake local node
 
-	o = StartCoordinator(from, members, peer.DefaultPeerHandler(from))
+	o = StartCoordinator(from, members, peer_handler.DefaultPeerHandler(from))
 	o.Run()
 	time.Sleep(time.Second)
 	o.Exit()

@@ -1,17 +1,18 @@
-package peer
+package peer_handler
 
 import (
 	n "github.com/marcosQuesada/mesh/node"
+	"github.com/marcosQuesada/mesh/peer"
 	"testing"
 )
 
-var c1 *NopPeer
-var c2 *NopPeer
+var c1 *peer.NopPeer
+var c2 *peer.NopPeer
 var clh *defaultPeerHandler
 
 func TestBasicPeerHandler(t *testing.T) {
-	c1 = &NopPeer{host: "foo", port: 1234}
-	c2 = &NopPeer{host: "bar", port: 1234}
+	c1 = &peer.NopPeer{Host: "foo", Port: 1234}
+	c2 = &peer.NopPeer{Host: "bar", Port: 1234}
 
 	clh = DefaultPeerHandler(n.Node{})
 	err := clh.accept(c1)

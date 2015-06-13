@@ -5,6 +5,7 @@ import (
 	"github.com/marcosQuesada/mesh/message"
 	n "github.com/marcosQuesada/mesh/node"
 	"github.com/marcosQuesada/mesh/peer"
+	"github.com/marcosQuesada/mesh/peer_handler"
 	"log"
 )
 
@@ -22,13 +23,13 @@ const (
 )
 
 type Coordinator struct {
-	peerHandler peer.PeerHandler
+	peerHandler peer_handler.PeerHandler
 	from        n.Node
 	members     map[string]n.Node
 	exitChan    chan bool
 }
 
-func StartCoordinator(from n.Node, members map[string]n.Node, clh peer.PeerHandler) *Coordinator {
+func StartCoordinator(from n.Node, members map[string]n.Node, clh peer_handler.PeerHandler) *Coordinator {
 	return &Coordinator{
 		peerHandler: clh,
 		from:        from,

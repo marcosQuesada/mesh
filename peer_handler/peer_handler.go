@@ -1,10 +1,11 @@
-package peer
+package peer_handler
 
 import (
 	"fmt"
 	"github.com/marcosQuesada/mesh/dispatcher"
 	"github.com/marcosQuesada/mesh/message"
 	n "github.com/marcosQuesada/mesh/node"
+	"github.com/marcosQuesada/mesh/peer"
 	"github.com/marcosQuesada/mesh/watch"
 	"log"
 	"sync"
@@ -14,7 +15,7 @@ import (
 //PeerHandler is in charge of Handle Client Lifecycle
 //Sends pings on ticker to check remote state
 type PeerHandler interface {
-	Handle(NodePeer) message.Status
+	Handle(peer.NodePeer) message.Status
 	Route(message.Message)
 	Events() chan dispatcher.Event
 	AggregatedChan() chan message.Message
@@ -23,7 +24,7 @@ type PeerHandler interface {
 
 type defaultPeerHandler struct {
 	watcher   watch.Watcher
-	peers     map[string]NodePeer
+	peers     map[string]peer.NodePeer
 	mutex     sync.Mutex
 	from      n.Node
 	eventChan chan dispatcher.Event
@@ -33,14 +34,14 @@ type defaultPeerHandler struct {
 func DefaultPeerHandler(node n.Node) *defaultPeerHandler {
 	return &defaultPeerHandler{
 		watcher:   watch.New(),
-		peers:     make(map[string]NodePeer),
+		peers:     make(map[string]peer.NodePeer),
 		from:      node,
 		eventChan: make(chan dispatcher.Event, 0),
 		peerChan:  make(chan message.Message, 0),
 	}
 }
 
-func (d *defaultPeerHandler) Handle(c NodePeer) (response message.Status) {
+func (d *defaultPeerHandler) Handle(c peer.NodePeer) (response message.Status) {
 	select {
 	case <-time.NewTimer(time.Second).C:
 		log.Println("Client has not receive response, Timeout")
@@ -54,48 +55,48 @@ func (d *defaultPeerHandler) Handle(c NodePeer) (response message.Status) {
 				c.Send(&message.Abort{Id: msg.(*message.Hello).Id, From: d.from, Details: map[string]interface{}{"foo_bar": 1231}})
 				c.Exit()
 
-				d.eventChan <- &OnPeerAbortedEvent{
+				d.eventChan <- &peer.OnPeerAbortedEvent{
 					Node:  msg.(*message.Hello).From,
-					Event: PeerStatusError,
+					Event: peer.PeerStatusError,
 				}
-				response = PeerStatusAbort
+				response = peer.PeerStatusAbort
 
 				return
 			}
 			c.Send(&message.Welcome{Id: msg.(*message.Hello).Id, From: d.from, Details: map[string]interface{}{"foo_bar": 1231}})
 
 			//d.watcher.Watch(c)
-			d.eventChan <- &OnPeerConnectedEvent{
+			d.eventChan <- &peer.OnPeerConnectedEvent{
 				Node:  msg.(*message.Hello).From,
-				Event: PeerStatusConnected,
+				Event: peer.PeerStatusConnected,
 				Peer:  c,
 			}
-			response = PeerStatusConnected
+			response = peer.PeerStatusConnected
 
 		case *message.Welcome:
 			err := d.accept(c)
 			if err != nil {
-				d.eventChan <- &OnPeerErroredEvent{
+				d.eventChan <- &peer.OnPeerErroredEvent{
 					Node:  c.Node(),
-					Event: PeerStatusError,
+					Event: peer.PeerStatusError,
 				}
 
-				response = PeerStatusError
+				response = peer.PeerStatusError
 				return
 			} else {
-				d.eventChan <- &OnPeerConnectedEvent{
+				d.eventChan <- &peer.OnPeerConnectedEvent{
 					Node:  c.Node(),
-					Event: PeerStatusConnected,
+					Event: peer.PeerStatusConnected,
 					Peer:  c,
 				}
-				response = PeerStatusConnected
+				response = peer.PeerStatusConnected
 			}
 		case *message.Abort:
-			d.eventChan <- &OnPeerAbortedEvent{
+			d.eventChan <- &peer.OnPeerAbortedEvent{
 				Node:  c.Node(),
-				Event: PeerStatusAbort,
+				Event: peer.PeerStatusAbort,
 			}
-			response = PeerStatusAbort
+			response = peer.PeerStatusAbort
 		default:
 			log.Println("Unexpected type On response ")
 		}
@@ -120,7 +121,7 @@ func (h *defaultPeerHandler) Len() int {
 	return len(h.peers)
 }
 
-func (h *defaultPeerHandler) accept(p NodePeer) error {
+func (h *defaultPeerHandler) accept(p peer.NodePeer) error {
 	h.mutex.Lock()
 	defer h.mutex.Unlock()
 
@@ -135,7 +136,7 @@ func (h *defaultPeerHandler) accept(p NodePeer) error {
 	return nil
 }
 
-func (h *defaultPeerHandler) remove(p NodePeer) error {
+func (h *defaultPeerHandler) remove(p peer.NodePeer) error {
 	h.mutex.Lock()
 	defer h.mutex.Unlock()
 

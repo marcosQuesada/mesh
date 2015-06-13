@@ -177,14 +177,14 @@ func (p *Peer) Identify(n n.Node) {
 
 // Nop Peer is Used on testing
 type NopPeer struct {
-	host     string
-	port     int
+	Host     string
+	Port     int
 	msgChan  chan message.Message
 	pingChan chan message.Message
 }
 
 func (f *NopPeer) Node() n.Node {
-	return n.Node{Host: f.host, Port: f.port}
+	return n.Node{Host: f.Host, Port: f.Port}
 }
 func (f *NopPeer) Id() ID {
 	return ID(0)
@@ -215,5 +215,5 @@ func (f *NopPeer) Mode() string {
 }
 
 func (f *NopPeer) From() n.Node {
-	return n.Node{Host: f.host, Port: f.port}
+	return n.Node{Host: f.Host, Port: f.Port}
 }
