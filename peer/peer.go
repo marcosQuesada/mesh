@@ -41,6 +41,7 @@ type Peer struct {
 	pingChan    chan message.Message
 	pongChan    chan message.Message
 	exitChan    chan bool
+	doneChan    chan bool
 	mode        string
 }
 
@@ -65,6 +66,7 @@ func NewDialer(from n.Node, destination n.Node) *Peer {
 		pingChan:    make(chan message.Message, 0),
 		pongChan:    make(chan message.Message, 0),
 		exitChan:    make(chan bool),
+		doneChan:    make(chan bool),
 		mode:        "client",
 	}
 }
@@ -77,6 +79,7 @@ func NewAcceptor(conn net.Conn, server n.Node) *Peer {
 		pingChan:    make(chan message.Message, 0),
 		pongChan:    make(chan message.Message, 0),
 		exitChan:    make(chan bool),
+		doneChan:    make(chan bool),
 		mode:        "server",
 	}
 }
@@ -103,11 +106,14 @@ func (p *Peer) SayHello() {
 }
 
 func (p *Peer) Run() {
+	defer log.Println("Exiting Peer ", p.Node())
+
 	response := make(chan interface{}, 0)
 	done := make(chan bool)
 	go func(exit chan bool) {
 		select {
 		case <-exit:
+			p.doneChan <- true
 			return
 		default:
 			for {
@@ -167,6 +173,7 @@ func (p *Peer) Run() {
 
 func (p *Peer) Exit() {
 	p.exitChan <- true
+	<-p.doneChan
 }
 
 func (p *Peer) Node() n.Node {

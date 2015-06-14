@@ -50,16 +50,18 @@ func TestBasicPingPongOverPipesChannel(t *testing.T) {
 				c1Mirror.Send(pong)
 				last = pong.Id
 				if last == total {
+					fmt.Println("Exiting")
+
 					return
 				}
 			case <-doneChan:
+				fmt.Println("Done")
 				return
-			default:
+				//default:
 			}
 		}
 		return
 	}()
-
 	evCh := make(chan dispatcher.Event, 0)
 	defer close(evCh)
 
@@ -75,8 +77,11 @@ func TestBasicPingPongOverPipesChannel(t *testing.T) {
 	}
 
 	w.Exit()
+	fmt.Println("here")
 	c1.Exit()
+	fmt.Println("Exit")
 	c1Mirror.Exit()
+	fmt.Println("Exit 2")
 }
 
 func TestBasicPingPongOverMultiplePipesChannel(t *testing.T) {
@@ -193,7 +198,19 @@ func TestBasicPingPongOverMultiplePipesChannel(t *testing.T) {
 	}
 
 	w.Exit()
+	fmt.Println("hhhhhere")
+
+	time.Sleep(time.Second)
 	c1.Exit()
+	fmt.Println("hhhhhere")
 	c2.Exit()
+	fmt.Println("hhhhhere")
 	c3.Exit()
+	fmt.Println("hhhhhere")
+	c1Mirror.Exit()
+	fmt.Println("hhhhhere")
+	c2Mirror.Exit()
+	fmt.Println("hhhhhere")
+	c3Mirror.Exit()
+	fmt.Println("hhhhhere")
 }
