@@ -67,7 +67,7 @@ func (d *defaultPeerHandler) Handle(c peer.NodePeer) (response message.Status) {
 			}
 			c.Send(&message.Welcome{Id: msg.(*message.Hello).Id, From: d.from, Details: map[string]interface{}{"foo_bar": 1231}})
 
-			d.watcher.Watch(c)
+			go d.watcher.Watch(c)
 			d.eventChan <- &peer.OnPeerConnectedEvent{
 				Node:  msg.(*message.Hello).From,
 				Event: peer.PeerStatusConnected,
@@ -87,7 +87,7 @@ func (d *defaultPeerHandler) Handle(c peer.NodePeer) (response message.Status) {
 				response = peer.PeerStatusError
 				return
 			} else {
-				d.watcher.Watch(c)
+				go d.watcher.Watch(c)
 				d.eventChan <- &peer.OnPeerConnectedEvent{
 					Node:  c.Node(),
 					Event: peer.PeerStatusConnected,

@@ -20,88 +20,6 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-/*
-func TestBasicPingPingOverFakeNopPeers(t *testing.T) {
-	fakePeerA := &FakePeerA{
-		peer.NopPeer{},
-	}
-	fakePeerB := &FakePeerA{
-		peer.NopPeer{},
-	}
-
-	msg := message.Ping{
-		Id:   999,
-		From: node.Node{"localhost", 9000},
-	}
-
-	fakePeerA.Send(msg)
-
-	rcvMsg := <-fakePeerB.PingChan()
-	if !reflect.DeepEqual(msg, rcvMsg) {
-		t.Errorf("Expected %s, got %s", msg, rcvMsg)
-	}
-
-	msgPong := message.Pong{
-		Id:   999,
-		From: node.Node{"localhost", 9000},
-	}
-	fakePeerB.Send(msgPong)
-
-	rcvMsg = <-fakePeerA.PingChan()
-	if !reflect.DeepEqual(msgPong, rcvMsg) {
-		t.Errorf("Expected %s, got %s", msg, rcvMsg)
-	}
-}
-*/
-func TestBasicWatchOverFakeNopPeers(t *testing.T) {
-	fakePeerA := &FakePeerA{
-		peer.NopPeer{},
-	}
-
-	fakePeerB := &FakePeerA{
-		peer.NopPeer{},
-	}
-
-	fakePeerA.Run()
-	fakePeerB.Run()
-
-	evCh := make(chan dispatcher.Event, 0)
-	w := New(evCh, 1)
-
-	w.Watch(fakePeerA)
-	w.Watch(fakePeerB)
-	close(evCh)
-
-	/*	for {
-		select {
-		case m := <-fakePeerA.PingChan():
-		case m := <-fakePeerB.PingChan():
-
-		case <-exit:
-			return
-		}
-	}*/
-	w.Exit()
-}
-
-var fkCh1 = make(chan message.Message, 10)
-var fkCh2 = make(chan message.Message, 10)
-
-type FakePeerA struct {
-	peer.NopPeer
-}
-
-func (f *FakePeerA) Send(m message.Message) error {
-	fkCh1 <- m
-	return nil
-}
-func (f *FakePeerA) PingChan() chan message.Message {
-	return fkCh2
-}
-func (f *FakePeerA) PongChan() chan message.Message {
-	return fkCh2
-}
-
 func TestBasicPingPongOverPipesChannel(t *testing.T) {
 	nodeA := node.Node{Host: "testA", Port: 1}
 	nodeB := node.Node{Host: "testB", Port: 2}
@@ -117,7 +35,7 @@ func TestBasicPingPongOverPipesChannel(t *testing.T) {
 
 	var wg sync.WaitGroup
 
-	total := 10
+	total := 5
 	last := 0
 	doneChan := make(chan struct{})
 	wg.Add(1)
@@ -143,9 +61,9 @@ func TestBasicPingPongOverPipesChannel(t *testing.T) {
 	evCh := make(chan dispatcher.Event, 0)
 	defer close(evCh)
 
-	w := New(evCh, 2)
+	w := New(evCh, 1)
 	fmt.Println("C1 from ", c1.From(), c1.Node())
-	w.Watch(c1)
+	go w.Watch(c1)
 
 	wg.Wait()
 	close(doneChan)
@@ -160,12 +78,12 @@ func TestBasicPingPongOverPipesChannel(t *testing.T) {
 }
 
 func TestBasicPingPongOverMultiplePipesChannel(t *testing.T) {
-	nodeA := node.Node{Host: "testA", Port: 1}
-	nodeB := node.Node{Host: "testB", Port: 2}
-	nodeC := node.Node{Host: "testC", Port: 3}
-	nodeD := node.Node{Host: "testD", Port: 4}
-	nodeE := node.Node{Host: "testE", Port: 5}
-	nodeF := node.Node{Host: "testF", Port: 6}
+	nodeA := node.Node{Host: "A", Port: 1}
+	nodeB := node.Node{Host: "B", Port: 2}
+	nodeC := node.Node{Host: "C", Port: 3}
+	nodeD := node.Node{Host: "D", Port: 4}
+	nodeE := node.Node{Host: "E", Port: 5}
+	nodeF := node.Node{Host: "F", Port: 6}
 
 	a, b := net.Pipe()
 
@@ -197,7 +115,7 @@ func TestBasicPingPongOverMultiplePipesChannel(t *testing.T) {
 
 	var wg sync.WaitGroup
 
-	total := 10
+	total := 5
 	last := 0
 	doneChan := make(chan struct{})
 	wg.Add(1)
@@ -207,26 +125,19 @@ func TestBasicPingPongOverMultiplePipesChannel(t *testing.T) {
 			select {
 			case r := <-c1Mirror.PingChan():
 				ping := r.(*message.Ping)
+				fmt.Println("PING received", ping)
 				pong := &message.Pong{Id: ping.Id, From: ping.To, To: ping.From}
 				c1Mirror.Send(pong)
-				/*				last = pong.Id
-								if last == total {
-									fmt.Println("Ended")
-									return
-								}*/
 			case r := <-c1Mirror.PongChan():
 				pong := r.(*message.Pong)
 				fmt.Println("PONG received", pong)
 
 			case r := <-c2Mirror.PingChan():
 				ping := r.(*message.Ping)
+				fmt.Println("PING received", ping)
 				pong := &message.Pong{Id: ping.Id, From: ping.To, To: ping.From}
 				c2Mirror.Send(pong)
-				/*				last = pong.Id
-								if last == total {
-									fmt.Println("Ended")
-									return
-								}*/
+
 			case r := <-c2Mirror.PongChan():
 				pong := r.(*message.Pong)
 				fmt.Println("PONG ", pong)
@@ -245,6 +156,7 @@ func TestBasicPingPongOverMultiplePipesChannel(t *testing.T) {
 				fmt.Println("PONG ", pong)
 			case <-doneChan:
 				return
+			default:
 			}
 		}
 		return
@@ -254,11 +166,11 @@ func TestBasicPingPongOverMultiplePipesChannel(t *testing.T) {
 	defer close(evCh)
 
 	w := New(evCh, 1)
-	w.Watch(c1)
-	w.Watch(c2)
-	w.Watch(c3)
+	go w.Watch(c1)
+	go w.Watch(c2)
+	go w.Watch(c3)
 
-	time.Sleep(time.Second * 3)
+	time.Sleep(time.Second * 2)
 	c1Mirror.Send(&message.Ping{Id: 0, From: c1.From(), To: c1.Node()})
 	c2Mirror.Send(&message.Ping{Id: 0, From: c2.From(), To: c2.Node()})
 	c3Mirror.Send(&message.Ping{Id: 0, From: c3.From(), To: c3.Node()})
