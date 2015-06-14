@@ -12,7 +12,7 @@ import (
 	"runtime"
 	"sync"
 	"testing"
-	//"time"
+	"time"
 )
 
 func TestMain(m *testing.M) {
@@ -138,7 +138,7 @@ func TestBasicPingPongOverMultiplePipesChannel(t *testing.T) {
 				}
 			case r := <-c1Mirror.PongChan():
 				pong := r.(*message.Pong)
-				fmt.Println("c1Mirror PONG received from ", pong.From.String())
+				fmt.Println("c1Mirror PONG received from ", pong.From.String(), "ID ", pong.Id)
 				last = pong.Id
 				if last == total {
 					fmt.Println("Ended")
@@ -146,7 +146,7 @@ func TestBasicPingPongOverMultiplePipesChannel(t *testing.T) {
 				}
 			case r := <-c2Mirror.PingChan():
 				ping := r.(*message.Ping)
-				fmt.Println("c2Mirror PING received from ", ping.From.String())
+				fmt.Println("c2Mirror PING received from ", ping.From.String(), "ID ")
 				pong := &message.Pong{Id: ping.Id, From: ping.To, To: ping.From}
 				c2Mirror.Send(pong)
 				fmt.Println("c2Mirror Pong sended to ", pong.To.String())
@@ -158,12 +158,13 @@ func TestBasicPingPongOverMultiplePipesChannel(t *testing.T) {
 				}
 			case r := <-c2Mirror.PongChan():
 				pong := r.(*message.Pong)
-				fmt.Println("c2Mirror PONG received from ", pong.From.String())
+				fmt.Println("c2Mirror PONG received from ", pong.From.String(), "ID ", pong.Id)
 				last = pong.Id
 				if last == total {
 					fmt.Println("Ended")
 					return
 				}
+				fmt.Println("c2Mirror PONG done")
 			case r := <-c3Mirror.PingChan():
 				ping := r.(*message.Ping)
 				fmt.Println("c3Mirror PING received from ", ping.From.String())
@@ -178,7 +179,7 @@ func TestBasicPingPongOverMultiplePipesChannel(t *testing.T) {
 				}
 			case r := <-c3Mirror.PongChan():
 				pong := r.(*message.Pong)
-				fmt.Println("c3Mirror PONG received from ", pong.From.String())
+				fmt.Println("c3Mirror PONG received from ", pong.From.String(), "ID ", pong.Id)
 				last = pong.Id
 				if last == total {
 					fmt.Println("Ended")
@@ -200,11 +201,11 @@ func TestBasicPingPongOverMultiplePipesChannel(t *testing.T) {
 	go w.Watch(c2)
 	go w.Watch(c3)
 
-	/*	time.Sleep(time.Second * 2)
-		c1Mirror.Send(&message.Ping{Id: 0, From: c1.From(), To: c1.Node()})
-		c2Mirror.Send(&message.Ping{Id: 0, From: c2.From(), To: c2.Node()})
-		c3Mirror.Send(&message.Ping{Id: 0, From: c3.From(), To: c3.Node()})
-	*/
+	time.Sleep(time.Second * 3)
+	c1Mirror.Send(&message.Ping{Id: 0, From: c1Mirror.From(), To: c1Mirror.Node()})
+	c2Mirror.Send(&message.Ping{Id: 0, From: c2Mirror.From(), To: c2Mirror.Node()})
+	c3Mirror.Send(&message.Ping{Id: 0, From: c3Mirror.From(), To: c3Mirror.Node()})
+
 	wg.Wait()
 	close(doneChan)
 
