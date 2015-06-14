@@ -83,9 +83,7 @@ func (s *Server) startAcceptorPeers(listener net.Listener) {
 		c := peer.NewAcceptor(conn, s.node)
 		c.Run()
 
-		r := s.peerHandler.Handle(c)
-		rn := c.Node()
-		log.Println("Server link from:", rn.String(), " result: ", r)
+		s.peerHandler.Handle(c)
 	}
 }
 

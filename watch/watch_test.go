@@ -1,16 +1,16 @@
 package watch
 
 import (
-	/*	"fmt"
-		"github.com/marcosQuesada/mesh/dispatcher"
-		"github.com/marcosQuesada/mesh/message"
-		"github.com/marcosQuesada/mesh/node"
-		"github.com/marcosQuesada/mesh/peer"
-		"net"*/
-	//"reflect"
+	"fmt"
+	"github.com/marcosQuesada/mesh/dispatcher"
+	"github.com/marcosQuesada/mesh/message"
+	"github.com/marcosQuesada/mesh/node"
+	"github.com/marcosQuesada/mesh/peer"
+	"net"
 	"os"
+	//"reflect"
 	"runtime"
-	//	"sync"
+	"sync"
 	"testing"
 	//	"time"
 )
@@ -21,60 +21,61 @@ func TestMain(m *testing.M) {
 }
 
 func TestBasicPingPongOverPipesChannel(t *testing.T) {
-	/*	nodeA := node.Node{Host: "testA", Port: 1}
-		nodeB := node.Node{Host: "testB", Port: 2}
-		a, b := net.Pipe()
+	nodeA := node.Node{Host: "A", Port: 1}
+	nodeB := node.Node{Host: "B", Port: 2}
+	a, b := net.Pipe()
 
-		c1 := peer.NewAcceptor(a, nodeA)
-		c1.Identify(nodeB)
-		c1.Run()
+	c1 := peer.NewAcceptor(a, nodeA)
+	c1.Identify(nodeB)
+	c1.Run()
 
-		c2 := peer.NewAcceptor(b, nodeB)
-		c2.Identify(nodeA)
-		c2.Run()
+	c1Mirror := peer.NewAcceptor(b, nodeB)
+	c1Mirror.Identify(nodeA)
+	c1Mirror.Run()
 
-		var wg sync.WaitGroup
+	var wg sync.WaitGroup
 
-		total := 0 //@TODO: ISSUE!!
-		last := 0
-		doneChan := make(chan struct{})
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for {
-				select {
-				case r := <-c2.PingChan():
-					ping := r.(*message.Ping)
-					pong := &message.Pong{Id: ping.Id, From: ping.To, To: ping.From}
-					c2.Send(pong)
-					last = pong.Id
-					if last == total {
-						return
-					}
-				case <-doneChan:
+	total := 5 //@TODO: ISSUE!!
+	last := 0
+	doneChan := make(chan struct{})
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for {
+			select {
+			case r := <-c1Mirror.PingChan():
+				ping := r.(*message.Ping)
+				pong := &message.Pong{Id: ping.Id, From: ping.To, To: ping.From}
+				c1Mirror.Send(pong)
+				last = pong.Id
+				if last == total {
 					return
 				}
+			case <-doneChan:
+				return
+			default:
 			}
-			return
-		}()
-
-		evCh := make(chan dispatcher.Event, 0)
-		defer close(evCh)
-
-		w := New(evCh, 1)
-		fmt.Println("C1 from ", c1.From(), c1.Node())
-		go w.Watch(c1)
-
-		wg.Wait()
-		close(doneChan)
-
-		if last != total {
-			t.Error("Unexpected last sample", last, "as total ", total)
 		}
+		return
+	}()
 
-		w.Exit()
-		c1.Exit()
-		c2.Exit()*/
+	evCh := make(chan dispatcher.Event, 0)
+	defer close(evCh)
+
+	w := New(evCh, 1)
+	fmt.Println("C1 from ", c1.From(), c1.Node())
+	go w.Watch(c1)
+
+	wg.Wait()
+	close(doneChan)
+
+	if last != total {
+		t.Error("Unexpected last sample", last, "as total ", total)
+	}
+
+	w.Exit()
+	c1.Exit()
+	c1Mirror.Exit()
 }
 
 func TestBasicPingPongOverMultiplePipesChannel(t *testing.T) {

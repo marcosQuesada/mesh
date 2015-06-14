@@ -15,7 +15,7 @@ import (
 //PeerHandler is in charge of Handle Client Lifecycle
 //Sends pings on ticker to check remote state
 type PeerHandler interface {
-	Handle(peer.NodePeer) message.Status
+	Handle(peer.NodePeer)
 	Remove(peer.NodePeer) error
 	Route(message.Message)
 	Events() chan dispatcher.Event
@@ -44,7 +44,7 @@ func DefaultPeerHandler(node n.Node) *defaultPeerHandler {
 	}
 }
 
-func (d *defaultPeerHandler) Handle(c peer.NodePeer) (response message.Status) {
+func (d *defaultPeerHandler) Handle(c peer.NodePeer) {
 	select {
 	case <-time.NewTimer(time.Second).C:
 		log.Println("Client has not receive response, Timeout")
@@ -62,7 +62,6 @@ func (d *defaultPeerHandler) Handle(c peer.NodePeer) (response message.Status) {
 					Node:  msg.(*message.Hello).From,
 					Event: peer.PeerStatusError,
 				}
-				response = peer.PeerStatusAbort
 
 				return
 			}
@@ -74,7 +73,6 @@ func (d *defaultPeerHandler) Handle(c peer.NodePeer) (response message.Status) {
 				Event: peer.PeerStatusConnected,
 				Peer:  c,
 			}
-			response = peer.PeerStatusConnected
 
 		case *message.Welcome:
 			err := d.accept(c)
@@ -85,7 +83,6 @@ func (d *defaultPeerHandler) Handle(c peer.NodePeer) (response message.Status) {
 					Error: err,
 				}
 
-				response = peer.PeerStatusError
 				return
 			} else {
 				go d.watcher.Watch(c)
@@ -94,14 +91,12 @@ func (d *defaultPeerHandler) Handle(c peer.NodePeer) (response message.Status) {
 					Event: peer.PeerStatusConnected,
 					Peer:  c,
 				}
-				response = peer.PeerStatusConnected
 			}
 		case *message.Abort:
 			d.eventChan <- &peer.OnPeerAbortedEvent{
 				Node:  c.Node(),
 				Event: peer.PeerStatusAbort,
 			}
-			response = peer.PeerStatusAbort
 		default:
 			log.Println("Unexpected type On response ")
 		}
@@ -163,9 +158,7 @@ func (h *defaultPeerHandler) InitDialClient(destination n.Node) {
 	p.Run()
 	//Say Hello and wait response
 	p.SayHello()
-	r := h.Handle(p)
-	rn := p.Node()
-	log.Println("Dial link to to:", rn.String(), "result: ", r)
+	h.Handle(p)
 }
 
 func (h *defaultPeerHandler) aggregate(c chan message.Message) {

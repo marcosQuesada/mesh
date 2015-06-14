@@ -56,13 +56,13 @@ func (c *Coordinator) Exit() {
 func (c *Coordinator) OnPeerConnectedEvent(e dispatcher.Event) {
 	n := e.(*peer.OnPeerConnectedEvent)
 	c.members[n.Node.String()] = n.Node
-	log.Println("Called Coordinator OnPeerConnectedEvent, adding peer", n.Node.String())
+	log.Println("OnPeerConnectedEvent, adding peer", n.Node.String(), "mode:", n.Peer.Mode())
 }
 
 func (c *Coordinator) OnPeerDisconnected(e dispatcher.Event) {
 	event := e.(*peer.OnPeerDisconnectedEvent)
 	c.members[event.Node.String()] = event.Node
-	log.Println("Called Coordinator OnPeerDisconnectedEvent, removing peer", event.Node.String())
+	log.Println("OnPeerDisconnectedEvent, removing peer", event.Node.String())
 
 	c.peerHandler.Remove(event.Peer)
 
@@ -72,10 +72,10 @@ func (c *Coordinator) OnPeerDisconnected(e dispatcher.Event) {
 
 func (c *Coordinator) OnPeerAborted(e dispatcher.Event) {
 	n := e.(*peer.OnPeerAbortedEvent)
-	log.Println("Called Coordinator OnPeerAbortedEvent", n.Node.String())
+	log.Println("OnPeerAbortedEvent", n.Node.String())
 }
 
 func (c *Coordinator) OnPeerErrored(e dispatcher.Event) {
 	n := e.(*peer.OnPeerErroredEvent)
-	log.Println("Called Coordinator OnPeerErroredEvent", n.Node.String())
+	log.Println("OnPeerErroredEvent", n.Node.String())
 }
