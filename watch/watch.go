@@ -94,7 +94,7 @@ func (w *defaultWatcher) Watch(p peer.NodePeer) {
 
 				p.Exit()
 				w.exit <- true
-				//default:
+				//default: @TODO : CONTINUE ISSUE FROM HERE!
 			}
 		}
 	}

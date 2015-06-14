@@ -32,7 +32,7 @@ func (s *Server) Start() {
 	defer close(s.exit)
 
 	c := cluster.StartCoordinator(s.node, s.config.Cluster, s.peerHandler)
-	c.Run()
+	go c.Run()
 
 	d := dispatcher.New()
 	d.RegisterListener(&peer.OnPeerConnectedEvent{}, c.OnPeerConnectedEvent)
@@ -40,10 +40,10 @@ func (s *Server) Start() {
 	d.RegisterListener(&peer.OnPeerAbortedEvent{}, c.OnPeerAborted)
 	d.RegisterListener(&peer.OnPeerErroredEvent{}, c.OnPeerErrored)
 
-	d.Run()
-	d.Aggregate(s.peerHandler.Events())
+	go d.Run()
+	go d.Aggregate(s.peerHandler.Events())
 
-	s.startClientPeers()
+	s.startDialPeers()
 	s.startServer()
 	s.run()
 }
@@ -68,43 +68,36 @@ func (s *Server) startServer() {
 		log.Println("Error starting Socket Server: ", err)
 		return
 	}
-	go func() {
-		for {
-			conn, err := listener.Accept()
-			if err != nil {
-				log.Println("Error starting socket client to: ", s.node.String(), "err: ", err)
-				return
-			}
 
-			c := peer.NewAcceptor(conn, s.node)
-			c.Run()
-
-			r := s.peerHandler.Handle(c)
-			rn := c.Node()
-			log.Println("Server link from:", rn.String(), " result: ", r)
-		}
-	}()
+	go s.startAcceptorPeers(listener)
 }
 
-func (s *Server) startClientPeers() {
-	//Start Dial Peers
+func (s *Server) startAcceptorPeers(listener net.Listener) {
+	for {
+		conn, err := listener.Accept()
+		if err != nil {
+			log.Println("Error starting socket client to: ", s.node.String(), "err: ", err)
+			return
+		}
+
+		c := peer.NewAcceptor(conn, s.node)
+		c.Run()
+
+		r := s.peerHandler.Handle(c)
+		rn := c.Node()
+		log.Println("Server link from:", rn.String(), " result: ", r)
+	}
+}
+
+//Start Dial Peers
+func (s *Server) startDialPeers() {
 	for _, node := range s.config.Cluster {
 		//avoid local connexion
 		if node.String() == s.node.String() {
 			continue
 		}
 
-		go func(destination n.Node) {
-			log.Println("Starting Dial Client from Node ", s.node.String(), "destination: ", node.String())
-			//Blocking call, wait until connection success
-			c := peer.NewDialer(s.node, destination)
-			c.Run()
-			//Say Hello and wait response
-			c.SayHello()
-			r := s.peerHandler.Handle(c)
-			rn := c.Node()
-			log.Println("Dial link to to:", rn.String(), "result: ", r)
-		}(node)
+		go s.peerHandler.InitDialClient(node)
 	}
 }
 

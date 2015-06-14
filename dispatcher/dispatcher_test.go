@@ -32,7 +32,7 @@ func TestDispatcherRun(t *testing.T) {
 
 	d := New()
 	d.RegisterListener(&OnFakeEvent{}, l.Listener)
-	d.Run()
+	go d.Run()
 
 	event := &OnFakeEvent{Id: 123}
 	d.EventChan <- event
@@ -42,7 +42,7 @@ func TestDispatcherRun(t *testing.T) {
 	}
 
 	e := make(chan Event, 0)
-	d.Aggregate(e)
+	go d.Aggregate(e)
 	eventB := &OnFakeEvent{Id: 456}
 	e <- eventB
 
@@ -87,18 +87,18 @@ func (f *fakeListener) Listener(e Event) {
 
 var result fakeResult
 
-type fakeResult struct{
+type fakeResult struct {
 	result string
-	mutex sync.Mutex
+	mutex  sync.Mutex
 }
 
-func (f *fakeResult)set(v string){
+func (f *fakeResult) set(v string) {
 	f.mutex.Lock()
 	defer f.mutex.Unlock()
 	f.result = v
 }
 
-func (f *fakeResult)get() string{
+func (f *fakeResult) get() string {
 	f.mutex.Lock()
 	defer f.mutex.Unlock()
 	return f.result

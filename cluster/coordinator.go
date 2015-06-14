@@ -39,16 +39,14 @@ func StartCoordinator(from n.Node, members map[string]n.Node, clh peer_handler.P
 }
 
 func (c *Coordinator) Run() {
-	go func() {
-		for {
-			select {
-			case <-c.exitChan:
-				return
-			case m := <-c.peerHandler.AggregatedChan():
-				log.Println("SERVER: Received Message on Main Channel ", m)
-			}
+	for {
+		select {
+		case <-c.exitChan:
+			return
+		case m := <-c.peerHandler.AggregatedChan():
+			log.Println("SERVER: Received Message on Main Channel ", m)
 		}
-	}()
+	}
 }
 
 func (c *Coordinator) Exit() {
@@ -68,17 +66,8 @@ func (c *Coordinator) OnPeerDisconnected(e dispatcher.Event) {
 
 	c.peerHandler.Remove(event.Peer)
 
-	go func(destination n.Node) {
-		log.Println("Starting Dial Client from Node ", c.from.String(), "destination: ", destination.String())
-		//Blocking call, wait until connection success
-		p := peer.NewDialer(c.from, destination)
-		p.Run()
-		//Say Hello and wait response
-		p.SayHello()
-		r := c.peerHandler.Handle(p)
-		rn := p.Node()
-		log.Println("Dial link to to:", rn.String(), "result: ", r)
-	}(event.Node)
+	//restart Node again
+	go c.peerHandler.InitDialClient(event.Node)
 }
 
 func (c *Coordinator) OnPeerAborted(e dispatcher.Event) {

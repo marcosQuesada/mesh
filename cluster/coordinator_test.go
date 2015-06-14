@@ -100,7 +100,7 @@ func TestForwardingChannel(t *testing.T) {
 	members[from.String()] = from // as fake local node
 
 	o = StartCoordinator(from, members, peer_handler.DefaultPeerHandler(from))
-	o.Run()
+	go o.Run()
 	time.Sleep(time.Second)
 	o.Exit()
 }

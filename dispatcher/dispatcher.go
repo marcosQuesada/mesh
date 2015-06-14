@@ -40,34 +40,30 @@ func (d *defaultDispatcher) RegisterListener(e Event, l Listener) {
 }
 
 func (d *defaultDispatcher) Run() {
-	go func() {
-		for {
-			select {
-			case e, open := <-d.EventChan:
-				if !open {
-					log.Println("Exiting Dispatcher Run loop")
-					return
-				}
-
-				d.dispatch(e)
+	for {
+		select {
+		case e, open := <-d.EventChan:
+			if !open {
+				log.Println("Exiting Dispatcher Run loop")
+				return
 			}
+
+			d.dispatch(e)
 		}
-	}()
+	}
 }
 
 //Enable event channel aggregation
 func (d *defaultDispatcher) Aggregate(e chan Event) {
-	go func() {
-		for {
-			select {
-			case m, open := <-e:
-				if !open {
-					return
-				}
-				d.EventChan <- m
+	for {
+		select {
+		case m, open := <-e:
+			if !open {
+				return
 			}
+			d.EventChan <- m
 		}
-	}()
+	}
 }
 
 func (d *defaultDispatcher) Exit() {

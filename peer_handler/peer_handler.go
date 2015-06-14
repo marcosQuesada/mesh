@@ -21,6 +21,7 @@ type PeerHandler interface {
 	Events() chan dispatcher.Event
 	AggregatedChan() chan message.Message
 	Len() int
+	InitDialClient(destination n.Node)
 }
 
 type defaultPeerHandler struct {
@@ -135,7 +136,7 @@ func (h *defaultPeerHandler) accept(p peer.NodePeer) error {
 	}
 	h.peers[node.String()] = p
 	//Agregate receiving Chann
-	h.aggregate(p.ReceiveChan())
+	go h.aggregate(p.ReceiveChan())
 
 	return nil
 }
@@ -155,16 +156,26 @@ func (h *defaultPeerHandler) Remove(p peer.NodePeer) error {
 	return nil
 }
 
+func (h *defaultPeerHandler) InitDialClient(destination n.Node) {
+	log.Println("Starting Dial Client from Node ", h.from.String(), "destination: ", destination.String())
+	//Blocking call, wait until connection success
+	p := peer.NewDialer(h.from, destination)
+	p.Run()
+	//Say Hello and wait response
+	p.SayHello()
+	r := h.Handle(p)
+	rn := p.Node()
+	log.Println("Dial link to to:", rn.String(), "result: ", r)
+}
+
 func (h *defaultPeerHandler) aggregate(c chan message.Message) {
-	go func() {
-		for {
-			select {
-			case m, open := <-c:
-				if !open {
-					return
-				}
-				h.peerChan <- m
+	for {
+		select {
+		case m, open := <-c:
+			if !open {
+				return
 			}
+			h.peerChan <- m
 		}
-	}()
+	}
 }
