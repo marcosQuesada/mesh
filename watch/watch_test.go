@@ -21,6 +21,8 @@ func TestMain(m *testing.M) {
 }
 
 func TestBasicPingPongOverPipesChannel(t *testing.T) {
+	total := 5
+	timeInterval := 1
 	nodeA := node.Node{Host: "A", Port: 1}
 	nodeB := node.Node{Host: "B", Port: 2}
 	a, b := net.Pipe()
@@ -35,7 +37,6 @@ func TestBasicPingPongOverPipesChannel(t *testing.T) {
 
 	var wg sync.WaitGroup
 
-	total := 5 //@TODO: ISSUE!!
 	last := 0
 	doneChan := make(chan struct{})
 	wg.Add(1)
@@ -62,7 +63,7 @@ func TestBasicPingPongOverPipesChannel(t *testing.T) {
 	evCh := make(chan dispatcher.Event, 0)
 	defer close(evCh)
 
-	w := New(evCh, 1)
+	w := New(evCh, timeInterval)
 	fmt.Println("C1 from ", c1.From(), c1.Node())
 	go w.Watch(c1)
 
@@ -79,6 +80,8 @@ func TestBasicPingPongOverPipesChannel(t *testing.T) {
 }
 
 func TestBasicPingPongOverMultiplePipesChannel(t *testing.T) {
+	total := 5
+	timeInterval := 1
 	nodeA := node.Node{Host: "c1", Port: 1}
 	nodeB := node.Node{Host: "c1mirror", Port: 2}
 	nodeC := node.Node{Host: "c2", Port: 3}
@@ -116,7 +119,6 @@ func TestBasicPingPongOverMultiplePipesChannel(t *testing.T) {
 
 	var wg sync.WaitGroup
 
-	total := 5
 	last := 0
 	doneChan := make(chan struct{})
 	wg.Add(1)
@@ -196,7 +198,7 @@ func TestBasicPingPongOverMultiplePipesChannel(t *testing.T) {
 	evCh := make(chan dispatcher.Event, 0)
 	defer close(evCh)
 
-	w := New(evCh, 1)
+	w := New(evCh, timeInterval)
 	go w.Watch(c1)
 	go w.Watch(c2)
 	go w.Watch(c3)
