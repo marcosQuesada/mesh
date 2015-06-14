@@ -54,9 +54,9 @@ func (c *Coordinator) Exit() {
 }
 
 func (c *Coordinator) OnPeerConnectedEvent(e dispatcher.Event) {
-	n := e.(*peer.OnPeerConnectedEvent)
-	c.members[n.Node.String()] = n.Node
-	log.Println("OnPeerConnectedEvent, adding peer", n.Node.String(), "mode:", n.Peer.Mode())
+	event := e.(*peer.OnPeerConnectedEvent)
+	c.members[event.Node.String()] = event.Node
+	log.Println("OnPeerConnectedEvent, adding peer", event.Node.String(), "mode:", event.Peer.Mode())
 }
 
 func (c *Coordinator) OnPeerDisconnected(e dispatcher.Event) {
@@ -66,7 +66,7 @@ func (c *Coordinator) OnPeerDisconnected(e dispatcher.Event) {
 
 	c.peerHandler.Remove(event.Peer)
 
-	//restart Node again
+	//restart Dial Peer and try again
 	go c.peerHandler.InitDialClient(event.Node)
 }
 

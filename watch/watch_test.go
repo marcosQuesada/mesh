@@ -21,7 +21,7 @@ func TestMain(m *testing.M) {
 }
 
 func TestBasicPingPongOverPipesChannel(t *testing.T) {
-	total := 5
+	total := 2
 	timeInterval := 1
 	nodeA := node.Node{Host: "A", Port: 1}
 	nodeB := node.Node{Host: "B", Port: 2}
@@ -80,7 +80,7 @@ func TestBasicPingPongOverPipesChannel(t *testing.T) {
 }
 
 func TestBasicPingPongOverMultiplePipesChannel(t *testing.T) {
-	total := 5
+	total := 3
 	timeInterval := 1
 	nodeA := node.Node{Host: "c1", Port: 1}
 	nodeB := node.Node{Host: "c1mirror", Port: 2}
@@ -131,54 +131,31 @@ func TestBasicPingPongOverMultiplePipesChannel(t *testing.T) {
 				fmt.Println("c1Mirror PING received from ", ping.From.String())
 				pong := &message.Pong{Id: ping.Id, From: ping.To, To: ping.From}
 				c1Mirror.Send(pong)
-				fmt.Println("c1Mirror Pong sended to ", pong.To.String())
 
-				last = pong.Id
-				if last == total {
-					fmt.Println("Ended")
-					return
-				}
 			case r := <-c1Mirror.PongChan():
 				pong := r.(*message.Pong)
 				fmt.Println("c1Mirror PONG received from ", pong.From.String(), "ID ", pong.Id)
-				last = pong.Id
-				if last == total {
-					fmt.Println("Ended")
-					return
-				}
+
 			case r := <-c2Mirror.PingChan():
 				ping := r.(*message.Ping)
-				fmt.Println("c2Mirror PING received from ", ping.From.String(), "ID ")
 				pong := &message.Pong{Id: ping.Id, From: ping.To, To: ping.From}
 				c2Mirror.Send(pong)
-				fmt.Println("c2Mirror Pong sended to ", pong.To.String())
 
-				last = pong.Id
-				if last == total {
-					fmt.Println("Ended")
-					return
-				}
 			case r := <-c2Mirror.PongChan():
 				pong := r.(*message.Pong)
 				fmt.Println("c2Mirror PONG received from ", pong.From.String(), "ID ", pong.Id)
-				last = pong.Id
-				if last == total {
-					fmt.Println("Ended")
-					return
-				}
-				fmt.Println("c2Mirror PONG done")
+
 			case r := <-c3Mirror.PingChan():
 				ping := r.(*message.Ping)
 				fmt.Println("c3Mirror PING received from ", ping.From.String())
 				pong := &message.Pong{Id: ping.Id, From: ping.To, To: ping.From}
 				c3Mirror.Send(pong)
-				fmt.Println("c3Mirror Pong sended to ", pong.To.String())
-
 				last = pong.Id
 				if last == total {
 					fmt.Println("Ended")
 					return
 				}
+
 			case r := <-c3Mirror.PongChan():
 				pong := r.(*message.Pong)
 				fmt.Println("c3Mirror PONG received from ", pong.From.String(), "ID ", pong.Id)

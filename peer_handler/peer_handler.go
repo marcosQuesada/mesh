@@ -144,7 +144,7 @@ func (h *defaultPeerHandler) Remove(p peer.NodePeer) error {
 	if _, ok := h.peers[node.String()]; !ok {
 		return fmt.Errorf("Peer Not found")
 	}
-
+	fmt.Println("PeerHandler Removed Peer ", node.String())
 	delete(h.peers, node.String())
 	//@TODO: Close aggregated channel
 

@@ -8,7 +8,6 @@ package watch
 // Basic PING PONG Mechanism
 
 import (
-	"fmt"
 	"github.com/marcosQuesada/mesh/dispatcher"
 	"github.com/marcosQuesada/mesh/message"
 	"github.com/marcosQuesada/mesh/peer"
@@ -43,24 +42,25 @@ func New(evCh chan dispatcher.Event, interval int) *defaultWatcher {
 }
 
 func (w *defaultWatcher) Watch(p peer.NodePeer) {
-	defer fmt.Println("Exiting Watch ", p.Node())
-	log.Println("Begin")
-	var id = 0
-
 	//@TODO: Randomize this
+	tickerReset := make(chan bool, 0)
 	ticker := newTicker(w.pingInterval)
-	s := &subject{p, ticker, id}
-	go w.watchPingChan(s)
+	s := &subject{p, ticker, 0}
+	go w.watchPingChan(s, tickerReset)
 
-	timeout := time.NewTimer(time.Second * 5)
+	timeout := time.NewTimer(time.Second * 3)
 	for {
 		select {
+		case <-tickerReset:
+			log.Println("Reseting ticker")
+			s.ticker.Stop()
+			s.ticker = newTicker(w.pingInterval)
 		case <-s.ticker.C:
-			ping := &message.Ping{Id: s.id, From: p.From(), To: p.Node()}
+			node := p.Node()
+			ping := &message.Ping{Id: s.id, From: p.From(), To: node}
+			log.Println("Sended Ticker PING ", ping.Id, "from ", ping.From.String(), "to ", node.String())
 			p.Send(ping)
 
-			node := p.Node()
-			log.Println("Sended Ticker PING ", ping.Id, "from ", ping.From.String(), "to ", node.String())
 			select {
 			case msg := <-p.PongChan():
 				pong := msg.(*message.Pong)
@@ -72,11 +72,11 @@ func (w *defaultWatcher) Watch(p peer.NodePeer) {
 				w.mutex.Lock()
 				s.id = ping.Id + 1
 				w.mutex.Unlock()
-				log.Println("ID is ", s.id, "stop timeout response")
+				//remove timeout
 				timeout.Stop()
 
 			case <-timeout.C:
-				fmt.Println("Timeout waiting pong from: ", node.String(), "Declare Dead")
+				log.Println("Timeout waiting pong from: ", node.String(), "Declare Dead")
 
 				w.eventChan <- &peer.OnPeerDisconnectedEvent{
 					Node:  p.Node(),
@@ -90,8 +90,8 @@ func (w *defaultWatcher) Watch(p peer.NodePeer) {
 				return
 			}
 		case <-w.exit:
-			fmt.Println("Exiting ticker watch ")
 			return
+		default:
 		}
 	}
 }
@@ -100,8 +100,7 @@ func (w *defaultWatcher) Exit() {
 	w.exit <- true
 }
 
-func (w *defaultWatcher) watchPingChan(s *subject) {
-	defer fmt.Println("Exiting watchPingChan ", s.peer.Node())
+func (w *defaultWatcher) watchPingChan(s *subject, tickerReset chan bool) {
 	for {
 		select {
 		case <-w.exit:
@@ -118,10 +117,7 @@ func (w *defaultWatcher) watchPingChan(s *subject) {
 			w.mutex.Unlock()
 
 			log.Println("--- Sended Pong", pong.Id, "to ", ping.From.String())
-
-			s.ticker.Stop()
-			s.ticker = newTicker(w.pingInterval)
-			log.Println("--- Restarting ticker ???")
+			tickerReset <- true
 		}
 	}
 }
