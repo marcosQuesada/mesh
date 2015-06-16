@@ -25,7 +25,7 @@ type defaultWatcher struct {
 	exit         chan bool
 	done         chan bool
 	pingInterval int
-	mutex        sync.Mutex
+	mutex        sync.RWMutex
 	index        map[string]bool
 }
 
@@ -48,7 +48,10 @@ func New(evCh chan dispatcher.Event, interval int) *defaultWatcher {
 func (w *defaultWatcher) Watch(p peer.NodePeer) {
 	defer log.Println("Watch ENds")
 	node := p.Node()
+	w.mutex.Lock()
 	w.index[node.String()] = true
+	w.mutex.Unlock()
+
 	//@TODO: Randomize this
 	tickerReset := make(chan bool, 1)
 	ticker := newTicker(w.pingInterval)

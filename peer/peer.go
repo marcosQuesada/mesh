@@ -66,7 +66,7 @@ func NewDialer(from n.Node, destination n.Node) *Peer {
 		pingChan:    make(chan message.Message, 0),
 		pongChan:    make(chan message.Message, 0),
 		exitChan:    make(chan bool),
-		doneChan:    make(chan bool),
+		doneChan:    make(chan bool, 1),
 		mode:        "client",
 	}
 }
@@ -79,7 +79,7 @@ func NewAcceptor(conn net.Conn, server n.Node) *Peer {
 		pingChan:    make(chan message.Message, 0),
 		pongChan:    make(chan message.Message, 0),
 		exitChan:    make(chan bool),
-		doneChan:    make(chan bool),
+		doneChan:    make(chan bool, 1),
 		mode:        "server",
 	}
 }
@@ -106,29 +106,34 @@ func (p *Peer) SayHello() {
 }
 
 func (p *Peer) Run() {
+
+	defer p.done()
 	defer log.Println("Exiting Peer ", p.Node())
 
 	response := make(chan interface{}, 0)
-	done := make(chan bool)
-	go func(exit chan bool) {
-		select {
-		case <-exit:
-			p.doneChan <- true
-			return
-		default:
-			for {
-				m, err := p.Receive()
-				if err != nil {
-					if err != io.EOF {
-						log.Println("Error Receiving: ", err, " exiting")
-					}
-					response <- err
-					return
+	done := make(chan bool, 1)
+	go func() {
+		for {
+			/*			select {
+						case <-done:
+							log.Println("XXX Exiting receive loop")
+							p.Terminate()
+							log.Println("XXX Exiting receive Done")
+							return
+						default:*/
+			/// @TODO: BUG!!! That receive blocks, so done is never readed!
+			m, err := p.Receive()
+			if err != nil {
+				if err != io.EOF {
+					log.Println("Error Receiving: ", err, " exiting")
 				}
-				response <- m
+				response <- err
+				return
 			}
+			response <- m
+			/*			}*/
 		}
-	}(done)
+	}()
 
 	//Required to allow message chan readers
 	go func() {
@@ -158,17 +163,24 @@ func (p *Peer) Run() {
 					log.Println("unexpected type %T", t)
 				}
 			case <-p.exitChan:
+				log.Println("X Exiting rcvChan loop")
 				done <- true
+				log.Println("Exiting rcvChan done ")
 				close(p.messageChan)
 				close(p.pingChan)
 				close(p.pongChan)
 				p.messageChan = nil
-				p.Terminate()
+				log.Println("Exiting rcvChan before terminate")
 
+				p.Terminate()
 				return
 			}
 		}
 	}()
+}
+
+func (p *Peer) done() {
+	close(p.doneChan)
 }
 
 func (p *Peer) Exit() {

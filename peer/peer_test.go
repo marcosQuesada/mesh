@@ -19,6 +19,9 @@ func TestPeerMessagingUnderPipes(t *testing.T) {
 		to:          node.Node{},
 		messageChan: make(chan message.Message, 0),
 		exitChan:    make(chan bool),
+		doneChan:    make(chan bool),
+		pingChan:    make(chan message.Message, 0),
+		pongChan:    make(chan message.Message, 0),
 		mode:        "pipe",
 	}
 	c1.Run()
@@ -29,6 +32,9 @@ func TestPeerMessagingUnderPipes(t *testing.T) {
 		to:          node.Node{},
 		messageChan: make(chan message.Message, 0),
 		exitChan:    make(chan bool),
+		doneChan:    make(chan bool),
+		pingChan:    make(chan message.Message, 0),
+		pongChan:    make(chan message.Message, 0),
 		mode:        "pipe",
 	}
 	c2.Run()

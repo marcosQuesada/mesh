@@ -198,19 +198,19 @@ func TestBasicPingPongOverMultiplePipesChannel(t *testing.T) {
 	}
 
 	w.Exit()
-	fmt.Println("hhhhhere")
+	fmt.Println("watch exited")
 
 	time.Sleep(time.Second)
 	c1.Exit()
-	fmt.Println("hhhhhere")
+	fmt.Println("1 exit")
 	c2.Exit()
-	fmt.Println("hhhhhere")
+	fmt.Println("2 exit")
 	c3.Exit()
-	fmt.Println("hhhhhere")
+	fmt.Println("3 exit")
 	c1Mirror.Exit()
-	fmt.Println("hhhhhere")
+	fmt.Println("1 mirror")
 	c2Mirror.Exit()
-	fmt.Println("hhhhhere")
+	fmt.Println("2 mirror")
 	c3Mirror.Exit()
-	fmt.Println("hhhhhere")
+	fmt.Println("3 mirror")
 }
