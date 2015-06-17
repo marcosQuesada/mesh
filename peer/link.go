@@ -83,10 +83,10 @@ func (p *SocketLink) Receive() (msg message.Message, err error) {
 	b := bufio.NewReader(p.Conn)
 	buffer, err := b.ReadBytes('\n')
 	if err != nil {
-		if err != io.EOF {
-			log.Print("Error Receiving on server, err ", err)
-			p.Conn.Close()
+		if err != io.ErrClosedPipe && err != io.EOF {
+			log.Print("Socket Reader err: ", err)
 		}
+		p.Conn.Close()
 
 		return nil, err
 	}
@@ -132,6 +132,7 @@ func (p *SocketLink) ReceiveChan() chan message.Message {
 
 func (p *SocketLink) Terminate() {
 	p.Conn.Close()
+	fmt.Println("Link Terminate")
 	close(p.RcvChan)
 	close(p.exitChan)
 }

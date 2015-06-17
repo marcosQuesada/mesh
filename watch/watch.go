@@ -35,18 +35,21 @@ type subject struct {
 	id     int
 }
 
+func init() {
+	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
+}
 func New(evCh chan dispatcher.Event, interval int) *defaultWatcher {
 	return &defaultWatcher{
 		eventChan:    evCh,
 		exit:         make(chan bool, 0),
 		done:         make(chan bool, 1),
-		pingInterval: interval,
 		index:        make(map[string]bool, 0),
+		pingInterval: interval,
 	}
 }
 
 func (w *defaultWatcher) Watch(p peer.NodePeer) {
-	defer log.Println("Watch ENds")
+	defer log.Println("Watch Exits")
 	node := p.Node()
 	w.mutex.Lock()
 	w.index[node.String()] = true
@@ -74,7 +77,11 @@ func (w *defaultWatcher) Watch(p peer.NodePeer) {
 			timeout = time.NewTimer(time.Second * 3)
 
 			select {
-			case msg := <-p.PongChan():
+			case msg, open := <-p.PongChan():
+				if !open {
+					log.Print("PongChan closed, exit")
+					return
+				}
 				//remove timeout
 				timeout.Stop()
 				pong := msg.(*message.Pong)
@@ -107,7 +114,7 @@ func (w *defaultWatcher) Watch(p peer.NodePeer) {
 
 			}
 		case <-w.exit:
-			timeout.Stop()
+			//			timeout.Stop()
 			w.done <- true
 			return
 			//default:
@@ -118,11 +125,10 @@ func (w *defaultWatcher) Watch(p peer.NodePeer) {
 
 func (w *defaultWatcher) Exit() {
 	w.exit <- true
-	log.Println("Exiting")
 	close(w.exit)
 	for range w.index {
 		<-w.done
-		log.Println("done")
+		log.Println("Stoping Watchers")
 	}
 	close(w.done)
 	log.Println("Exiting Done")
@@ -133,7 +139,11 @@ func (w *defaultWatcher) watchPingChan(s *subject, tickerReset chan bool) {
 		select {
 		case <-w.exit:
 			return
-		case msg := <-s.peer.PingChan():
+		case msg, open := <-s.peer.PingChan():
+			if !open {
+				log.Println("Ping Channel closed, exit")
+				return
+			}
 			tickerReset <- true
 			//if Ping received Return Pong
 			ping := msg.(*message.Ping)

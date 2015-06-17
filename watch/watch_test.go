@@ -8,7 +8,6 @@ import (
 	"github.com/marcosQuesada/mesh/peer"
 	"net"
 	"os"
-	//"reflect"
 	"runtime"
 	"sync"
 	"testing"
@@ -44,7 +43,11 @@ func TestBasicPingPongOverPipesChannel(t *testing.T) {
 		defer wg.Done()
 		for {
 			select {
-			case r := <-c1Mirror.PingChan():
+			case r, open := <-c1Mirror.PingChan():
+				if !open {
+					fmt.Println("PingChan Closed")
+					return
+				}
 				ping := r.(*message.Ping)
 				pong := &message.Pong{Id: ping.Id, From: ping.To, To: ping.From}
 				c1Mirror.Send(pong)
@@ -57,7 +60,6 @@ func TestBasicPingPongOverPipesChannel(t *testing.T) {
 			case <-doneChan:
 				fmt.Println("Done")
 				return
-				//default:
 			}
 		}
 		return
@@ -77,11 +79,11 @@ func TestBasicPingPongOverPipesChannel(t *testing.T) {
 	}
 
 	w.Exit()
-	fmt.Println("here")
+	fmt.Println("1 exit")
 	c1.Exit()
-	fmt.Println("Exit")
+	fmt.Println("C1 Exit")
 	c1Mirror.Exit()
-	fmt.Println("Exit 2")
+	fmt.Println("C1 mirror exit done")
 }
 
 func TestBasicPingPongOverMultiplePipesChannel(t *testing.T) {
@@ -131,42 +133,64 @@ func TestBasicPingPongOverMultiplePipesChannel(t *testing.T) {
 		defer wg.Done()
 		for {
 			select {
-			case r := <-c1Mirror.PingChan():
+			case r, open := <-c1Mirror.PingChan():
+				if !open {
+					fmt.Println("Pingchan closed , exits")
+					return
+				}
 				ping := r.(*message.Ping)
 				fmt.Println("c1Mirror PING received from ", ping.From.String())
 				pong := &message.Pong{Id: ping.Id, From: ping.To, To: ping.From}
 				c1Mirror.Send(pong)
 
-			case r := <-c1Mirror.PongChan():
+			case r, open := <-c1Mirror.PongChan():
+				if !open {
+					fmt.Println("PongChan Closed, exits")
+					return
+				}
 				pong := r.(*message.Pong)
 				fmt.Println("c1Mirror PONG received from ", pong.From.String(), "ID ", pong.Id)
 
-			case r := <-c2Mirror.PingChan():
+			case r, open := <-c2Mirror.PingChan():
+				if !open {
+					fmt.Println("Pingchan closed , exits")
+					return
+				}
 				ping := r.(*message.Ping)
 				pong := &message.Pong{Id: ping.Id, From: ping.To, To: ping.From}
 				c2Mirror.Send(pong)
 
-			case r := <-c2Mirror.PongChan():
+			case r, open := <-c2Mirror.PongChan():
+				if !open {
+					fmt.Println("PongChan Closed, exits")
+					return
+				}
 				pong := r.(*message.Pong)
 				fmt.Println("c2Mirror PONG received from ", pong.From.String(), "ID ", pong.Id)
 
-			case r := <-c3Mirror.PingChan():
+			case r, open := <-c3Mirror.PingChan():
+				if !open {
+					fmt.Println("PingChan Closed, exits")
+					return
+				}
 				ping := r.(*message.Ping)
 				fmt.Println("c3Mirror PING received from ", ping.From.String())
 				pong := &message.Pong{Id: ping.Id, From: ping.To, To: ping.From}
 				c3Mirror.Send(pong)
 				last = pong.Id
 				if last == total {
-					fmt.Println("Ended")
 					return
 				}
 
-			case r := <-c3Mirror.PongChan():
+			case r, open := <-c3Mirror.PongChan():
+				if !open {
+					fmt.Println("PongChan Closed, exits")
+					return
+				}
 				pong := r.(*message.Pong)
 				fmt.Println("c3Mirror PONG received from ", pong.From.String(), "ID ", pong.Id)
 				last = pong.Id
 				if last == total {
-					fmt.Println("Ended")
 					return
 				}
 			case <-doneChan:
@@ -178,7 +202,6 @@ func TestBasicPingPongOverMultiplePipesChannel(t *testing.T) {
 	}()
 
 	evCh := make(chan dispatcher.Event, 0)
-	defer close(evCh)
 
 	w := New(evCh, timeInterval)
 	go w.Watch(c1)
@@ -198,7 +221,7 @@ func TestBasicPingPongOverMultiplePipesChannel(t *testing.T) {
 	}
 
 	w.Exit()
-	fmt.Println("watch exited")
+	close(evCh)
 
 	time.Sleep(time.Second)
 	c1.Exit()
@@ -207,6 +230,7 @@ func TestBasicPingPongOverMultiplePipesChannel(t *testing.T) {
 	fmt.Println("2 exit")
 	c3.Exit()
 	fmt.Println("3 exit")
+
 	c1Mirror.Exit()
 	fmt.Println("1 mirror")
 	c2Mirror.Exit()
