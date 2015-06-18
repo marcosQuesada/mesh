@@ -30,10 +30,11 @@ type defaultWatcher struct {
 }
 
 type subject struct {
-	peer   peer.NodePeer
-	ticker *time.Ticker
-	id     int
-	Done   chan bool
+	peer        peer.NodePeer
+	ticker      *time.Ticker
+	id          int
+	Done        chan bool
+	tickerReset chan bool
 }
 
 func init() {
@@ -59,22 +60,23 @@ func (w *defaultWatcher) Watch(p peer.NodePeer) {
 	tickerReset := make(chan bool, 1)
 	ticker := newTicker(w.pingInterval)
 	subjectDone := make(chan bool, 1)
-	s := &subject{p, ticker, 0, subjectDone}
+	s := &subject{p, ticker, 0, subjectDone, tickerReset}
 
 	node := p.Node()
 	w.mutex.Lock()
 	w.index[node.String()] = s
 	w.mutex.Unlock()
 
-	go w.watchPingChan(s, tickerReset)
+	go w.watchPingChan(s)
 
 	var timeout *time.Timer
 	for {
 		select {
-		case <-tickerReset:
+		case <-s.tickerReset:
 			log.Println("Reseting ticker")
-			/*			s.ticker.Stop()
-						s.ticker = newTicker(w.pingInterval)*/
+			s.ticker.Stop()
+			s.ticker = newTicker(w.pingInterval)
+
 		case <-s.ticker.C:
 			ping := &message.Ping{Id: s.id, From: p.From(), To: node}
 			log.Println("Sended Ticker PING ", s.id, "from ", ping.From.String(), "to ", node.String())
@@ -91,7 +93,7 @@ func (w *defaultWatcher) Watch(p peer.NodePeer) {
 				timeout.Stop()
 				pong := msg.(*message.Pong)
 				if pong.Id != ping.Id {
-					w.exit <- true
+					log.Println("Mistmatched IDs!!!!!")
 				}
 				log.Println("Received Pong ", pong.Id, "from ", pong.From.String())
 
@@ -125,8 +127,9 @@ func (w *defaultWatcher) Watch(p peer.NodePeer) {
 }
 
 func (w *defaultWatcher) Exit() {
-	w.exit <- true
 	close(w.exit)
+
+	//stop all Subject watchers
 	for s := range w.index {
 		w.index[s].Done <- true
 		log.Println("Stoping Watchers")
@@ -136,7 +139,8 @@ func (w *defaultWatcher) Exit() {
 	log.Println("Exiting Done")
 }
 
-func (w *defaultWatcher) watchPingChan(s *subject, tickerReset chan bool) {
+func (w *defaultWatcher) watchPingChan(s *subject) {
+	defer log.Println("Exiting WatchPingChan ", s.peer.From())
 	for {
 		select {
 		case <-w.exit:
@@ -146,21 +150,21 @@ func (w *defaultWatcher) watchPingChan(s *subject, tickerReset chan bool) {
 				log.Println("Ping Channel closed, exit")
 				return
 			}
-			tickerReset <- true
+
 			//if Ping received Return Pong
 			ping := msg.(*message.Ping)
 			log.Println("--- Received Ping", ping.Id, "from ", ping.From.String(), "on: ", ping.To.String())
 			pong := &message.Pong{Id: ping.Id, From: ping.To, To: ping.From}
 			s.peer.Send(pong)
 
+			//Reset ticker
+			s.tickerReset <- true
+
 			w.mutex.Lock()
 			s.id = ping.Id + 1
 			w.mutex.Unlock()
 
 			log.Println("--- Sended Pong", pong.Id, "to ", ping.From.String())
-			/*					log.Println("Reseting ticker")
-			s.ticker.Stop()
-			s.ticker = newTicker(w.pingInterval)*/
 		}
 	}
 }
