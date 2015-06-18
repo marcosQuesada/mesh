@@ -37,6 +37,7 @@ type Peer struct {
 	Link
 	from        n.Node
 	to          n.Node
+	dataChan    chan message.Message
 	messageChan chan message.Message
 	pingChan    chan message.Message
 	pongChan    chan message.Message
@@ -62,6 +63,7 @@ func NewDialer(from n.Node, destination n.Node) *Peer {
 		from:        from,
 		Link:        NewJSONSocketLink(conn),
 		to:          destination,
+		dataChan:    make(chan message.Message, 0),
 		messageChan: make(chan message.Message, 0),
 		pingChan:    make(chan message.Message, 0),
 		pongChan:    make(chan message.Message, 0),
@@ -75,6 +77,7 @@ func NewAcceptor(conn net.Conn, server n.Node) *Peer {
 	return &Peer{
 		Link:        NewJSONSocketLink(conn),
 		from:        server,
+		dataChan:    make(chan message.Message, 0),
 		messageChan: make(chan message.Message, 0),
 		pingChan:    make(chan message.Message, 0),
 		pongChan:    make(chan message.Message, 0),
@@ -105,21 +108,22 @@ func (p *Peer) SayHello() {
 	p.Send(msg)
 }
 
-func (p *Peer) Run() {
-	response := make(chan interface{}, 0)
-	go func() {
-		defer close(response)
-		for {
-			m, err := p.Receive()
-			if err != nil {
-				if err != io.ErrClosedPipe && err != io.EOF {
-					log.Println("Error Receiving: ", err, " exiting")
-				}
-				return
+func (p *Peer) receiveLoop() {
+	defer close(p.dataChan)
+	for {
+		m, err := p.Receive()
+		if err != nil {
+			if err != io.ErrClosedPipe && err != io.EOF {
+				log.Println("Error Receiving: ", err, " exiting")
 			}
-			response <- m
+			return
 		}
-	}()
+		p.dataChan <- m
+	}
+}
+
+func (p *Peer) Run() {
+	go p.receiveLoop()
 
 	//Required to allow message chan readers
 	go func() {
@@ -130,34 +134,25 @@ func (p *Peer) Run() {
 
 		for {
 			select {
-			case msg, open := <-response:
+			case msg, open := <-p.dataChan:
 				if !open {
-					log.Println("closed response channel, return")
+					log.Println("Data channel is closed, return")
 					return
 				}
-				switch t := msg.(type) {
-				case error:
-					log.Println("Error: ", msg, "exiting Peer Link:", p.to.String())
-					return
-				case message.Message:
-					m := t.(message.Message)
-					switch m.(type) {
-					case *message.Ping:
-						p.pingChan <- m
-						//log.Println("Peer RVC Ping", m.(*message.Ping).Id, "to ", m.(*message.Ping).From.String())
-						continue
-					case *message.Pong:
-						p.pongChan <- m
-						//log.Println("Peer RVC Pong", m.(*message.Pong).Id, "to ", m.(*message.Pong).From.String())
-						continue
-					default:
-						p.messageChan <- m
-						continue
-					}
+				switch msg.(type) {
+				case *message.Ping:
+					p.pingChan <- msg
+					//log.Println("Peer RVC Ping", m.(*message.Ping).Id, "to ", m.(*message.Ping).From.String())
+					continue
+				case *message.Pong:
+					p.pongChan <- msg
+					//log.Println("Peer RVC Pong", m.(*message.Pong).Id, "to ", m.(*message.Pong).From.String())
+					continue
 				default:
-					log.Println("unexpected type %T", t)
-					return
+					p.messageChan <- msg
+					continue
 				}
+
 			case <-p.exitChan:
 				return
 			}

@@ -15,8 +15,9 @@ func TestPeerMessagingUnderPipes(t *testing.T) {
 
 	c1 := &Peer{
 		Link:        NewJSONSocketLink(a),
-		from:        node.Node{},
-		to:          node.Node{},
+		from:        node.Node{Host: "foo"},
+		to:          node.Node{Host: "bar"},
+		dataChan:    make(chan message.Message, 0),
 		messageChan: make(chan message.Message, 0),
 		exitChan:    make(chan bool),
 		doneChan:    make(chan bool),
@@ -28,8 +29,9 @@ func TestPeerMessagingUnderPipes(t *testing.T) {
 
 	c2 := &Peer{
 		Link:        NewJSONSocketLink(b),
-		from:        node.Node{},
-		to:          node.Node{},
+		from:        node.Node{Host: "bar"},
+		to:          node.Node{Host: "foo"},
+		dataChan:    make(chan message.Message, 0),
 		messageChan: make(chan message.Message, 0),
 		exitChan:    make(chan bool),
 		doneChan:    make(chan bool),
@@ -71,12 +73,10 @@ func TestPeerMessagingUnderPipes(t *testing.T) {
 	for k := range resChan {
 		r = append(r, k)
 	}
-
 	if len(r) != 2 {
 		t.Error("Unexpected response size", r)
 		t.Fail()
 	}
-
 	h1, ok := r[0].(*message.Hello)
 	if !ok {
 		t.Error("Error Casting to Hello ", h1)

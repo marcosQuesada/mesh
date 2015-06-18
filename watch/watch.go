@@ -23,16 +23,17 @@ type Watcher interface {
 type defaultWatcher struct {
 	eventChan    chan dispatcher.Event
 	exit         chan bool
-	done         chan bool
 	pingInterval int
 	mutex        sync.RWMutex
-	index        map[string]bool
+	index        map[string]*subject
+	wg           sync.WaitGroup
 }
 
 type subject struct {
 	peer   peer.NodePeer
 	ticker *time.Ticker
 	id     int
+	Done   chan bool
 }
 
 func init() {
@@ -42,23 +43,29 @@ func New(evCh chan dispatcher.Event, interval int) *defaultWatcher {
 	return &defaultWatcher{
 		eventChan:    evCh,
 		exit:         make(chan bool, 0),
-		done:         make(chan bool, 1),
-		index:        make(map[string]bool, 0),
+		index:        make(map[string]*subject, 0),
 		pingInterval: interval,
 	}
 }
 
 func (w *defaultWatcher) Watch(p peer.NodePeer) {
-	defer log.Println("Watch Exits")
-	node := p.Node()
-	w.mutex.Lock()
-	w.index[node.String()] = true
-	w.mutex.Unlock()
+	defer log.Println("Watch from ", p.From(), "Exits")
+
+	//add watcher to waitGroup
+	w.wg.Add(1)
+	defer w.wg.Done()
 
 	//@TODO: Randomize this
 	tickerReset := make(chan bool, 1)
 	ticker := newTicker(w.pingInterval)
-	s := &subject{p, ticker, 0}
+	subjectDone := make(chan bool, 1)
+	s := &subject{p, ticker, 0, subjectDone}
+
+	node := p.Node()
+	w.mutex.Lock()
+	w.index[node.String()] = s
+	w.mutex.Unlock()
+
 	go w.watchPingChan(s, tickerReset)
 
 	var timeout *time.Timer
@@ -69,13 +76,11 @@ func (w *defaultWatcher) Watch(p peer.NodePeer) {
 			/*			s.ticker.Stop()
 						s.ticker = newTicker(w.pingInterval)*/
 		case <-s.ticker.C:
-			log.Println("Fire Ticker")
-			//node := p.Node()
 			ping := &message.Ping{Id: s.id, From: p.From(), To: node}
 			log.Println("Sended Ticker PING ", s.id, "from ", ping.From.String(), "to ", node.String())
 			p.Send(ping)
-			timeout = time.NewTimer(time.Second * 3)
 
+			timeout = time.NewTimer(time.Second * 3)
 			select {
 			case msg, open := <-p.PongChan():
 				if !open {
@@ -104,20 +109,16 @@ func (w *defaultWatcher) Watch(p peer.NodePeer) {
 				}
 
 				s.peer.Exit()
-				w.exit <- true
 
 				return
-			case <-w.exit:
-				timeout.Stop()
-				w.done <- true
-				return
 
+			//Watcher Done inside Pong Expectation
+			case <-s.Done:
+				return
 			}
-		case <-w.exit:
-			//			timeout.Stop()
-			w.done <- true
+
+		case <-s.Done:
 			return
-			//default:
 		}
 	}
 
@@ -126,11 +127,12 @@ func (w *defaultWatcher) Watch(p peer.NodePeer) {
 func (w *defaultWatcher) Exit() {
 	w.exit <- true
 	close(w.exit)
-	for range w.index {
-		<-w.done
+	for s := range w.index {
+		w.index[s].Done <- true
 		log.Println("Stoping Watchers")
 	}
-	close(w.done)
+
+	w.wg.Wait()
 	log.Println("Exiting Done")
 }
 
