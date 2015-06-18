@@ -20,8 +20,6 @@ type Link interface {
 	Receive() (message.Message, error)
 	ReceiveTimeout() (message.Message, error)
 	Send(message.Message) error
-	ReceiveChan() chan message.Message
-	Terminate()
 }
 
 type ID string
@@ -31,8 +29,6 @@ type SocketLink struct {
 	id         ID
 	Node       node.Node
 	serializer serializer.Serializer
-	RcvChan    chan message.Message
-	exitChan   chan bool
 }
 
 func NewJSONSocketLink(conn net.Conn) *SocketLink {
@@ -45,8 +41,6 @@ func NewJSONSocketLink(conn net.Conn) *SocketLink {
 		id:         ID(id.String()),
 		Conn:       conn,
 		serializer: &serializer.JsonSerializer{}, //@TODO: Must be plugable!
-		RcvChan:    make(chan message.Message),
-		exitChan:   make(chan bool),
 	}
 }
 
@@ -123,16 +117,6 @@ func (p *SocketLink) ReceiveTimeout() (msg message.Message, err error) {
 	case <-timeout.C:
 		return nil, fmt.Errorf("Timeout receiving Link response")
 	}
+
 	return
-}
-
-func (p *SocketLink) ReceiveChan() chan message.Message {
-	return p.RcvChan
-}
-
-func (p *SocketLink) Terminate() {
-	p.Conn.Close()
-	fmt.Println("Link Terminate")
-	close(p.RcvChan)
-	close(p.exitChan)
 }

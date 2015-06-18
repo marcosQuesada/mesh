@@ -25,7 +25,7 @@ func TestPeerMessagingUnderPipes(t *testing.T) {
 		pongChan:    make(chan message.Message, 0),
 		mode:        "pipe",
 	}
-	c1.Run()
+	go c1.Run()
 
 	c2 := &Peer{
 		Link:        NewJSONSocketLink(b),
@@ -39,7 +39,7 @@ func TestPeerMessagingUnderPipes(t *testing.T) {
 		pongChan:    make(chan message.Message, 0),
 		mode:        "pipe",
 	}
-	c2.Run()
+	go c2.Run()
 
 	resChan := make(chan message.Message, 2)
 	doneChan := make(chan struct{})
@@ -118,10 +118,10 @@ func TestBasicPingPongChannel(t *testing.T) {
 	a, b := net.Pipe()
 
 	c1 := NewAcceptor(a, node.Node{})
-	c1.Run()
+	go c1.Run()
 
 	c2 := NewAcceptor(b, node.Node{})
-	c2.Run()
+	go c2.Run()
 
 	resChan := make(chan message.Message, 4)
 	doneChan := make(chan struct{})

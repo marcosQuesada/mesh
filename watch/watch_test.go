@@ -28,11 +28,11 @@ func TestBasicPingPongOverPipesChannel(t *testing.T) {
 
 	c1 := peer.NewAcceptor(a, nodeA)
 	c1.Identify(nodeB)
-	c1.Run()
+	go c1.Run()
 
 	c1Mirror := peer.NewAcceptor(b, nodeB)
 	c1Mirror.Identify(nodeA)
-	c1Mirror.Run()
+	go c1Mirror.Run()
 
 	var wg sync.WaitGroup
 
@@ -100,29 +100,29 @@ func TestBasicPingPongOverMultiplePipesChannel(t *testing.T) {
 
 	c1 := peer.NewAcceptor(a, nodeA)
 	c1.Identify(nodeB)
-	c1.Run()
+	go c1.Run()
 
 	c1Mirror := peer.NewAcceptor(b, nodeB)
 	c1Mirror.Identify(nodeA)
-	c1Mirror.Run()
+	go c1Mirror.Run()
 
 	c, d := net.Pipe()
 	c2 := peer.NewAcceptor(c, nodeC)
 	c2.Identify(nodeD)
-	c2.Run()
+	go c2.Run()
 
 	c2Mirror := peer.NewAcceptor(d, nodeD)
 	c2Mirror.Identify(nodeC)
-	c2Mirror.Run()
+	go c2Mirror.Run()
 
 	e, f := net.Pipe()
 	c3 := peer.NewAcceptor(e, nodeE)
 	c3.Identify(nodeF)
-	c3.Run()
+	go c3.Run()
 
 	c3Mirror := peer.NewAcceptor(f, nodeF)
 	c3Mirror.Identify(nodeE)
-	c3Mirror.Run()
+	go c3Mirror.Run()
 
 	var wg sync.WaitGroup
 

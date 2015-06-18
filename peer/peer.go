@@ -108,64 +108,18 @@ func (p *Peer) SayHello() {
 	p.Send(msg)
 }
 
-func (p *Peer) receiveLoop() {
-	defer close(p.dataChan)
-	for {
-		m, err := p.Receive()
-		if err != nil {
-			if err != io.ErrClosedPipe && err != io.EOF {
-				log.Println("Error Receiving: ", err, " exiting")
-			}
-			return
-		}
-		p.dataChan <- m
-	}
-}
-
 func (p *Peer) Run() {
-	go p.receiveLoop()
-
-	//Required to allow message chan readers
-	go func() {
-		defer close(p.pongChan)
-		defer close(p.pingChan)
-		defer close(p.doneChan)
-		defer p.Terminate()
-
-		for {
-			select {
-			case msg, open := <-p.dataChan:
-				if !open {
-					log.Println("Data channel is closed, return")
-					return
-				}
-				switch msg.(type) {
-				case *message.Ping:
-					p.pingChan <- msg
-					//log.Println("Peer RVC Ping", m.(*message.Ping).Id, "to ", m.(*message.Ping).From.String())
-					continue
-				case *message.Pong:
-					p.pongChan <- msg
-					//log.Println("Peer RVC Pong", m.(*message.Pong).Id, "to ", m.(*message.Pong).From.String())
-					continue
-				default:
-					p.messageChan <- msg
-					continue
-				}
-
-			case <-p.exitChan:
-				return
-			}
-		}
-	}()
-
+	go p.handle()
+	//start receive loop
+	p.receiveLoop()
 }
 
 func (p *Peer) Exit() {
+	log.Println("Order Exit on ", p.from)
 	close(p.exitChan)
 	log.Println("Waiting doneChan signal")
 	<-p.doneChan
-	log.Println("XXX ")
+
 	close(p.messageChan)
 	log.Println("BYE ", p.From())
 }
@@ -185,6 +139,53 @@ func (p *Peer) Mode() string {
 
 func (p *Peer) Identify(n n.Node) {
 	p.to = n
+}
+
+func (p *Peer) receiveLoop() {
+	defer close(p.dataChan)
+	for {
+		m, err := p.Receive()
+		if err != nil {
+			if err != io.ErrClosedPipe && err != io.EOF {
+				log.Println("Error Receiving: ", err, " exiting", p.from)
+			}
+			return
+		}
+		p.dataChan <- m
+	}
+}
+
+func (p *Peer) handle() {
+	defer close(p.pongChan)
+	defer close(p.pingChan)
+	defer close(p.doneChan)
+
+	for {
+		select {
+		case msg, open := <-p.dataChan:
+			if !open {
+				log.Println("Data channel is closed, return", p.from)
+				return
+			}
+			switch msg.(type) {
+			case *message.Ping:
+				p.pingChan <- msg
+				continue
+
+			case *message.Pong:
+				p.pongChan <- msg
+				continue
+
+			default:
+				p.messageChan <- msg
+				continue
+			}
+
+		case <-p.exitChan:
+			log.Println("Peer handle loop exits")
+			return
+		}
+	}
 }
 
 // Nop Peer is Used on testing
