@@ -7,17 +7,10 @@ import (
 	"github.com/marcosQuesada/mesh/node"
 	"github.com/marcosQuesada/mesh/peer"
 	"net"
-	"os"
-	"runtime"
 	"sync"
 	"testing"
 	"time"
 )
-
-func TestMain(m *testing.M) {
-	runtime.GOMAXPROCS(runtime.NumCPU())
-	os.Exit(m.Run())
-}
 
 func TestBasicPingPongOverPipesChannel(t *testing.T) {
 	total := 2
@@ -79,6 +72,7 @@ func TestBasicPingPongOverPipesChannel(t *testing.T) {
 	}
 
 	w.Exit()
+
 	fmt.Println("1 exit")
 	c1.Exit()
 	fmt.Println("C1 Exit")
@@ -86,7 +80,7 @@ func TestBasicPingPongOverPipesChannel(t *testing.T) {
 	fmt.Println("C1 mirror exit done")
 }
 
-func TestBasicPingPongOverMultiplePipesChannel(t *testing.T) {
+func TestPingPongOverMultiplePipesChannel(t *testing.T) {
 	total := 3
 	timeInterval := 1
 	nodeA := node.Node{Host: "c1", Port: 1}
@@ -223,7 +217,7 @@ func TestBasicPingPongOverMultiplePipesChannel(t *testing.T) {
 	w.Exit()
 	close(evCh)
 
-	time.Sleep(time.Second)
+	//time.Sleep(time.Second)
 	c1.Exit()
 	fmt.Println("1 exit")
 	c2.Exit()
