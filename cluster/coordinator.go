@@ -62,10 +62,10 @@ func (c *Coordinator) OnPeerConnectedEvent(e dispatcher.Event) {
 func (c *Coordinator) OnPeerDisconnected(e dispatcher.Event) {
 	event := e.(*peer.OnPeerDisconnectedEvent)
 	c.members[event.Node.String()] = event.Node
+
 	log.Println("OnPeerDisconnectedEvent, removing peer", event.Node.String())
 
 	c.peerHandler.Remove(event.Peer)
-
 	//restart Dial Peer and try again
 	go c.peerHandler.InitDialClient(event.Node)
 }

@@ -106,6 +106,7 @@ func (p *Peer) SayHello() {
 		Details: map[string]interface{}{"foo": "bar"},
 	}
 	p.Send(msg)
+	log.Println("Sended Hello from ", p.from)
 }
 
 func (p *Peer) Run() {

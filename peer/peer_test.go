@@ -165,3 +165,38 @@ func TestBasicPingPongChannel(t *testing.T) {
 	c1.Exit()
 	c2.Exit()
 }
+
+func TestHandlePeerUsingPipes(t *testing.T) {
+	nodeA := node.Node{Host: "A", Port: 1}
+	nodeB := node.Node{Host: "B", Port: 2}
+	a, b := net.Pipe()
+
+	c1 := NewAcceptor(a, nodeA)
+	c1.Identify(nodeB)
+	go c1.Run()
+
+	c1Mirror := NewAcceptor(b, nodeB)
+	c1Mirror.Identify(nodeA)
+	go c1Mirror.Run()
+
+	fmt.Println("Done")
+	go func() {
+		for {
+			select {
+			case msg, open := <-c1.ReceiveChan():
+				if !open {
+					return
+				}
+
+				if msg.MessageType() != 0 {
+					t.Error("Unexpected message type")
+				}
+			}
+		}
+	}()
+
+	c1Mirror.SayHello()
+
+	c1.Exit()
+	c1Mirror.Exit()
+}

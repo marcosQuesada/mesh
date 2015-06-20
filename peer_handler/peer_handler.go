@@ -1,15 +1,17 @@
 package peer_handler
 
 import (
+	//"fmt"
 	"fmt"
+	"log"
+	"sync"
+	"time"
+
 	"github.com/marcosQuesada/mesh/dispatcher"
 	"github.com/marcosQuesada/mesh/message"
 	n "github.com/marcosQuesada/mesh/node"
 	"github.com/marcosQuesada/mesh/peer"
 	"github.com/marcosQuesada/mesh/watch"
-	"log"
-	"sync"
-	"time"
 )
 
 //PeerHandler is in charge of Handle Client Lifecycle
@@ -34,22 +36,31 @@ type defaultPeerHandler struct {
 }
 
 func DefaultPeerHandler(node n.Node) *defaultPeerHandler {
-	evCh := make(chan dispatcher.Event, 0)
+	evCh := make(chan dispatcher.Event, 10)
 	return &defaultPeerHandler{
 		watcher:   watch.New(evCh, 2),
 		peers:     make(map[string]peer.NodePeer),
 		from:      node,
 		eventChan: evCh,
-		peerChan:  make(chan message.Message, 0),
+		peerChan:  make(chan message.Message, 10),
 	}
 }
 
 func (d *defaultPeerHandler) Handle(c peer.NodePeer) {
+	timer := time.NewTimer(time.Second)
 	select {
-	case <-time.NewTimer(time.Second).C:
-		log.Println("Client has not receive response, Timeout")
+	case <-timer.C:
+		log.Println("PeerHandler has not receive response, Timeout")
 		return
-	case msg := <-c.ReceiveChan():
+	case msg, open := <-c.ReceiveChan():
+		log.Println("here")
+		if !open {
+			log.Println("Closed receiveChan, exit")
+			return
+		}
+		timer.Stop()
+
+		log.Println("MSG", msg)
 		switch msg.(type) {
 		case *message.Hello:
 			c.Identify(msg.(*message.Hello).From)
@@ -126,6 +137,7 @@ func (h *defaultPeerHandler) accept(p peer.NodePeer) error {
 	defer h.mutex.Unlock()
 
 	node := p.Node()
+	fmt.Println("Adding ", node.String())
 	if _, ok := h.peers[node.String()]; ok {
 		return fmt.Errorf("Peer: %s Already registered", node.String())
 	}
