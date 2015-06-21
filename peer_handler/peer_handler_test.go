@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net"
 	"testing"
-	"time"
 
 	"github.com/marcosQuesada/mesh/dispatcher"
 	"github.com/marcosQuesada/mesh/message"
@@ -122,7 +121,6 @@ func TestHandlePeerUsingPipes(t *testing.T) {
 	c1Mirror.SayHello()
 	go peerHandler.Handle(c1)
 
-	time.Sleep(time.Second)
 	select {
 	case msg, open := <-c1Mirror.ReceiveChan():
 		if !open {

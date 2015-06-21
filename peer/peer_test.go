@@ -195,8 +195,7 @@ func TestBasicPingPongChannel(t *testing.T) {
 	}
 
 	total := 0
-	for k := range resChan {
-		fmt.Println("XXX Result Channel data: ", k)
+	for _ = range resChan {
 		total++
 	}
 

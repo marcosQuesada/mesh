@@ -47,7 +47,7 @@ func DefaultPeerHandler(node n.Node) *defaultPeerHandler {
 }
 
 func (d *defaultPeerHandler) Handle(c peer.NodePeer) {
-	timer := time.NewTimer(time.Second)
+	timer := time.NewTimer(time.Second * 2)
 	select {
 	case <-timer.C:
 		log.Println("PeerHandler has not receive response, Timeout")
