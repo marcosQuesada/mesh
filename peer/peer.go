@@ -165,7 +165,6 @@ func (p *Peer) handle() {
 				log.Println("Data channel is closed, return", p.to)
 				return
 			}
-			log.Println("MSG origin ", msg.Origin())
 			switch msg.(type) {
 			case *message.Ping:
 				p.pingChan <- msg

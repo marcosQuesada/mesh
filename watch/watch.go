@@ -36,6 +36,21 @@ type subject struct {
 	id          int
 	Done        chan bool
 	tickerReset chan bool
+	mutex       sync.Mutex
+}
+
+func (s *subject) setId(id int) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	s.id = id
+}
+
+func (s *subject) getId() int {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	return s.id
 }
 
 func init() {
@@ -52,7 +67,6 @@ func New(evCh chan dispatcher.Event, interval int) *defaultWatcher {
 
 func (w *defaultWatcher) Watch(p peer.NodePeer) {
 	defer log.Println("Watcher", p.Node(), "Exits")
-
 	//add watcher to waitGroup
 	w.wg.Add(1)
 	defer w.wg.Done()
@@ -61,7 +75,14 @@ func (w *defaultWatcher) Watch(p peer.NodePeer) {
 	tickerReset := make(chan bool, 10)
 	ticker := newTicker(w.pingInterval)
 	subjectDone := make(chan bool, 10)
-	s := &subject{p, ticker, 0, subjectDone, tickerReset}
+	s := &subject{
+		peer:        p,
+		ticker:      ticker,
+		Done:        subjectDone,
+		tickerReset: tickerReset,
+	}
+	defer close(s.Done)
+	defer close(s.tickerReset)
 
 	node := p.Node()
 	w.mutex.Lock()
@@ -75,21 +96,15 @@ func (w *defaultWatcher) Watch(p peer.NodePeer) {
 		timeout = time.NewTimer(time.Second * 3)
 		select {
 		case <-s.tickerReset:
-			w.mutex.Lock()
-			log.Println("Reseting ticker", s.id, "to", p.Node())
-			w.mutex.Unlock()
+			log.Println("Reseting ticker to", p.Node())
 
-			//@TODO: TEST!
-
-			s.ticker.Stop()
 			timeout.Stop()
+			s.ticker.Stop()
 			s.ticker = newTicker(w.pingInterval)
 		case <-s.ticker.C:
-			go func() {
-				w.mutex.Lock()
-				ping := &message.Ping{Id: s.id, From: p.From(), To: node}
-				log.Println("Ticker PING", s.id, "to", node.String())
-				w.mutex.Unlock()
+			go func(id int) {
+				log.Println("Ticker PING", id, "id", s.getId(), "to", node.String())
+				ping := &message.Ping{Id: id, From: p.From(), To: node}
 				p.Send(ping)
 
 				//timeout = time.NewTimer(time.Second * 3)
@@ -114,15 +129,11 @@ func (w *defaultWatcher) Watch(p peer.NodePeer) {
 						log.Println("Mistmatched IDs!!!!!", pong.Id, ping.Id)
 					}
 					log.Println("Received Pong", pong.Id, "from", pong.From.String())
-
-					w.mutex.Lock()
-					s.id = ping.Id + 1
-					w.mutex.Unlock()
+					id++
+					s.setId(id)
 
 				case <-timeout.C:
-					w.mutex.Lock()
-					log.Println("Timeout id:", s.id, "IsDead", node.String())
-					w.mutex.Unlock()
+					log.Println("Timeout id:", id, "IsDead", node.String())
 
 					w.eventChan <- &peer.OnPeerDisconnectedEvent{
 						Node:  p.Node(),
@@ -140,7 +151,7 @@ func (w *defaultWatcher) Watch(p peer.NodePeer) {
 
 					return
 				}
-			}()
+			}(s.getId())
 
 		case <-s.Done:
 			return
