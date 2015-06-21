@@ -91,14 +91,14 @@ func (w *defaultWatcher) Watch(p peer.NodePeer) {
 
 	go w.watchPingChan(s)
 
-	var timeout *time.Timer
+	//var timeout *time.Timer
 	for {
-		timeout = time.NewTimer(time.Second * 3)
+		//timeout = time.NewTimer(time.Second * 3)
 		select {
 		case <-s.tickerReset:
 			log.Println("Reseting ticker to", p.Node())
 
-			timeout.Stop()
+			//timeout.Stop()
 			s.ticker.Stop()
 			s.ticker = newTicker(w.pingInterval)
 		case <-s.ticker.C:
@@ -107,7 +107,7 @@ func (w *defaultWatcher) Watch(p peer.NodePeer) {
 				ping := &message.Ping{Id: id, From: p.From(), To: node}
 				p.Send(ping)
 
-				//timeout = time.NewTimer(time.Second * 3)
+				timeout := time.NewTimer(time.Second * 3)
 				select {
 				case msg, open := <-p.PongChan():
 					if !open {
