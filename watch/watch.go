@@ -75,7 +75,9 @@ func (w *defaultWatcher) Watch(p peer.NodePeer) {
 		timeout = time.NewTimer(time.Second * 3)
 		select {
 		case <-s.tickerReset:
+			w.mutex.Lock()
 			log.Println("Reseting ticker", s.id, "to", p.Node())
+			w.mutex.Unlock()
 
 			//@TODO: TEST!
 
@@ -84,8 +86,10 @@ func (w *defaultWatcher) Watch(p peer.NodePeer) {
 			s.ticker = newTicker(w.pingInterval)
 		case <-s.ticker.C:
 			go func() {
+				w.mutex.Lock()
 				ping := &message.Ping{Id: s.id, From: p.From(), To: node}
 				log.Println("Ticker PING", s.id, "to", node.String())
+				w.mutex.Unlock()
 				p.Send(ping)
 
 				//timeout = time.NewTimer(time.Second * 3)
@@ -116,7 +120,9 @@ func (w *defaultWatcher) Watch(p peer.NodePeer) {
 					w.mutex.Unlock()
 
 				case <-timeout.C:
+					w.mutex.Lock()
 					log.Println("Timeout id:", s.id, "IsDead", node.String())
+					w.mutex.Unlock()
 
 					w.eventChan <- &peer.OnPeerDisconnectedEvent{
 						Node:  p.Node(),
