@@ -116,9 +116,7 @@ func (p *Peer) Run() {
 }
 
 func (p *Peer) Exit() {
-	log.Println("Order Exit on ", p.from)
 	close(p.exitChan)
-	log.Println("Waiting doneChan signal")
 	<-p.doneChan
 
 	close(p.messageChan)

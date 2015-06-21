@@ -53,14 +53,12 @@ func (d *defaultPeerHandler) Handle(c peer.NodePeer) {
 		log.Println("PeerHandler has not receive response, Timeout")
 		return
 	case msg, open := <-c.ReceiveChan():
-		log.Println("here")
 		if !open {
 			log.Println("Closed receiveChan, exit")
 			return
 		}
 		timer.Stop()
 
-		log.Println("MSG", msg)
 		switch msg.(type) {
 		case *message.Hello:
 			c.Identify(msg.(*message.Hello).From)
@@ -166,9 +164,11 @@ func (h *defaultPeerHandler) InitDialClient(destination n.Node) {
 	log.Println("Starting Dial Client from Node ", h.from.String(), "destination: ", destination.String())
 	//Blocking call, wait until connection success
 	p := peer.NewDialer(h.from, destination)
-	p.Run()
+	go p.Run()
+
 	//Say Hello and wait response
 	p.SayHello()
+
 	h.Handle(p)
 }
 
