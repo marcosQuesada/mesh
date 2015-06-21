@@ -2,12 +2,14 @@ package peer
 
 import (
 	"fmt"
-	"github.com/marcosQuesada/mesh/message"
-	"github.com/marcosQuesada/mesh/node"
 	"net"
 	"reflect"
+	"sync"
 	"testing"
 	"time"
+
+	"github.com/marcosQuesada/mesh/message"
+	"github.com/marcosQuesada/mesh/node"
 )
 
 func TestPeerMessagingUnderPipes(t *testing.T) {
@@ -41,8 +43,11 @@ func TestPeerMessagingUnderPipes(t *testing.T) {
 	}
 	go c2.Run()
 
+	var wg sync.WaitGroup
+
 	resChan := make(chan message.Message, 2)
 	doneChan := make(chan struct{})
+	wg.Add(1)
 	go func() {
 		for {
 			select {
@@ -56,6 +61,7 @@ func TestPeerMessagingUnderPipes(t *testing.T) {
 				resChan <- msg
 			case <-doneChan:
 				close(resChan)
+				wg.Done()
 				return
 			}
 		}
@@ -68,7 +74,7 @@ func TestPeerMessagingUnderPipes(t *testing.T) {
 	time.Sleep(time.Millisecond * 100)
 
 	close(doneChan)
-
+	wg.Wait()
 	r := make([]message.Message, 0)
 	for k := range resChan {
 		r = append(r, k)
@@ -123,25 +129,49 @@ func TestBasicPingPongChannel(t *testing.T) {
 	c2 := NewAcceptor(b, node.Node{})
 	go c2.Run()
 
-	resChan := make(chan message.Message, 4)
-	doneChan := make(chan struct{})
+	resChan := make(chan message.Message, 6)
+	doneChan := make(chan bool, 1)
+
+	var wg sync.WaitGroup
+	wg.Add(1)
 	go func() {
+		defer close(resChan)
 		for {
 			select {
-			case r := <-c1.PingChan():
+			case r, open := <-c1.PingChan():
+				if !open {
+					fmt.Println("closed Chan")
+					return
+				}
 				msg := r.(*message.Ping)
 				resChan <- msg
-			case r := <-c1.PongChan():
+			case r, open := <-c1.PongChan():
+				if !open {
+					fmt.Println("closed Chan")
+					return
+				}
 				msg := r.(*message.Pong)
 				resChan <- msg
-			case r := <-c2.PingChan():
+			case r, open := <-c2.PingChan():
+				if !open {
+					fmt.Println("closed Chan")
+					return
+				}
 				msg := r.(*message.Ping)
 				resChan <- msg
-			case r := <-c2.PongChan():
+				c2.Send(msg)
+			case r, open := <-c2.PongChan():
+				if !open {
+					fmt.Println("closed Chan")
+					return
+				}
 				msg := r.(*message.Pong)
 				resChan <- msg
+				c2.Send(msg)
 			case <-doneChan:
-				close(resChan)
+
+				wg.Done()
+
 				return
 			}
 		}
@@ -155,11 +185,23 @@ func TestBasicPingPongChannel(t *testing.T) {
 	time.Sleep(time.Millisecond * 100)
 
 	close(doneChan)
-	if len(resChan) != 4 {
+	wg.Wait()
+
+	if len(resChan) != 6 {
 		t.Error("Unexpected result chan", len(resChan))
 	}
+	if cap(resChan) != 6 {
+		t.Error("Unexpected result chan", len(resChan))
+	}
+
+	total := 0
 	for k := range resChan {
-		fmt.Println("Result Channel data: ", k)
+		fmt.Println("XXX Result Channel data: ", k)
+		total++
+	}
+
+	if total != 6 {
+		t.Error("Wrong size", total)
 	}
 
 	c1.Exit()

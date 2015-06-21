@@ -2,8 +2,10 @@ package peer_handler
 
 import (
 	//"fmt"
+
 	"net"
 	"testing"
+	"time"
 
 	"github.com/marcosQuesada/mesh/dispatcher"
 	"github.com/marcosQuesada/mesh/message"
@@ -116,29 +118,31 @@ func TestHandlePeerUsingPipes(t *testing.T) {
 		t.Error("Peer has not been accepted")
 	}
 
-	/*	c1Mirror.SayHello()
-		time.Sleep(time.Second)
-		peerHandler.Handle(c1)
-		select {
-		case msg, open := <-c1Mirror.ReceiveChan():
-			if !open {
-				t.Error("Closed Receive Chan")
-			}
-			if msg != nil {
-				if msg.MessageType() != 2 {
-					t.Error("Unexpected MessageType")
-				}
+	c1Mirror.SayHello()
+	//peerHandler.Handle(c1)
+
+	//c1.SayHello()
+
+	time.Sleep(time.Second)
+	select {
+	case msg, open := <-c1.ReceiveChan():
+		if !open {
+			t.Error("Closed Receive Chan")
+		}
+		if msg != nil {
+			if msg.MessageType() != 0 {
+				t.Error("Unexpected MessageType")
 			}
 		}
-	*/
+	}
+
 	c1.Exit()
 	c1Mirror.Exit()
 	close(peerHandler.eventChan)
 	close(peerHandler.peerChan)
 }
 
-type fakeWatch struct {
-}
+type fakeWatch struct{}
 
 func (f *fakeWatch) Watch(peer.NodePeer) {
 
