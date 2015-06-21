@@ -59,7 +59,6 @@ func NewDialer(from n.Node, destination n.Node) *Peer {
 			break
 		}
 	}
-	//fmt.Println("Start dial Peer from ", from.String(), "to", node.String())
 	return &Peer{
 		from:        from,
 		Link:        NewJSONSocketLink(conn),
@@ -163,9 +162,10 @@ func (p *Peer) handle() {
 		select {
 		case msg, open := <-p.dataChan:
 			if !open {
-				log.Println("Data channel is closed, return", p.from)
+				log.Println("Data channel is closed, return", p.to)
 				return
 			}
+			log.Println("MSG origin ", msg.Origin())
 			switch msg.(type) {
 			case *message.Ping:
 				p.pingChan <- msg
@@ -181,7 +181,7 @@ func (p *Peer) handle() {
 			}
 
 		case <-p.exitChan:
-			log.Println("Peer handle loop exits")
+			log.Println("Peer handleLoop exits", p.to)
 			return
 		}
 	}

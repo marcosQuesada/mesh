@@ -4,14 +4,16 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"io"
+	"log"
+	"net"
+	"sync"
+	"time"
+
 	"github.com/marcosQuesada/mesh/message"
 	"github.com/marcosQuesada/mesh/node"
 	"github.com/marcosQuesada/mesh/serializer"
 	"github.com/nu7hatch/gouuid"
-	"io"
-	"log"
-	"net"
-	"time"
 )
 
 type Link interface {
@@ -29,6 +31,7 @@ type SocketLink struct {
 	id         ID
 	Node       node.Node
 	serializer serializer.Serializer
+	mutex      sync.Mutex
 }
 
 func NewJSONSocketLink(conn net.Conn) *SocketLink {
@@ -58,6 +61,8 @@ func (p *SocketLink) Send(msg message.Message) error {
 		return err
 	}
 
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
 	var n int
 	rawMsg = append(rawMsg, '\n')
 	n, err = p.Conn.Write(rawMsg)

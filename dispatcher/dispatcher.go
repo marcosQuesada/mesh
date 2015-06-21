@@ -24,7 +24,7 @@ type defaultDispatcher struct {
 func New() *defaultDispatcher {
 	return &defaultDispatcher{
 		listeners: make(map[EventType][]Listener, 0),
-		EventChan: make(chan Event, 0),
+		EventChan: make(chan Event, 10),
 	}
 }
 

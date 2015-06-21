@@ -2,13 +2,14 @@ package main
 
 import (
 	"flag"
-	"github.com/marcosQuesada/mesh/config"
-	"github.com/marcosQuesada/mesh/server"
 	"log"
 	"os"
 	"os/signal"
 	"runtime"
 	"syscall"
+
+	"github.com/marcosQuesada/mesh/config"
+	"github.com/marcosQuesada/mesh/server"
 )
 
 func main() {
@@ -24,7 +25,7 @@ func main() {
 	//f := handleFile(*logFile)
 	//defer f.Close()
 	//log.SetOutput(f)
-	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
+	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds | log.Lshortfile)
 
 	//Create COnfiguration
 	config := config.NewConfig(*addr, *cluster)

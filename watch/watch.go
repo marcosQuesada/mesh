@@ -8,12 +8,13 @@ package watch
 // Basic PING PONG Mechanism
 
 import (
-	"github.com/marcosQuesada/mesh/dispatcher"
-	"github.com/marcosQuesada/mesh/message"
-	"github.com/marcosQuesada/mesh/peer"
 	"log"
 	"sync"
 	"time"
+
+	"github.com/marcosQuesada/mesh/dispatcher"
+	"github.com/marcosQuesada/mesh/message"
+	"github.com/marcosQuesada/mesh/peer"
 )
 
 type Watcher interface {
@@ -38,7 +39,7 @@ type subject struct {
 }
 
 func init() {
-	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
+	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds | log.Lshortfile)
 }
 func New(evCh chan dispatcher.Event, interval int) *defaultWatcher {
 	return &defaultWatcher{
@@ -50,16 +51,16 @@ func New(evCh chan dispatcher.Event, interval int) *defaultWatcher {
 }
 
 func (w *defaultWatcher) Watch(p peer.NodePeer) {
-	defer log.Println("Watch from ", p.From(), "Exits")
+	defer log.Println("Watcher", p.Node(), "Exits")
 
 	//add watcher to waitGroup
 	w.wg.Add(1)
 	defer w.wg.Done()
 
 	//@TODO: Randomize this
-	tickerReset := make(chan bool, 1)
+	tickerReset := make(chan bool, 10)
 	ticker := newTicker(w.pingInterval)
-	subjectDone := make(chan bool, 1)
+	subjectDone := make(chan bool, 10)
 	s := &subject{p, ticker, 0, subjectDone, tickerReset}
 
 	node := p.Node()
@@ -71,53 +72,69 @@ func (w *defaultWatcher) Watch(p peer.NodePeer) {
 
 	var timeout *time.Timer
 	for {
+		timeout = time.NewTimer(time.Second * 3)
 		select {
 		case <-s.tickerReset:
-			log.Println("Reseting ticker")
+			log.Println("Reseting ticker", s.id, "to", p.Node())
+
+			//@TODO: TEST!
+
 			s.ticker.Stop()
+			timeout.Stop()
 			s.ticker = newTicker(w.pingInterval)
-
 		case <-s.ticker.C:
-			ping := &message.Ping{Id: s.id, From: p.From(), To: node}
-			log.Println("Sended Ticker PING ", s.id, "from ", ping.From.String(), "to ", node.String())
-			p.Send(ping)
+			go func() {
+				ping := &message.Ping{Id: s.id, From: p.From(), To: node}
+				log.Println("Ticker PING", s.id, "to", node.String())
+				p.Send(ping)
 
-			timeout = time.NewTimer(time.Second * 3)
-			select {
-			case msg, open := <-p.PongChan():
-				if !open {
-					log.Print("PongChan closed, exit")
+				//timeout = time.NewTimer(time.Second * 3)
+				select {
+				case msg, open := <-p.PongChan():
+					if !open {
+						log.Print("PongChan closed, exit")
+
+						w.eventChan <- &peer.OnPeerDisconnectedEvent{
+							Node:  p.Node(),
+							Event: peer.PeerStatusDisconnected,
+							Peer:  p,
+						}
+
+						s.Done <- true
+						return
+					}
+					//remove timeout
+					timeout.Stop()
+					pong := msg.(*message.Pong)
+					if pong.Id != ping.Id {
+						log.Println("Mistmatched IDs!!!!!", pong.Id, ping.Id)
+					}
+					log.Println("Received Pong", pong.Id, "from", pong.From.String())
+
+					w.mutex.Lock()
+					s.id = ping.Id + 1
+					w.mutex.Unlock()
+
+				case <-timeout.C:
+					log.Println("Timeout id:", s.id, "IsDead", node.String())
+
+					w.eventChan <- &peer.OnPeerDisconnectedEvent{
+						Node:  p.Node(),
+						Event: peer.PeerStatusDisconnected,
+						Peer:  p,
+					}
+
+					s.peer.Exit()
+
+					return
+
+				//Watcher Done inside Pong Expectation
+				case <-s.Done:
+					timeout.Stop()
+
 					return
 				}
-				//remove timeout
-				timeout.Stop()
-				pong := msg.(*message.Pong)
-				if pong.Id != ping.Id {
-					log.Println("Mistmatched IDs!!!!!")
-				}
-				log.Println("Received Pong ", pong.Id, "from ", pong.From.String())
-
-				w.mutex.Lock()
-				s.id = ping.Id + 1
-				w.mutex.Unlock()
-
-			case <-timeout.C:
-				log.Println("Timeout waiting pong from: ", node.String(), "id:", s.id, "Declare Dead")
-
-				w.eventChan <- &peer.OnPeerDisconnectedEvent{
-					Node:  p.Node(),
-					Event: peer.PeerStatusDisconnected,
-					Peer:  p,
-				}
-
-				s.peer.Exit()
-
-				return
-
-			//Watcher Done inside Pong Expectation
-			case <-s.Done:
-				return
-			}
+			}()
 
 		case <-s.Done:
 			return
@@ -151,20 +168,20 @@ func (w *defaultWatcher) watchPingChan(s *subject) {
 				return
 			}
 
-			//if Ping received Return Pong
-			ping := msg.(*message.Ping)
-			log.Println("--- Received Ping", ping.Id, "from ", ping.From.String(), "on: ", ping.To.String())
-			pong := &message.Pong{Id: ping.Id, From: ping.To, To: ping.From}
-			s.peer.Send(pong)
-
 			//Reset ticker
 			s.tickerReset <- true
 
-			w.mutex.Lock()
-			s.id = ping.Id + 1
-			w.mutex.Unlock()
+			//if Ping received Return Pong
+			ping := msg.(*message.Ping)
+			log.Println("Received Ping", ping.Id, "on: ", ping.From.String())
+			pong := &message.Pong{Id: ping.Id, From: ping.To, To: ping.From}
+			s.peer.Send(pong)
 
-			log.Println("--- Sended Pong", pong.Id, "to ", ping.From.String())
+			/*			w.mutex.Lock()
+						s.id = ping.Id + 1
+						w.mutex.Unlock()*/
+
+			log.Println("--Sended Pong", pong.Id, "to ", ping.From.String())
 		}
 	}
 }
