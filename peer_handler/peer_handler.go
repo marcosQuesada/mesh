@@ -137,7 +137,6 @@ func (h *defaultPeerHandler) accept(p peer.NodePeer) error {
 	defer h.mutex.Unlock()
 
 	node := p.Node()
-	fmt.Println("Adding ", node.String())
 	if _, ok := h.peers[node.String()]; ok {
 		return fmt.Errorf("Peer: %s Already registered", node.String())
 	}

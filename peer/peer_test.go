@@ -208,7 +208,7 @@ func TestBasicPingPongChannel(t *testing.T) {
 	c2.Exit()
 }
 
-func TestHandlePeerUsingPipes(t *testing.T) {
+func TestPeersUsingPipes(t *testing.T) {
 	nodeA := node.Node{Host: "A", Port: 1}
 	nodeB := node.Node{Host: "B", Port: 2}
 	a, b := net.Pipe()
@@ -220,9 +220,11 @@ func TestHandlePeerUsingPipes(t *testing.T) {
 	c1Mirror := NewAcceptor(b, nodeB)
 	c1Mirror.Identify(nodeA)
 	go c1Mirror.Run()
+	var wg sync.WaitGroup
 
-	fmt.Println("Done")
+	wg.Add(1)
 	go func() {
+		total := 0
 		for {
 			select {
 			case msg, open := <-c1.ReceiveChan():
@@ -233,12 +235,35 @@ func TestHandlePeerUsingPipes(t *testing.T) {
 				if msg.MessageType() != 0 {
 					t.Error("Unexpected message type")
 				}
+				c1.Send(&message.Abort{Id: msg.(*message.Hello).Id, From: msg.(*message.Hello).From, Details: map[string]interface{}{"foo_bar": 1231}})
+
+				if total == 100 {
+					wg.Done()
+					return
+				}
+				total++
+			case msg, open := <-c1Mirror.ReceiveChan():
+				if !open {
+					return
+				}
+
+				if msg.MessageType() != 2 {
+					t.Error("Unexpected message type")
+				}
+				c1Mirror.SayHello()
+
+				if total == 100 {
+					wg.Done()
+					return
+				}
+				total++
 			}
 		}
 	}()
 
 	c1Mirror.SayHello()
 
+	wg.Wait()
 	c1.Exit()
 	c1Mirror.Exit()
 }

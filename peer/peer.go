@@ -1,12 +1,13 @@
 package peer
 
 import (
-	"github.com/marcosQuesada/mesh/message"
-	n "github.com/marcosQuesada/mesh/node"
 	"io"
 	"log"
 	"net"
 	"time"
+
+	"github.com/marcosQuesada/mesh/message"
+	n "github.com/marcosQuesada/mesh/node"
 )
 
 const (
@@ -106,7 +107,6 @@ func (p *Peer) SayHello() {
 		Details: map[string]interface{}{"foo": "bar"},
 	}
 	p.Send(msg)
-	log.Println("Sended Hello from ", p.from)
 }
 
 func (p *Peer) Run() {

@@ -3,6 +3,7 @@ package peer_handler
 import (
 	//"fmt"
 
+	"fmt"
 	"net"
 	"testing"
 	"time"
@@ -90,7 +91,7 @@ func TestHandlePeerUsingPipes(t *testing.T) {
 	}
 
 	c1Mirror.SayHello()
-	peerHandler.Handle(c1)
+	go peerHandler.Handle(c1)
 
 	select {
 	case msg, open := <-c1Mirror.ReceiveChan():
@@ -119,24 +120,24 @@ func TestHandlePeerUsingPipes(t *testing.T) {
 	}
 
 	c1Mirror.SayHello()
-	//peerHandler.Handle(c1)
-
-	//c1.SayHello()
+	go peerHandler.Handle(c1)
 
 	time.Sleep(time.Second)
 	select {
-	case msg, open := <-c1.ReceiveChan():
+	case msg, open := <-c1Mirror.ReceiveChan():
 		if !open {
 			t.Error("Closed Receive Chan")
 		}
+		fmt.Println("Msg is ", msg, msg.MessageType())
 		if msg != nil {
-			if msg.MessageType() != 0 {
+			if msg.MessageType() != 2 {
 				t.Error("Unexpected MessageType")
 			}
 		}
 	}
 
-	c1.Exit()
+	//On abort PeerHandler will exit peer
+	//c1.Exit()
 	c1Mirror.Exit()
 	close(peerHandler.eventChan)
 	close(peerHandler.peerChan)
