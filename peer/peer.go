@@ -142,14 +142,14 @@ func (p *Peer) Identify(n n.Node) {
 func (p *Peer) receiveLoop() {
 	defer close(p.dataChan)
 	for {
-		m, err := p.Receive()
+		msg, err := p.Receive()
 		if err != nil {
 			if err != io.ErrClosedPipe && err != io.EOF {
 				log.Println("Error Receiving: ", err, " exiting", p.from)
 			}
 			return
 		}
-		p.dataChan <- m
+		p.dataChan <- msg
 	}
 }
 
