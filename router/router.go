@@ -71,16 +71,6 @@ func (r *defaultRouter) Accept(c *peer.Peer) {
 				response := r.Handle(msg)
 				c.Send(response)
 
-			// Goes out when Peer leaves pingChan
-			/*			case msg, open := <-c.PingChan():
-						if !open {
-							log.Println("Closed PingChan, exit")
-							return
-						}
-						fmt.Println("PING ", msg)
-						response := r.Handle(msg)
-						c.Send(response)*/
-
 			case <-r.exit:
 				return
 			}

@@ -19,29 +19,27 @@ func TestPeerMessagingUnderPipes(t *testing.T) {
 		Link:        NewJSONSocketLink(a),
 		from:        node.Node{Host: "foo"},
 		to:          node.Node{Host: "bar"},
-		dataChan:    make(chan message.Message, 0),
-		messageChan: make(chan message.Message, 0),
+		dataChan:    make(chan message.Message, 10),
+		sendChan:    make(chan message.Message, 10),
+		messageChan: make(chan message.Message, 10),
 		exitChan:    make(chan bool),
 		doneChan:    make(chan bool),
-		pingChan:    make(chan message.Message, 0),
-		pongChan:    make(chan message.Message, 0),
 		mode:        "pipe",
 	}
 	go c1.Run()
 
-	c2 := &Peer{
+	c1Mirror := &Peer{
 		Link:        NewJSONSocketLink(b),
 		from:        node.Node{Host: "bar"},
 		to:          node.Node{Host: "foo"},
-		dataChan:    make(chan message.Message, 0),
-		messageChan: make(chan message.Message, 0),
+		dataChan:    make(chan message.Message, 10),
+		sendChan:    make(chan message.Message, 10),
+		messageChan: make(chan message.Message, 10),
 		exitChan:    make(chan bool),
 		doneChan:    make(chan bool),
-		pingChan:    make(chan message.Message, 0),
-		pongChan:    make(chan message.Message, 0),
 		mode:        "pipe",
 	}
-	go c2.Run()
+	go c1Mirror.Run()
 
 	var wg sync.WaitGroup
 
@@ -55,7 +53,7 @@ func TestPeerMessagingUnderPipes(t *testing.T) {
 				msg := r.(*message.Hello)
 				msg.Id = 1
 				resChan <- msg
-			case r := <-c2.ReceiveChan():
+			case r := <-c1Mirror.ReceiveChan():
 				msg := r.(*message.Hello)
 				msg.Id = 2
 				resChan <- msg
@@ -69,7 +67,7 @@ func TestPeerMessagingUnderPipes(t *testing.T) {
 	}()
 
 	c1.SayHello()
-	c2.SayHello()
+	c1Mirror.SayHello()
 
 	time.Sleep(time.Millisecond * 100)
 
@@ -88,23 +86,18 @@ func TestPeerMessagingUnderPipes(t *testing.T) {
 		t.Error("Error Casting to Hello ", h1)
 	}
 
-	if h1.Id != 2 {
-		t.Error("Unexpected First Id received ", h1)
-	}
-
-	h2 := r[1].(*message.Hello)
-	if h2.Id != 1 {
-		t.Error("Unexpected First Id received ", h2)
+	h2, ok := r[1].(*message.Hello)
+	if !ok {
+		t.Error("Error Casting to Hello ", h2)
 	}
 
 	c1.Exit()
-	c2.Exit()
+	c1Mirror.Exit()
 }
 
 func TestBasicNopPeerTest(t *testing.T) {
 	ch := make(chan message.Message, 10)
-	pCh := make(chan message.Message, 10)
-	fkc := &NopPeer{"localhost", 9000, ch, pCh}
+	fkc := &NopPeer{"localhost", 9000, ch}
 
 	msg := message.Hello{
 		Id:      999,
@@ -126,8 +119,8 @@ func TestBasicPingPongChannel(t *testing.T) {
 	c1 := NewAcceptor(a, node.Node{})
 	go c1.Run()
 
-	c2 := NewAcceptor(b, node.Node{})
-	go c2.Run()
+	c1Mirror := NewAcceptor(b, node.Node{})
+	go c1Mirror.Run()
 
 	resChan := make(chan message.Message, 6)
 	doneChan := make(chan bool, 1)
@@ -138,36 +131,20 @@ func TestBasicPingPongChannel(t *testing.T) {
 		defer close(resChan)
 		for {
 			select {
-			case r, open := <-c1.PingChan():
+			case msg, open := <-c1.ReceiveChan():
 				if !open {
 					fmt.Println("closed Chan")
 					return
 				}
-				msg := r.(*message.Ping)
 				resChan <- msg
-			case r, open := <-c1.PongChan():
+
+			case msg, open := <-c1Mirror.ReceiveChan():
 				if !open {
 					fmt.Println("closed Chan")
 					return
 				}
-				msg := r.(*message.Pong)
 				resChan <- msg
-			case r, open := <-c2.PingChan():
-				if !open {
-					fmt.Println("closed Chan")
-					return
-				}
-				msg := r.(*message.Ping)
-				resChan <- msg
-				c2.Send(msg)
-			case r, open := <-c2.PongChan():
-				if !open {
-					fmt.Println("closed Chan")
-					return
-				}
-				msg := r.(*message.Pong)
-				resChan <- msg
-				c2.Send(msg)
+				c1Mirror.Commit(msg)
 			case <-doneChan:
 
 				wg.Done()
@@ -178,10 +155,10 @@ func TestBasicPingPongChannel(t *testing.T) {
 		return
 	}()
 
-	c1.Send(message.Ping{})
-	c2.Send(message.Ping{})
-	c1.Send(message.Pong{})
-	c2.Send(message.Pong{})
+	c1.Commit(message.Ping{})
+	c1Mirror.Commit(message.Ping{})
+	c1.Commit(message.Pong{})
+	c1Mirror.Commit(message.Pong{})
 	time.Sleep(time.Millisecond * 100)
 
 	close(doneChan)
@@ -204,7 +181,7 @@ func TestBasicPingPongChannel(t *testing.T) {
 	}
 
 	c1.Exit()
-	c2.Exit()
+	c1Mirror.Exit()
 }
 
 func TestPeersUsingPipes(t *testing.T) {
@@ -234,7 +211,7 @@ func TestPeersUsingPipes(t *testing.T) {
 				if msg.MessageType() != 0 {
 					t.Error("Unexpected message type")
 				}
-				c1.Send(&message.Abort{Id: msg.(*message.Hello).Id, From: msg.(*message.Hello).From, Details: map[string]interface{}{"foo_bar": 1231}})
+				c1.Commit(&message.Abort{Id: msg.(*message.Hello).Id, From: msg.(*message.Hello).From, Details: map[string]interface{}{"foo_bar": 1231}})
 
 				if total == 100 {
 					wg.Done()

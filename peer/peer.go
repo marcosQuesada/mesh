@@ -28,9 +28,8 @@ type NodePeer interface {
 	Run()
 	Exit()
 	ReceiveChan() chan message.Message
-	PingChan() chan message.Message
-	PongChan() chan message.Message
 	Send(message.Message) error
+	Commit(message.Message)
 	SayHello() // Pending to remove, must be internal
 }
 
@@ -40,8 +39,7 @@ type Peer struct {
 	to          n.Node
 	dataChan    chan message.Message
 	messageChan chan message.Message
-	pingChan    chan message.Message
-	pongChan    chan message.Message
+	sendChan    chan message.Message
 	exitChan    chan bool
 	doneChan    chan bool
 	mode        string
@@ -65,8 +63,7 @@ func NewDialer(from n.Node, destination n.Node) *Peer {
 		to:          destination,
 		dataChan:    make(chan message.Message, 10),
 		messageChan: make(chan message.Message, 10),
-		pingChan:    make(chan message.Message, 10),
-		pongChan:    make(chan message.Message, 10),
+		sendChan:    make(chan message.Message, 10),
 		exitChan:    make(chan bool, 2),
 		doneChan:    make(chan bool, 1),
 		mode:        "client",
@@ -79,8 +76,7 @@ func NewAcceptor(conn net.Conn, server n.Node) *Peer {
 		from:        server,
 		dataChan:    make(chan message.Message, 10),
 		messageChan: make(chan message.Message, 10),
-		pingChan:    make(chan message.Message, 10),
-		pongChan:    make(chan message.Message, 10),
+		sendChan:    make(chan message.Message, 10),
 		exitChan:    make(chan bool, 1),
 		doneChan:    make(chan bool, 1),
 		mode:        "server",
@@ -91,21 +87,13 @@ func (p *Peer) ReceiveChan() chan message.Message {
 	return p.messageChan
 }
 
-func (p *Peer) PingChan() chan message.Message {
-	return p.pingChan
-}
-
-func (p *Peer) PongChan() chan message.Message {
-	return p.pongChan
-}
-
 func (p *Peer) SayHello() {
 	msg := message.Hello{
 		Id:      0,
 		From:    p.from,
 		Details: map[string]interface{}{"foo": "bar"},
 	}
-	p.Send(msg)
+	p.Commit(msg)
 }
 
 func (p *Peer) Run() {
@@ -139,6 +127,10 @@ func (p *Peer) Identify(n n.Node) {
 	p.to = n
 }
 
+func (p *Peer) Commit(msg message.Message) {
+	p.sendChan <- msg
+}
+
 func (p *Peer) receiveLoop() {
 	defer close(p.dataChan)
 	for {
@@ -154,10 +146,9 @@ func (p *Peer) receiveLoop() {
 }
 
 func (p *Peer) handle() {
-	defer close(p.pongChan)
-	defer close(p.pingChan)
 	defer close(p.doneChan)
 
+	go p.handleSendChan()
 	for {
 		select {
 		case msg, open := <-p.dataChan:
@@ -165,19 +156,26 @@ func (p *Peer) handle() {
 				log.Println("Data channel is closed, return", p.to)
 				return
 			}
-			switch msg.(type) {
-			/*			case *message.Ping:
-							p.pingChan <- msg
-							continue
+			p.messageChan <- msg
 
-						case *message.Pong:
-							p.pongChan <- msg
-							continue
-			*/
-			default:
-				p.messageChan <- msg
-				continue
+		case <-p.exitChan:
+			log.Println("Peer handleLoop exits", p.to)
+			return
+		}
+	}
+}
+
+func (p *Peer) handleSendChan() {
+	defer close(p.sendChan)
+
+	for {
+		select {
+		case msg, open := <-p.sendChan:
+			if !open {
+				log.Println("Send channel is closed, return", p.to)
+				return
 			}
+			p.Send(msg)
 
 		case <-p.exitChan:
 			log.Println("Peer handleLoop exits", p.to)
@@ -188,10 +186,9 @@ func (p *Peer) handle() {
 
 // Nop Peer is Used on testing
 type NopPeer struct {
-	Host         string
-	Port         int
-	MsgChan      chan message.Message
-	PingPongChan chan message.Message
+	Host    string
+	Port    int
+	MsgChan chan message.Message
 }
 
 func (f *NopPeer) Node() n.Node {
@@ -210,17 +207,14 @@ func (f *NopPeer) ReceiveChan() chan message.Message {
 	return f.MsgChan
 }
 
-func (f *NopPeer) PingChan() chan message.Message {
-	return f.PingPongChan
-}
-func (f *NopPeer) PongChan() chan message.Message {
-	return f.PingPongChan
-}
 func (f *NopPeer) Exit() {
 }
 func (f *NopPeer) SayHello() {
 }
 func (f *NopPeer) Identify(n n.Node) {
+}
+
+func (f *NopPeer) Commit(msg message.Message) {
 }
 
 func (f *NopPeer) Mode() string {
