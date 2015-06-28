@@ -63,7 +63,6 @@ func TestRouterAccept(t *testing.T) {
 	}
 	c1Mirror.Send(msg)
 
-	//result = <-c1Mirror.PongChan()
 	result = <-c1Mirror.ReceiveChan()
 	if result.MessageType() != 4 {
 		t.Error("Unexpected response type, expected 1 got", result.MessageType())
