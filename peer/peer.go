@@ -57,14 +57,14 @@ func NewDialer(from n.Node, destination n.Node) *Peer {
 			break
 		}
 	}
-	log.Println("Connected from", from, "to ", destination)
+
 	return &Peer{
 		from:        from,
 		Link:        NewJSONSocketLink(conn),
 		to:          destination,
 		dataChan:    make(chan message.Message, 10),
 		messageChan: make(chan message.Message, 10),
-		sendChan:    make(chan message.Message, 10),
+		sendChan:    make(chan message.Message, 0),
 		exitChan:    make(chan bool, 2),
 		doneChan:    make(chan bool, 1),
 		mode:        "client",
@@ -77,7 +77,7 @@ func NewAcceptor(conn net.Conn, server n.Node) *Peer {
 		from:        server,
 		dataChan:    make(chan message.Message, 10),
 		messageChan: make(chan message.Message, 10),
-		sendChan:    make(chan message.Message, 10),
+		sendChan:    make(chan message.Message, 0),
 		exitChan:    make(chan bool, 1),
 		doneChan:    make(chan bool, 1),
 		mode:        "server",
@@ -108,7 +108,7 @@ func (p *Peer) Exit() {
 	<-p.doneChan
 
 	close(p.messageChan)
-	log.Println("BYE ", p.Node())
+	log.Println("BYE ", p.Node(), p.mode)
 }
 
 func (p *Peer) Node() n.Node {
@@ -140,11 +140,10 @@ func (p *Peer) receiveLoop() {
 		msg, err := p.Receive()
 		if err != nil {
 			if err != io.ErrClosedPipe && err != io.EOF {
-				log.Println("Error Receiving: ", err, " exiting", p.to, p.mode)
+				log.Println("Error Receiving: ", err, " exiting", p.from, p.mode)
 			}
 			return
 		}
-		log.Println("Receive Loop ", msg.MessageType(), "to", p.to, p.mode)
 		p.dataChan <- msg
 	}
 }
@@ -163,7 +162,6 @@ func (p *Peer) handle() {
 			p.messageChan <- msg
 
 		case <-p.exitChan:
-			log.Println("Peer handle Loop exits", p.to, p.mode)
 			return
 		}
 	}
@@ -181,16 +179,16 @@ func (p *Peer) handleSendChan() {
 				return
 			}
 			p.Send(msg)
-
 		case <-p.exitChan:
-			log.Println("Peer handleSendChan exits", p.to, p.mode)
 			return
 		}
 	}
 }
 
 func (p *Peer) nilSendChan() {
-	p.sendChan = nil
+	go func() {
+		p.sendChan = nil
+	}()
 }
 
 // Nop Peer is Used on testing

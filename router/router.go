@@ -53,17 +53,19 @@ func (r *defaultRouter) RegisterHandler(msgType message.MsgType, handler Handler
 
 func (r *defaultRouter) Accept(c *peer.Peer) {
 	go func() {
-		defer log.Println("Exiting Accept loop ", c.From(), c.Mode())
 		for {
 			select {
 			case msg, open := <-c.ReceiveChan():
 				if !open {
-					log.Println("Closed receiveChan, exit")
+					//log.Println("Closed receiveChan, exit")
 					return
 				}
 				response := r.Handle(c, msg)
 				if response != nil {
 					c.Commit(response)
+					if response.MessageType() == message.ABORT {
+						c.Exit()
+					}
 				}
 
 			case <-r.exit:
@@ -109,10 +111,8 @@ func (r *defaultRouter) InitDialClient(destination node.Node) {
 	p := peer.NewDialer(r.from, destination)
 	go p.Run()
 
-	log.Println("Client Run")
 	//Say Hello and wait response
 	p.SayHello()
-	log.Println("Client Say Hello")
 
 	r.Accept(p)
 }

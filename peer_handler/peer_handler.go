@@ -46,11 +46,9 @@ func DefaultPeerHandler(node n.Node) *defaultPeerHandler {
 }
 
 func (d *defaultPeerHandler) HandleHello(c peer.NodePeer, msg message.Message) (message.Message, error) {
-	log.Println("Peer Handler Hello", msg)
 	c.Identify(msg.(*message.Hello).From)
 	err := d.accept(c)
 	if err != nil {
-		c.Exit()
 
 		d.eventChan <- &peer.OnPeerAbortedEvent{
 			Node:  msg.(*message.Hello).From,
@@ -71,7 +69,6 @@ func (d *defaultPeerHandler) HandleHello(c peer.NodePeer, msg message.Message) (
 }
 
 func (d *defaultPeerHandler) HandleWelcome(c peer.NodePeer, msg message.Message) (message.Message, error) {
-	log.Println("Peer Handler Welcome", msg)
 	err := d.accept(c)
 	if err != nil {
 		d.eventChan <- &peer.OnPeerErroredEvent{
@@ -93,7 +90,6 @@ func (d *defaultPeerHandler) HandleWelcome(c peer.NodePeer, msg message.Message)
 }
 
 func (d *defaultPeerHandler) HandleAbort(c peer.NodePeer, msg message.Message) (message.Message, error) {
-	log.Println("Peer Handler Abort", msg)
 	d.eventChan <- &peer.OnPeerAbortedEvent{
 		Node:  c.Node(),
 		Event: peer.PeerStatusAbort,
@@ -104,7 +100,7 @@ func (d *defaultPeerHandler) HandleAbort(c peer.NodePeer, msg message.Message) (
 }
 
 func (d *defaultPeerHandler) HandleDone(c peer.NodePeer, msg message.Message) (message.Message, error) {
-	log.Println("Peer Handler Done", msg)
+	//log.Println("Peer Handler Done", msg)
 	return nil, nil
 }
 
