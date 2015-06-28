@@ -1,7 +1,6 @@
 package router
 
 import (
-	"fmt"
 	"sync"
 
 	"log"
@@ -73,14 +72,14 @@ func (r *defaultRouter) Accept(c *peer.Peer) {
 				c.Send(response)
 
 			// Goes out when Peer leaves pingChan
-			case msg, open := <-c.PingChan():
-				if !open {
-					log.Println("Closed PingChan, exit")
-					return
-				}
-				fmt.Println("PING ", msg)
-				response := r.Handle(msg)
-				c.Send(response)
+			/*			case msg, open := <-c.PingChan():
+						if !open {
+							log.Println("Closed PingChan, exit")
+							return
+						}
+						fmt.Println("PING ", msg)
+						response := r.Handle(msg)
+						c.Send(response)*/
 
 			case <-r.exit:
 				return

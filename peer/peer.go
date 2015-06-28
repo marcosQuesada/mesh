@@ -166,14 +166,14 @@ func (p *Peer) handle() {
 				return
 			}
 			switch msg.(type) {
-			case *message.Ping:
-				p.pingChan <- msg
-				continue
+			/*			case *message.Ping:
+							p.pingChan <- msg
+							continue
 
-			case *message.Pong:
-				p.pongChan <- msg
-				continue
-
+						case *message.Pong:
+							p.pongChan <- msg
+							continue
+			*/
 			default:
 				p.messageChan <- msg
 				continue
