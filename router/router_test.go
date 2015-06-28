@@ -17,8 +17,13 @@ func TestBasicRouterHandling(t *testing.T) {
 
 	msg := &message.Ping{}
 	r.RegisterHandler(msg.MessageType(), fakePingHandler)
+	/*
+		nodeA := node.Node{Host: "A", Port: 1}
+		a, _ := net.Pipe()
 
-	result := r.Handle(msg)
+		c1 := peer.NewAcceptor(a, nodeA)*/
+	c1 := &peer.NopPeer{}
+	result := r.Handle(c1, msg)
 	if result.MessageType() != 4 {
 		t.Error("unexpected response ", result)
 	}
@@ -81,12 +86,12 @@ func TestRouterAccept(t *testing.T) {
 	c1Mirror.Exit()
 }
 
-func fakeHelloHandler(msg message.Message) (message.Message, error) {
+func fakeHelloHandler(c peer.NodePeer, msg message.Message) (message.Message, error) {
 	hello := msg.(*message.Hello)
 	return &message.Welcome{hello.Id, hello.To, hello.From, hello.Details}, nil
 }
 
-func fakePingHandler(msg message.Message) (message.Message, error) {
+func fakePingHandler(c peer.NodePeer, msg message.Message) (message.Message, error) {
 	ping := msg.(*message.Ping)
 	return &message.Pong{ping.Id, ping.To, ping.From}, nil
 }
