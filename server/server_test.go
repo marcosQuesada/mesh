@@ -2,13 +2,15 @@ package server
 
 import (
 	"fmt"
+	"net"
+	"testing"
+	"time"
+
 	"github.com/marcosQuesada/mesh/config"
 	"github.com/marcosQuesada/mesh/message"
 	"github.com/marcosQuesada/mesh/node"
 	"github.com/marcosQuesada/mesh/peer"
-	"net"
-	"testing"
-	"time"
+	"github.com/marcosQuesada/mesh/router"
 )
 
 func TestBasicServerClient(t *testing.T) {
@@ -18,6 +20,7 @@ func TestBasicServerClient(t *testing.T) {
 	}
 
 	srv := New(config)
+	srv.router = router.New(org)
 	srv.startServer()
 	time.Sleep(time.Millisecond * 100)
 

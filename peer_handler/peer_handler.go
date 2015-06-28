@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"sync"
-	"time"
 
 	"github.com/marcosQuesada/mesh/dispatcher"
 	"github.com/marcosQuesada/mesh/message"
@@ -17,13 +16,15 @@ import (
 //PeerHandler is in charge of Handle Client Lifecycle
 //Sends pings on ticker to check remote state
 type PeerHandler interface {
-	Handle(peer.NodePeer)
+	HandleHello(c peer.NodePeer, msg message.Message) (message.Message, error)
+	HandleWelcome(c peer.NodePeer, msg message.Message) (message.Message, error)
+	HandleAbort(c peer.NodePeer, msg message.Message) (message.Message, error)
+	HandleDone(c peer.NodePeer, msg message.Message) (message.Message, error)
+	HandleError(c peer.NodePeer, msg message.Message) (message.Message, error)
+
 	Remove(peer.NodePeer) error
 	Route(message.Message)
 	Events() chan dispatcher.Event
-	AggregatedChan() chan message.Message
-	Len() int
-	InitDialClient(destination n.Node)
 }
 
 type defaultPeerHandler struct {
@@ -31,7 +32,6 @@ type defaultPeerHandler struct {
 	peers     map[string]peer.NodePeer
 	from      n.Node
 	eventChan chan dispatcher.Event
-	peerChan  chan message.Message
 	mutex     sync.Mutex
 }
 
@@ -42,76 +42,75 @@ func DefaultPeerHandler(node n.Node) *defaultPeerHandler {
 		peers:     make(map[string]peer.NodePeer),
 		from:      node,
 		eventChan: evCh,
-		peerChan:  make(chan message.Message, 10),
 	}
 }
 
-func (d *defaultPeerHandler) Handle(c peer.NodePeer) {
-	timer := time.NewTimer(time.Second * 2)
-	select {
-	case <-timer.C:
-		log.Println("PeerHandler has not receive response, Timeout")
-		return
-	case msg, open := <-c.ReceiveChan():
-		if !open {
-			log.Println("Closed receiveChan, exit")
-			return
+func (d *defaultPeerHandler) HandleHello(c peer.NodePeer, msg message.Message) (message.Message, error) {
+	log.Println("Peer Handler Hello", msg)
+	c.Identify(msg.(*message.Hello).From)
+	err := d.accept(c)
+	if err != nil {
+		c.Exit()
+
+		d.eventChan <- &peer.OnPeerAbortedEvent{
+			Node:  msg.(*message.Hello).From,
+			Event: peer.PeerStatusError,
 		}
-		timer.Stop()
 
-		switch msg.(type) {
-		case *message.Hello:
-			c.Identify(msg.(*message.Hello).From)
-			err := d.accept(c)
-			if err != nil {
-				c.Send(&message.Abort{Id: msg.(*message.Hello).Id, From: d.from, Details: map[string]interface{}{"foo_bar": 1231}})
-				c.Exit()
-
-				d.eventChan <- &peer.OnPeerAbortedEvent{
-					Node:  msg.(*message.Hello).From,
-					Event: peer.PeerStatusError,
-				}
-
-				return
-			}
-			c.Send(&message.Welcome{Id: msg.(*message.Hello).Id, From: d.from, Details: map[string]interface{}{"foo_bar": 1231}})
-
-			go d.watcher.Watch(c)
-			d.eventChan <- &peer.OnPeerConnectedEvent{
-				Node:  msg.(*message.Hello).From,
-				Event: peer.PeerStatusConnected,
-				Peer:  c,
-			}
-
-		case *message.Welcome:
-			err := d.accept(c)
-			if err != nil {
-				d.eventChan <- &peer.OnPeerErroredEvent{
-					Node:  c.Node(),
-					Event: peer.PeerStatusError,
-					Error: err,
-				}
-
-				return
-			} else {
-				go d.watcher.Watch(c)
-				d.eventChan <- &peer.OnPeerConnectedEvent{
-					Node:  c.Node(),
-					Event: peer.PeerStatusConnected,
-					Peer:  c,
-				}
-			}
-		case *message.Abort:
-			d.eventChan <- &peer.OnPeerAbortedEvent{
-				Node:  c.Node(),
-				Event: peer.PeerStatusAbort,
-			}
-		default:
-			log.Println("Unexpected type On response ")
-		}
+		return &message.Abort{Id: msg.(*message.Hello).Id, From: d.from}, nil
 	}
 
-	return
+	//go d.watcher.Watch(c)
+	d.eventChan <- &peer.OnPeerConnectedEvent{
+		Node:  msg.(*message.Hello).From,
+		Event: peer.PeerStatusConnected,
+		Peer:  c,
+	}
+
+	return &message.Welcome{Id: msg.(*message.Hello).Id, From: d.from}, nil
+}
+
+func (d *defaultPeerHandler) HandleWelcome(c peer.NodePeer, msg message.Message) (message.Message, error) {
+	log.Println("Peer Handler Welcome", msg)
+	err := d.accept(c)
+	if err != nil {
+		d.eventChan <- &peer.OnPeerErroredEvent{
+			Node:  c.Node(),
+			Event: peer.PeerStatusError,
+			Error: err,
+		}
+
+		return &message.Error{Id: msg.(*message.Welcome).Id, From: d.from}, err
+	} else {
+		//go d.watcher.Watch(c)
+		d.eventChan <- &peer.OnPeerConnectedEvent{
+			Node:  c.Node(),
+			Event: peer.PeerStatusConnected,
+			Peer:  c,
+		}
+		return &message.Done{Id: msg.(*message.Welcome).Id, From: d.from}, nil
+	}
+}
+
+func (d *defaultPeerHandler) HandleAbort(c peer.NodePeer, msg message.Message) (message.Message, error) {
+	log.Println("Peer Handler Abort", msg)
+	d.eventChan <- &peer.OnPeerAbortedEvent{
+		Node:  c.Node(),
+		Event: peer.PeerStatusAbort,
+	}
+
+	c.Exit()
+	return &message.Done{Id: msg.(*message.Abort).Id, From: d.from}, nil
+}
+
+func (d *defaultPeerHandler) HandleDone(c peer.NodePeer, msg message.Message) (message.Message, error) {
+	log.Println("Peer Handler Done", msg)
+	return nil, nil
+}
+
+func (d *defaultPeerHandler) HandleError(c peer.NodePeer, msg message.Message) (message.Message, error) {
+	log.Println("Peer Handler Error", msg)
+	return nil, nil
 }
 
 func (h *defaultPeerHandler) Events() chan dispatcher.Event {
@@ -120,14 +119,6 @@ func (h *defaultPeerHandler) Events() chan dispatcher.Event {
 
 func (h *defaultPeerHandler) Route(m message.Message) {
 
-}
-
-func (h *defaultPeerHandler) AggregatedChan() chan message.Message {
-	return h.peerChan
-}
-
-func (h *defaultPeerHandler) Len() int {
-	return len(h.peers)
 }
 
 func (h *defaultPeerHandler) accept(p peer.NodePeer) error {
@@ -139,8 +130,6 @@ func (h *defaultPeerHandler) accept(p peer.NodePeer) error {
 		return fmt.Errorf("Peer: %s Already registered", node.String())
 	}
 	h.peers[node.String()] = p
-	//Agregate receiving Chann
-	go h.aggregate(p.ReceiveChan())
 
 	return nil
 }
@@ -158,28 +147,4 @@ func (h *defaultPeerHandler) Remove(p peer.NodePeer) error {
 	//@TODO: Close aggregated channel
 
 	return nil
-}
-
-func (h *defaultPeerHandler) InitDialClient(destination n.Node) {
-	log.Println("Starting Dial Client from Node ", h.from.String(), "destination: ", destination.String())
-	//Blocking call, wait until connection success
-	p := peer.NewDialer(h.from, destination)
-	go p.Run()
-
-	//Say Hello and wait response
-	p.SayHello()
-
-	h.Handle(p)
-}
-
-func (h *defaultPeerHandler) aggregate(c chan message.Message) {
-	for {
-		select {
-		case m, open := <-c:
-			if !open {
-				return
-			}
-			h.peerChan <- m
-		}
-	}
 }

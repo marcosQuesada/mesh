@@ -57,6 +57,7 @@ func NewDialer(from n.Node, destination n.Node) *Peer {
 			break
 		}
 	}
+	log.Println("Connected from", from, "to ", destination)
 	return &Peer{
 		from:        from,
 		Link:        NewJSONSocketLink(conn),
@@ -107,7 +108,7 @@ func (p *Peer) Exit() {
 	<-p.doneChan
 
 	close(p.messageChan)
-	log.Println("BYE ", p.From())
+	log.Println("BYE ", p.Node())
 }
 
 func (p *Peer) Node() n.Node {
@@ -128,7 +129,9 @@ func (p *Peer) Identify(n n.Node) {
 }
 
 func (p *Peer) Commit(msg message.Message) {
-	p.sendChan <- msg
+	if p.sendChan != nil {
+		p.sendChan <- msg
+	}
 }
 
 func (p *Peer) receiveLoop() {
@@ -137,10 +140,11 @@ func (p *Peer) receiveLoop() {
 		msg, err := p.Receive()
 		if err != nil {
 			if err != io.ErrClosedPipe && err != io.EOF {
-				log.Println("Error Receiving: ", err, " exiting", p.from)
+				log.Println("Error Receiving: ", err, " exiting", p.to, p.mode)
 			}
 			return
 		}
+		log.Println("Receive Loop ", msg.MessageType(), "to", p.to, p.mode)
 		p.dataChan <- msg
 	}
 }
@@ -153,13 +157,13 @@ func (p *Peer) handle() {
 		select {
 		case msg, open := <-p.dataChan:
 			if !open {
-				log.Println("Data channel is closed, return", p.to)
+				log.Println("Data channel is closed, return", p.to, p.mode)
 				return
 			}
 			p.messageChan <- msg
 
 		case <-p.exitChan:
-			log.Println("Peer handleLoop exits", p.to)
+			log.Println("Peer handle Loop exits", p.to, p.mode)
 			return
 		}
 	}
@@ -167,21 +171,26 @@ func (p *Peer) handle() {
 
 func (p *Peer) handleSendChan() {
 	defer close(p.sendChan)
+	defer p.nilSendChan()
 
 	for {
 		select {
 		case msg, open := <-p.sendChan:
 			if !open {
-				log.Println("Send channel is closed, return", p.to)
+				log.Println("Send channel is closed, return", p.to, p.mode)
 				return
 			}
 			p.Send(msg)
 
 		case <-p.exitChan:
-			log.Println("Peer handleLoop exits", p.to)
+			log.Println("Peer handleSendChan exits", p.to, p.mode)
 			return
 		}
 	}
+}
+
+func (p *Peer) nilSendChan() {
+	p.sendChan = nil
 }
 
 // Nop Peer is Used on testing

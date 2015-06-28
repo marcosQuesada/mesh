@@ -26,6 +26,8 @@ func (mt MsgType) New() Message {
 		return &Pong{}
 	case GOODBYE:
 		return &GoodBye{}
+	case DONE:
+		return &Done{}
 	case ERROR:
 		return &Error{}
 	}
@@ -40,6 +42,7 @@ const (
 	PING    = MsgType(3)
 	PONG    = MsgType(4)
 	GOODBYE = MsgType(5)
+	DONE    = MsgType(90)
 	ERROR   = MsgType(99)
 )
 
@@ -157,6 +160,25 @@ func (h GoodBye) Origin() n.Node {
 }
 
 func (h GoodBye) Destination() n.Node {
+	return h.To
+}
+
+type Done struct {
+	Id      int
+	From    n.Node
+	To      n.Node
+	Details map[string]interface{}
+}
+
+func (g Done) MessageType() MsgType {
+	return DONE
+}
+
+func (h Done) Origin() n.Node {
+	return h.From
+}
+
+func (h Done) Destination() n.Node {
 	return h.To
 }
 

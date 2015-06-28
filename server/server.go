@@ -1,15 +1,18 @@
 package server
 
 import (
+	"log"
+	"net"
+
 	"github.com/marcosQuesada/mesh/cli"
 	"github.com/marcosQuesada/mesh/cluster"
 	"github.com/marcosQuesada/mesh/config"
 	"github.com/marcosQuesada/mesh/dispatcher"
+	"github.com/marcosQuesada/mesh/message"
 	n "github.com/marcosQuesada/mesh/node"
 	"github.com/marcosQuesada/mesh/peer"
 	"github.com/marcosQuesada/mesh/peer_handler"
-	"log"
-	"net"
+	"github.com/marcosQuesada/mesh/router"
 )
 
 type Server struct {
@@ -17,6 +20,7 @@ type Server struct {
 	node        n.Node
 	peerHandler peer_handler.PeerHandler
 	exit        chan bool
+	router      router.Router
 }
 
 func New(c *config.Config) *Server {
@@ -33,6 +37,14 @@ func (s *Server) Start() {
 
 	c := cluster.StartCoordinator(s.node, s.config.Cluster, s.peerHandler)
 	go c.Run()
+
+	r := router.New(s.node)
+	r.RegisterHandler(message.HELLO, s.peerHandler.HandleHello)
+	r.RegisterHandler(message.WELCOME, s.peerHandler.HandleWelcome)
+	r.RegisterHandler(message.ABORT, s.peerHandler.HandleAbort)
+	r.RegisterHandler(message.DONE, s.peerHandler.HandleDone)
+	r.RegisterHandler(message.ERROR, s.peerHandler.HandleError)
+	s.router = r
 
 	d := dispatcher.New()
 	d.RegisterListener(&peer.OnPeerConnectedEvent{}, c.OnPeerConnectedEvent)
@@ -83,7 +95,7 @@ func (s *Server) startAcceptorPeers(listener net.Listener) {
 		c := peer.NewAcceptor(conn, s.node)
 		go c.Run()
 
-		s.peerHandler.Handle(c)
+		s.router.Accept(c)
 	}
 }
 
@@ -95,7 +107,7 @@ func (s *Server) startDialPeers() {
 			continue
 		}
 
-		go s.peerHandler.InitDialClient(node)
+		go s.router.InitDialClient(node)
 	}
 }
 

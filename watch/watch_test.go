@@ -2,14 +2,15 @@ package watch
 
 import (
 	"fmt"
-	"github.com/marcosQuesada/mesh/dispatcher"
-	"github.com/marcosQuesada/mesh/message"
-	"github.com/marcosQuesada/mesh/node"
-	"github.com/marcosQuesada/mesh/peer"
 	"net"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/marcosQuesada/mesh/dispatcher"
+	"github.com/marcosQuesada/mesh/message"
+	"github.com/marcosQuesada/mesh/node"
+	"github.com/marcosQuesada/mesh/peer"
 )
 
 func TestBasicPingPongOverPipesChannel(t *testing.T) {
@@ -36,9 +37,9 @@ func TestBasicPingPongOverPipesChannel(t *testing.T) {
 		defer wg.Done()
 		for {
 			select {
-			case r, open := <-c1Mirror.PingChan():
+			case r, open := <-c1Mirror.ReceiveChan():
 				if !open {
-					fmt.Println("PingChan Closed")
+					fmt.Println("ReceiveChan Closed")
 					return
 				}
 				ping := r.(*message.Ping)
@@ -127,47 +128,46 @@ func TestPingPongOverMultiplePipesChannel(t *testing.T) {
 		defer wg.Done()
 		for {
 			select {
-			case r, open := <-c1Mirror.PingChan():
+			case r, open := <-c1Mirror.ReceiveChan():
 				if !open {
 					fmt.Println("Pingchan closed , exits")
 					return
 				}
-				ping := r.(*message.Ping)
+				ping, ok := r.(*message.Ping)
+				if !ok {
+					pong := r.(*message.Pong)
+					fmt.Println("c1Mirror PONG received from ", pong.From.String(), "ID ", pong.Id)
+					continue
+				}
 				fmt.Println("c1Mirror PING received from ", ping.From.String())
 				pong := &message.Pong{Id: ping.Id, From: ping.To, To: ping.From}
 				c1Mirror.Send(pong)
 
-			case r, open := <-c1Mirror.PongChan():
-				if !open {
-					fmt.Println("PongChan Closed, exits")
-					return
-				}
-				pong := r.(*message.Pong)
-				fmt.Println("c1Mirror PONG received from ", pong.From.String(), "ID ", pong.Id)
-
-			case r, open := <-c2Mirror.PingChan():
+			case r, open := <-c2Mirror.ReceiveChan():
 				if !open {
 					fmt.Println("Pingchan closed , exits")
 					return
 				}
-				ping := r.(*message.Ping)
+				ping, ok := r.(*message.Ping)
+				if !ok {
+					pong := r.(*message.Pong)
+					fmt.Println("c1Mirror PONG received from ", pong.From.String(), "ID ", pong.Id)
+					continue
+				}
 				pong := &message.Pong{Id: ping.Id, From: ping.To, To: ping.From}
 				c2Mirror.Send(pong)
 
-			case r, open := <-c2Mirror.PongChan():
-				if !open {
-					fmt.Println("PongChan Closed, exits")
-					return
-				}
-				pong := r.(*message.Pong)
-				fmt.Println("c2Mirror PONG received from ", pong.From.String(), "ID ", pong.Id)
-
-			case r, open := <-c3Mirror.PingChan():
+			case r, open := <-c3Mirror.ReceiveChan():
 				if !open {
 					fmt.Println("PingChan Closed, exits")
 					return
 				}
-				ping := r.(*message.Ping)
+				ping, ok := r.(*message.Ping)
+				if !ok {
+					pong := r.(*message.Pong)
+					fmt.Println("c1Mirror PONG received from ", pong.From.String(), "ID ", pong.Id)
+					continue
+				}
 				fmt.Println("c3Mirror PING received from ", ping.From.String())
 				pong := &message.Pong{Id: ping.Id, From: ping.To, To: ping.From}
 				c3Mirror.Send(pong)
@@ -176,17 +176,6 @@ func TestPingPongOverMultiplePipesChannel(t *testing.T) {
 					return
 				}
 
-			case r, open := <-c3Mirror.PongChan():
-				if !open {
-					fmt.Println("PongChan Closed, exits")
-					return
-				}
-				pong := r.(*message.Pong)
-				fmt.Println("c3Mirror PONG received from ", pong.From.String(), "ID ", pong.Id)
-				last = pong.Id
-				if last == total {
-					return
-				}
 			case <-doneChan:
 				return
 			default:
@@ -203,9 +192,9 @@ func TestPingPongOverMultiplePipesChannel(t *testing.T) {
 	go w.Watch(c3)
 
 	time.Sleep(time.Second * 3)
-	c1Mirror.Send(&message.Ping{Id: 0, From: c1Mirror.From(), To: c1Mirror.Node()})
-	c2Mirror.Send(&message.Ping{Id: 0, From: c2Mirror.From(), To: c2Mirror.Node()})
-	c3Mirror.Send(&message.Ping{Id: 0, From: c3Mirror.From(), To: c3Mirror.Node()})
+	c1Mirror.Commit(&message.Ping{Id: 0, From: c1Mirror.From(), To: c1Mirror.Node()})
+	c2Mirror.Commit(&message.Ping{Id: 0, From: c2Mirror.From(), To: c2Mirror.Node()})
+	c3Mirror.Commit(&message.Ping{Id: 0, From: c3Mirror.From(), To: c3Mirror.Node()})
 
 	wg.Wait()
 	close(doneChan)

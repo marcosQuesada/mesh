@@ -1,12 +1,13 @@
 package cluster
 
 import (
+	"log"
+
 	"github.com/marcosQuesada/mesh/dispatcher"
 	"github.com/marcosQuesada/mesh/message"
 	n "github.com/marcosQuesada/mesh/node"
 	"github.com/marcosQuesada/mesh/peer"
 	"github.com/marcosQuesada/mesh/peer_handler"
-	"log"
 )
 
 // Coordinator takes cares on all cluster related tasks
@@ -43,8 +44,8 @@ func (c *Coordinator) Run() {
 		select {
 		case <-c.exitChan:
 			return
-		case m := <-c.peerHandler.AggregatedChan():
-			log.Println("SERVER: Received Message on Main Channel ", m)
+			/*		case m := <-c.peerHandler.AggregatedChan():
+					log.Println("SERVER: Received Message on Main Channel ", m)*/
 		}
 	}
 }
@@ -67,7 +68,7 @@ func (c *Coordinator) OnPeerDisconnected(e dispatcher.Event) {
 
 	c.peerHandler.Remove(event.Peer)
 	//restart Dial Peer and try again
-	go c.peerHandler.InitDialClient(event.Node)
+	//go c.peerHandler.InitDialClient(event.Node)
 }
 
 func (c *Coordinator) OnPeerAborted(e dispatcher.Event) {
