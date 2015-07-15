@@ -114,7 +114,7 @@ func (w *defaultWatcher) Watch(p peer.NodePeer) {
 						w.eventChan <- &peer.OnPeerDisconnectedEvent{
 							Node:  p.Node(),
 							Event: peer.PeerStatusDisconnected,
-							Peer:  p,
+							//Peer:  p,
 						}
 
 						s.Done <- true

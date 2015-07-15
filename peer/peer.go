@@ -106,9 +106,8 @@ func (p *Peer) Run() {
 func (p *Peer) Exit() {
 	close(p.exitChan)
 	<-p.doneChan
-
 	close(p.messageChan)
-	log.Println("BYE ", p.Node(), p.mode)
+	//	log.Println("exit done ", p.Node(), p.mode, p.Id())
 }
 
 func (p *Peer) Node() n.Node {
@@ -156,7 +155,9 @@ func (p *Peer) handle() {
 		select {
 		case msg, open := <-p.dataChan:
 			if !open {
-				log.Println("Data channel is closed, return", p.to, p.mode)
+				//peer disconnected, exit
+				go p.Exit()
+
 				return
 			}
 			p.messageChan <- msg

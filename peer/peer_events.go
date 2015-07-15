@@ -9,7 +9,7 @@ import (
 type OnPeerConnectedEvent struct {
 	Node  node.Node
 	Event message.Status
-	Peer  NodePeer
+	//Peer  NodePeer
 }
 
 func (m OnPeerConnectedEvent) GetEventType() dispatcher.EventType {
@@ -38,7 +38,7 @@ func (m OnPeerErroredEvent) GetEventType() dispatcher.EventType {
 type OnPeerDisconnectedEvent struct {
 	Node  node.Node
 	Event message.Status
-	Peer  NodePeer
+	//Peer  NodePeer
 }
 
 func (m OnPeerDisconnectedEvent) GetEventType() dispatcher.EventType {
