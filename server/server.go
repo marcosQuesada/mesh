@@ -8,43 +8,32 @@ import (
 	"github.com/marcosQuesada/mesh/cluster"
 	"github.com/marcosQuesada/mesh/config"
 	"github.com/marcosQuesada/mesh/dispatcher"
-	"github.com/marcosQuesada/mesh/message"
 	n "github.com/marcosQuesada/mesh/node"
 	"github.com/marcosQuesada/mesh/peer"
-	"github.com/marcosQuesada/mesh/peer_handler"
 	"github.com/marcosQuesada/mesh/router"
 )
 
 type Server struct {
-	config      *config.Config
-	node        n.Node
-	peerHandler peer_handler.PeerHandler
-	exit        chan bool
-	router      router.Router
+	config *config.Config
+	node   n.Node
+	exit   chan bool
+	router router.Router
 }
 
 func New(c *config.Config) *Server {
 	return &Server{
-		config:      c,
-		exit:        make(chan bool),
-		node:        c.Addr,
-		peerHandler: peer_handler.DefaultPeerHandler(c.Addr),
+		config: c,
+		exit:   make(chan bool),
+		node:   c.Addr,
+		router: router.New(c.Addr),
 	}
 }
 
 func (s *Server) Start() {
-	defer close(s.exit)
-
-	c := cluster.StartCoordinator(s.node, s.config.Cluster, s.peerHandler)
+	c := cluster.StartCoordinator(s.node, s.config.Cluster)
 	go c.Run()
 
-	r := router.New(s.node)
-	r.RegisterHandler(message.HELLO, s.peerHandler.HandleHello)
-	r.RegisterHandler(message.WELCOME, s.peerHandler.HandleWelcome)
-	r.RegisterHandler(message.ABORT, s.peerHandler.HandleAbort)
-	r.RegisterHandler(message.DONE, s.peerHandler.HandleDone)
-	r.RegisterHandler(message.ERROR, s.peerHandler.HandleError)
-	s.router = r
+	//s.router.RegisterHandler(message.ERROR, s.peerHandler.HandleError)
 
 	d := dispatcher.New()
 	d.RegisterListener(&peer.OnPeerConnectedEvent{}, c.OnPeerConnectedEvent)
@@ -53,7 +42,7 @@ func (s *Server) Start() {
 	d.RegisterListener(&peer.OnPeerErroredEvent{}, c.OnPeerErrored)
 
 	go d.Run()
-	go d.Aggregate(s.peerHandler.Events())
+	go d.Aggregate(s.router.Events())
 
 	s.startDialPeers()
 	s.startServer()
@@ -61,7 +50,9 @@ func (s *Server) Start() {
 }
 
 func (s *Server) Close() {
-	s.exit <- true
+	//d.Exit()
+
+	close(s.exit)
 }
 
 func (s *Server) run() {

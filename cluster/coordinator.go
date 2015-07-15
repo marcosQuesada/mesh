@@ -7,7 +7,6 @@ import (
 	"github.com/marcosQuesada/mesh/message"
 	n "github.com/marcosQuesada/mesh/node"
 	"github.com/marcosQuesada/mesh/peer"
-	"github.com/marcosQuesada/mesh/peer_handler"
 )
 
 // Coordinator takes cares on all cluster related tasks
@@ -24,18 +23,17 @@ const (
 )
 
 type Coordinator struct {
-	peerHandler peer_handler.PeerHandler
-	from        n.Node
-	members     map[string]n.Node
-	exitChan    chan bool
+	//peerHandler peer_handler.PeerHandler
+	from     n.Node
+	members  map[string]n.Node
+	exitChan chan bool
 }
 
-func StartCoordinator(from n.Node, members map[string]n.Node, clh peer_handler.PeerHandler) *Coordinator {
+func StartCoordinator(from n.Node, members map[string]n.Node) *Coordinator {
 	return &Coordinator{
-		peerHandler: clh,
-		from:        from,
-		members:     members,
-		exitChan:    make(chan bool, 0),
+		from:     from,
+		members:  members,
+		exitChan: make(chan bool, 0),
 	}
 }
 
@@ -57,7 +55,7 @@ func (c *Coordinator) Exit() {
 func (c *Coordinator) OnPeerConnectedEvent(e dispatcher.Event) {
 	event := e.(*peer.OnPeerConnectedEvent)
 	c.members[event.Node.String()] = event.Node
-	log.Println("OnPeerConnectedEvent, adding peer", event.Node.String(), "mode:", event.Peer.Mode())
+	log.Println("OnPeerConnectedEvent, adding peer", event.Node.String()) //, "mode:", event.Peer.Mode()
 }
 
 func (c *Coordinator) OnPeerDisconnected(e dispatcher.Event) {
@@ -66,7 +64,7 @@ func (c *Coordinator) OnPeerDisconnected(e dispatcher.Event) {
 
 	log.Println("OnPeerDisconnectedEvent, removing peer", event.Node.String())
 
-	c.peerHandler.Remove(event.Peer)
+	//c.peerHandler.Remove(event.Peer)
 	//restart Dial Peer and try again
 	//go c.peerHandler.InitDialClient(event.Node)
 }
