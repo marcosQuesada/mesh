@@ -10,6 +10,7 @@ import (
 	"github.com/marcosQuesada/mesh/message"
 	"github.com/marcosQuesada/mesh/node"
 	"github.com/marcosQuesada/mesh/peer"
+	"github.com/marcosQuesada/mesh/watch"
 )
 
 type Router interface {
@@ -34,16 +35,20 @@ type defaultRouter struct {
 	peerIDs   map[peer.ID]bool
 	eventChan chan dispatcher.Event
 	exit      chan bool
+	watcher   watch.Watcher
 	mutex     sync.Mutex
 }
 
 func New(n node.Node) *defaultRouter {
+	evChan := make(chan dispatcher.Event, 10)
+	w := watch.New(evChan, 2)
 	r := &defaultRouter{
 		from:      n,
 		peers:     make(map[string]peer.NodePeer),
 		peerIDs:   make(map[peer.ID]bool, 0),
-		eventChan: make(chan dispatcher.Event, 10),
+		eventChan: evChan,
 		exit:      make(chan bool),
+		watcher:   w,
 	}
 	//initialize local handlers
 	r.handlers = map[message.MsgType]Handler{
@@ -51,6 +56,8 @@ func New(n node.Node) *defaultRouter {
 		message.WELCOME: r.HandleWelcome,
 		message.ABORT:   r.HandleAbort,
 		message.ERROR:   r.HandleError,
+		message.PING:    w.HandlePing,
+		message.PONG:    w.HandlePong,
 	}
 
 	return r
@@ -136,45 +143,6 @@ func (r *defaultRouter) Exit() {
 	close(r.exit)
 }
 
-func (r *defaultRouter) HandleHello(c peer.NodePeer, msg message.Message) (message.Message, error) {
-	c.Identify(msg.(*message.Hello).From)
-	err := r.accept(c)
-	if err != nil {
-		r.eventChan <- &peer.OnPeerAbortedEvent{msg.(*message.Hello).From, peer.PeerStatusError}
-
-		return &message.Abort{Id: msg.(*message.Hello).Id, From: r.from}, nil
-	}
-	r.eventChan <- &peer.OnPeerConnectedEvent{msg.(*message.Hello).From, peer.PeerStatusConnected}
-
-	return &message.Welcome{Id: msg.(*message.Hello).Id, From: r.from}, nil
-}
-
-func (r *defaultRouter) HandleWelcome(c peer.NodePeer, msg message.Message) (message.Message, error) {
-	err := r.accept(c)
-	if err != nil {
-		r.eventChan <- &peer.OnPeerErroredEvent{c.Node(), peer.PeerStatusError, err}
-
-		return &message.Error{Id: msg.(*message.Welcome).Id, From: r.from}, err
-	}
-	r.eventChan <- &peer.OnPeerConnectedEvent{c.Node(), peer.PeerStatusConnected}
-
-	return nil, nil
-
-}
-
-func (r *defaultRouter) HandleAbort(c peer.NodePeer, msg message.Message) (message.Message, error) {
-	r.eventChan <- &peer.OnPeerAbortedEvent{c.Node(), peer.PeerStatusAbort}
-	c.Exit()
-
-	return nil, nil
-}
-
-func (r *defaultRouter) HandleError(c peer.NodePeer, msg message.Message) (message.Message, error) {
-	log.Println("HandleError ", c.Node(), "msg:", msg)
-
-	return nil, nil
-}
-
 func (r *defaultRouter) Events() chan dispatcher.Event {
 	return r.eventChan
 }
@@ -199,7 +167,6 @@ func (r *defaultRouter) accept(p peer.NodePeer) error {
 		return fmt.Errorf("Peer: %s Already registered", node.String())
 	}
 
-	log.Println("accept peer ", p.Node(), p.Mode(), p.Id())
 	r.peers[node.String()] = p
 	r.peerIDs[p.Id()] = true
 
@@ -215,7 +182,6 @@ func (r *defaultRouter) remove(p peer.NodePeer) error {
 		return fmt.Errorf("Peer Not found")
 	}
 
-	log.Println("remove peer ", p.Node(), p.Mode(), p.Id())
 	delete(r.peers, node.String())
 	delete(r.peerIDs, p.Id())
 
