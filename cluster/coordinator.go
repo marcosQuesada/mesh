@@ -23,7 +23,6 @@ const (
 )
 
 type Coordinator struct {
-	//peerHandler peer_handler.PeerHandler
 	from     n.Node
 	members  map[string]n.Node
 	exitChan chan bool
@@ -42,8 +41,6 @@ func (c *Coordinator) Run() {
 		select {
 		case <-c.exitChan:
 			return
-			/*		case m := <-c.peerHandler.AggregatedChan():
-					log.Println("SERVER: Received Message on Main Channel ", m)*/
 		}
 	}
 }
@@ -55,7 +52,8 @@ func (c *Coordinator) Exit() {
 func (c *Coordinator) OnPeerConnectedEvent(e dispatcher.Event) {
 	event := e.(*peer.OnPeerConnectedEvent)
 	c.members[event.Node.String()] = event.Node
-	log.Println("OnPeerConnectedEvent, adding peer", event.Node.String()) //, "mode:", event.Peer.Mode()
+
+	log.Println("OnPeerConnectedEvent, adding peer", event.Node.String(), "mode:", event.Mode)
 }
 
 func (c *Coordinator) OnPeerDisconnected(e dispatcher.Event) {
@@ -63,10 +61,6 @@ func (c *Coordinator) OnPeerDisconnected(e dispatcher.Event) {
 	c.members[event.Node.String()] = event.Node
 
 	log.Println("OnPeerDisconnectedEvent, removing peer", event.Node.String())
-
-	//c.peerHandler.Remove(event.Peer)
-	//restart Dial Peer and try again
-	//go c.peerHandler.InitDialClient(event.Node)
 }
 
 func (c *Coordinator) OnPeerAborted(e dispatcher.Event) {

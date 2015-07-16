@@ -9,7 +9,7 @@ import (
 type OnPeerConnectedEvent struct {
 	Node  node.Node
 	Event message.Status
-	//Peer  NodePeer
+	Mode  string
 }
 
 func (m OnPeerConnectedEvent) GetEventType() dispatcher.EventType {

@@ -19,15 +19,18 @@ import (
 
 type Watcher interface {
 	Watch(peer.NodePeer)
+	HandlePing(peer.NodePeer, message.Message) (message.Message, error)
+	HandlePong(peer.NodePeer, message.Message) (message.Message, error)
 }
 
 type defaultWatcher struct {
-	eventChan    chan dispatcher.Event
-	exit         chan bool
-	pingInterval int
-	mutex        sync.RWMutex
-	index        map[string]*subject
-	wg           sync.WaitGroup
+	eventChan       chan dispatcher.Event
+	exit            chan bool
+	pingInterval    int
+	mutex           sync.RWMutex
+	index           map[string]*subject
+	requestListener *requestListener
+	wg              sync.WaitGroup
 }
 
 type subject struct {
@@ -57,24 +60,31 @@ func init() {
 	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds | log.Lshortfile)
 }
 func New(evCh chan dispatcher.Event, interval int) *defaultWatcher {
+	rl := &requestListener{
+		listeners: make(map[string]chan message.Message, 0),
+		timeout:   time.Duration(2),
+	}
+
 	return &defaultWatcher{
-		eventChan:    evCh,
-		exit:         make(chan bool, 0),
-		index:        make(map[string]*subject, 0),
-		pingInterval: interval,
+		eventChan:       evCh,
+		exit:            make(chan bool, 0),
+		index:           make(map[string]*subject, 0),
+		pingInterval:    interval,
+		requestListener: rl,
 	}
 }
 
 func (w *defaultWatcher) Watch(p peer.NodePeer) {
 	defer log.Println("Watcher", p.Node(), "Exits")
 	//add watcher to waitGroup
+	log.Println("Started Watcher to", p.Node())
 	w.wg.Add(1)
 	defer w.wg.Done()
 
 	//@TODO: Randomize this
 	tickerReset := make(chan bool, 10)
-	ticker := newTicker(w.pingInterval)
 	subjectDone := make(chan bool, 10)
+	ticker := newTicker(w.pingInterval)
 	s := &subject{
 		peer:        p,
 		ticker:      ticker,
@@ -89,72 +99,25 @@ func (w *defaultWatcher) Watch(p peer.NodePeer) {
 	w.index[node.String()] = s
 	w.mutex.Unlock()
 
-	//var timeout *time.Timer
 	for {
-		//timeout = time.NewTimer(time.Second * 3)
 		select {
-		case <-s.tickerReset:
-			log.Println("Reseting ticker to", p.Node())
-
-			//timeout.Stop()
-			s.ticker.Stop()
-			s.ticker = newTicker(w.pingInterval)
 		case <-s.ticker.C:
-			go func(id int) {
-				log.Println("Ticker PING", id, "id", s.getId(), "to", node.String())
-				ping := &message.Ping{Id: id, From: p.From(), To: node}
-				p.Send(ping)
+			id := s.getId()
+			p.Send(&message.Ping{Id: id, From: p.From(), To: node})
+			log.Println("Sended PING", id, "to", node.String())
+			requestId := w.requestListener.Id(p.From(), id)
+			w.requestListener.register(requestId)
+			log.Println("Waiting ", requestId)
 
-				timeout := time.NewTimer(time.Second * 3)
-				select {
-				case msg, open := <-p.ReceiveChan():
-					if !open {
-						log.Print("ReceiveChan closed, exit")
+			msg, err := w.requestListener.wait(requestId)
+			if err != nil {
+				log.Println("EEEEEEEEEEE Error Waiting requestListener ", requestId, err)
+			} else {
+				log.Println("XXX Message is ", msg)
+			}
 
-						w.eventChan <- &peer.OnPeerDisconnectedEvent{
-							Node:  p.Node(),
-							Event: peer.PeerStatusDisconnected,
-							//Peer:  p,
-						}
-
-						s.Done <- true
-						return
-					}
-					//remove timeout
-					timeout.Stop()
-					pong, ok := msg.(*message.Pong)
-					if ok {
-						if pong.Id != ping.Id {
-							log.Println("Mistmatched IDs!!!!!", pong.Id, ping.Id)
-						}
-						log.Println("Received Pong", pong.Id, "from", pong.From.String())
-						id++
-						s.setId(id)
-					} else {
-						ping := msg.(*message.Ping)
-						log.Println("XXX  Received Unexpected Ping", ping.Id, "from", ping.From.String())
-					}
-
-					/*				case <-timeout.C:
-									log.Println("Timeout id:", id, "IsDead", node.String())
-
-									w.eventChan <- &peer.OnPeerDisconnectedEvent{
-										Node:  p.Node(),
-										Event: peer.PeerStatusDisconnected,
-										Peer:  p,
-									}
-
-									s.peer.Exit()
-
-									return*/
-
-				//Watcher Done inside Pong Expectation
-				case <-s.Done:
-					timeout.Stop()
-
-					return
-				}
-			}(s.getId())
+			id++
+			s.setId(id)
 
 		case <-s.Done:
 			return
@@ -176,33 +139,22 @@ func (w *defaultWatcher) Exit() {
 	log.Println("Exiting Done")
 }
 
-/*
-func (w *defaultWatcher) watchPingChan(s *subject) {
-	defer log.Println("Exiting WatchPingChan ", s.peer.From())
-	for {
-		select {
-		case <-w.exit:
-			return
-		case msg, open := <-s.peer.PingChan():
-			if !open {
-				log.Println("Ping Channel closed, exit")
-				return
-			}
+func (w *defaultWatcher) HandlePing(c peer.NodePeer, msg message.Message) (message.Message, error) {
+	ping := msg.(*message.Ping)
+	log.Println("Received Ping", ping.Id, "from: ", ping.From.String())
 
-			//Reset ticker
-			s.tickerReset <- true
+	return &message.Pong{Id: ping.Id, From: ping.To, To: ping.From}, nil
+}
 
-			//if Ping received Return Pong
-			ping := msg.(*message.Ping)
-			log.Println("Received Ping", ping.Id, "on: ", ping.From.String())
-			pong := &message.Pong{Id: ping.Id, From: ping.To, To: ping.From}
-			s.peer.Send(pong)
+func (w *defaultWatcher) HandlePong(c peer.NodePeer, msg message.Message) (message.Message, error) {
+	log.Println("Handle Pong ", c.Node(), msg)
+	pong := msg.(*message.Pong)
+	requestID := w.requestListener.Id(c.From(), pong.Id)
+	w.requestListener.notify(msg, requestID)
 
+	return nil, nil
+}
 
-			log.Println("--Sended Pong", pong.Id, "to ", ping.From.String())
-		}
-	}
-}*/
 func newTicker(pingInterval int) *time.Ticker {
 	return time.NewTicker(time.Duration(pingInterval) * time.Second)
 }
