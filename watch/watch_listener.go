@@ -41,16 +41,23 @@ func (r *requestListener) register(requestID string) {
 }
 
 func (r *requestListener) wait(requestID string) (msg message.Message, err error) {
-	if wait, ok := r.listeners[requestID]; !ok {
+	timeout := time.NewTimer(time.Second * 2)
+	wait, ok := r.listeners[requestID]
+	if !ok {
 		return nil, fmt.Errorf("unknown listener ID: %v", requestID)
 	} else {
 		select {
 		case msg = <-wait:
 			log.Println("Wait done", requestID)
-			return
-		case <-time.NewTimer(time.Second * 2).C: //time.After(r.timeout)
+			timeout.Stop()
+
+		case <-timeout.C: //time.After(r.timeout)
 			err = fmt.Errorf("timeout while waiting for message")
-			return
+			panic(err)
 		}
 	}
+	close(wait)
+	delete(r.listeners, requestID)
+
+	return
 }
