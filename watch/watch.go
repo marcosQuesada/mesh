@@ -105,7 +105,7 @@ func (w *defaultWatcher) Watch(p peer.NodePeer) {
 			id := s.getId()
 			p.Send(&message.Ping{Id: id, From: p.From(), To: node})
 			log.Println("Sended PING", id, "to", node.String())
-			requestId := w.requestListener.Id(p.From(), id)
+			requestId := w.requestListener.Id(p.Node(), id)
 			w.requestListener.register(requestId)
 			log.Println("Waiting ", requestId)
 
@@ -149,8 +149,8 @@ func (w *defaultWatcher) HandlePing(c peer.NodePeer, msg message.Message) (messa
 func (w *defaultWatcher) HandlePong(c peer.NodePeer, msg message.Message) (message.Message, error) {
 	log.Println("Handle Pong ", c.Node(), msg)
 	pong := msg.(*message.Pong)
-	requestID := w.requestListener.Id(c.From(), pong.Id)
-	w.requestListener.notify(msg, requestID)
+	requestID := w.requestListener.Id(c.Node(), pong.Id)
+	go w.requestListener.notify(msg, requestID)
 
 	return nil, nil
 }
