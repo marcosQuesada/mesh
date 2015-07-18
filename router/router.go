@@ -106,6 +106,7 @@ func (r *defaultRouter) Accept(c *peer.Peer) {
 				response := r.Handle(c, msg)
 				if response != nil {
 					c.Commit(response)
+
 					if response.MessageType() == message.ABORT {
 						c.Exit()
 						return
