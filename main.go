@@ -7,6 +7,7 @@ import (
 	"os/signal"
 	"runtime"
 	"syscall"
+
 	"github.com/marcosQuesada/mesh/config"
 	"github.com/marcosQuesada/mesh/server"
 )

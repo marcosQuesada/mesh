@@ -9,6 +9,7 @@ package watch
 
 import (
 	"log"
+	"math/rand"
 	"sync"
 	"time"
 
@@ -34,19 +35,18 @@ type defaultWatcher struct {
 }
 
 type subject struct {
-	peer        peer.NodePeer
-	ticker      *time.Ticker
-	id          int
-	Done        chan bool
-	tickerReset chan bool
-	mutex       sync.Mutex
+	peer   peer.NodePeer
+	ticker *time.Ticker
+	id     int
+	Done   chan bool
+	mutex  sync.Mutex
 }
 
-func (s *subject) setId(id int) {
+func (s *subject) incId() {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	s.id = id
+	s.id++
 }
 
 func (s *subject) getId() int {
@@ -58,41 +58,34 @@ func (s *subject) getId() int {
 
 func init() {
 	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds | log.Lshortfile)
+	rand.Seed(time.Now().UTC().UnixNano())
 }
-func New(evCh chan dispatcher.Event, interval int) *defaultWatcher {
-	rl := &requestListener{
-		listeners: make(map[string]chan message.Message, 0),
-		timeout:   time.Duration(2),
-	}
 
+func New(evCh chan dispatcher.Event, interval int) *defaultWatcher {
 	return &defaultWatcher{
 		eventChan:       evCh,
 		exit:            make(chan bool, 0),
 		index:           make(map[string]*subject, 0),
-		pingInterval:    interval,
-		requestListener: rl,
+		pingInterval:    interval * 1000,
+		requestListener: newRequestListener(),
 	}
 }
 
 func (w *defaultWatcher) Watch(p peer.NodePeer) {
-	defer log.Println("Watcher", p.Node(), "Exits")
+	defer log.Println("XXX Watcher", p.Node(), "Exits")
+
 	//add watcher to waitGroup
-	log.Println("Started Watcher to", p.Node())
 	w.wg.Add(1)
 	defer w.wg.Done()
 
 	//@TODO: Randomize this
-	tickerReset := make(chan bool, 10)
 	subjectDone := make(chan bool, 10)
-	ticker := newTicker(w.pingInterval)
 	s := &subject{
-		peer:        p,
-		ticker:      ticker,
-		Done:        subjectDone,
-		tickerReset: tickerReset,
+		peer:   p,
+		ticker: w.newTicker(),
+		Done:   subjectDone,
 	}
 	defer close(s.Done)
-	defer close(s.tickerReset)
 
 	node := p.Node()
 	w.mutex.Lock()
@@ -102,23 +95,30 @@ func (w *defaultWatcher) Watch(p peer.NodePeer) {
 	for {
 		select {
 		case <-s.ticker.C:
-			id := s.getId()
-			p.Send(&message.Ping{Id: id, From: p.From(), To: node})
-			log.Println("Sended PING", id, "to", node.String())
-			requestId := w.requestListener.Id(p.Node(), id)
+			p.Commit(&message.Ping{Id: s.getId(), From: p.From(), To: node})
+			s.ticker.Stop()
+
+			requestId := w.requestListener.Id(p.Node(), s.getId())
 			w.requestListener.register(requestId)
-			log.Println("Waiting ", requestId)
+			log.Println("PING", s.getId(), "to", node.String(), "Waiting ", requestId)
 
 			msg, err := w.requestListener.wait(requestId)
 			if err != nil {
-				log.Println("EEEEEEEEEEE Error Waiting requestListener ", requestId, err)
-			} else {
-				log.Println("XXX Message is ", msg)
+				log.Println("RequestListener ", requestId, err)
+
+				return
 			}
 
-			id++
-			s.setId(id)
+			if msg.MessageType() != message.PONG {
+				log.Println("Error Unexpected Received type, expected PONG ", msg.MessageType(), "requestListener ", requestId, err)
+				//@TODO: used to check development stability
+				panic(err)
+			}
 
+			log.Println("PING PONG OK", s.getId(), "to", node.String(), "Waiting ", requestId)
+
+			s.incId()
+			s.ticker = w.newTicker()
 		case <-s.Done:
 			return
 		}
@@ -141,20 +141,20 @@ func (w *defaultWatcher) Exit() {
 
 func (w *defaultWatcher) HandlePing(c peer.NodePeer, msg message.Message) (message.Message, error) {
 	ping := msg.(*message.Ping)
-	log.Println("Received Ping", ping.Id, "from: ", ping.From.String())
+	log.Println("Handle Ping", ping.Id, "from: ", ping.From.String())
 
 	return &message.Pong{Id: ping.Id, From: ping.To, To: ping.From}, nil
 }
 
 func (w *defaultWatcher) HandlePong(c peer.NodePeer, msg message.Message) (message.Message, error) {
-	log.Println("Handle Pong ", c.Node(), msg)
 	pong := msg.(*message.Pong)
+	log.Println("Handle Pong ", pong.Id, c.Node(), "from: ", pong.From.String())
 	requestID := w.requestListener.Id(c.Node(), pong.Id)
 	go w.requestListener.notify(msg, requestID)
 
 	return nil, nil
 }
 
-func newTicker(pingInterval int) *time.Ticker {
-	return time.NewTicker(time.Duration(pingInterval) * time.Second)
+func (w *defaultWatcher) newTicker() *time.Ticker {
+	return time.NewTicker(time.Duration(w.pingInterval+rand.Intn(2000)) * time.Millisecond)
 }
