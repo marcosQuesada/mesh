@@ -1,19 +1,6 @@
 package watch
 
-import (
-	"fmt"
-	"net"
-	"sync"
-	"testing"
-	"time"
-
-	"github.com/marcosQuesada/mesh/dispatcher"
-	"github.com/marcosQuesada/mesh/message"
-	"github.com/marcosQuesada/mesh/node"
-	"github.com/marcosQuesada/mesh/peer"
-)
-
-func TestBasicPingPongOverPipesChannel(t *testing.T) {
+/*func TestBasicPingPongOverPipesChannel(t *testing.T) {
 	total := 2
 	timeInterval := 1
 	nodeA := node.Node{Host: "A", Port: 1}
@@ -221,3 +208,4 @@ func TestPingPongOverMultiplePipesChannel(t *testing.T) {
 	c3Mirror.Exit()
 	fmt.Println("3 mirror")
 }
+*/
