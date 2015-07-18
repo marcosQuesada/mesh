@@ -5,18 +5,27 @@ import (
 	"net"
 	"testing"
 	"time"
+
+	"github.com/marcosQuesada/mesh/config"
+	"github.com/marcosQuesada/mesh/message"
+	"github.com/marcosQuesada/mesh/node"
+	"github.com/marcosQuesada/mesh/peer"
+	"github.com/marcosQuesada/mesh/router"
 )
 
 func TestBasicServerClient(t *testing.T) {
-	config := &Config{
-		raft_addr: &Node{host: "localhost", port: 8001},
+	org := node.Node{Host: "localhost", Port: 8001}
+	config := &config.Config{
+		Addr: org,
 	}
 
 	srv := New(config)
+	srv.router = router.New(org)
 	srv.startServer()
 	time.Sleep(time.Millisecond * 100)
 
-	go func() {
+	done := make(chan bool)
+	go func(d chan bool) {
 		conn, err := net.Dial("tcp", "localhost:8001")
 		if err != nil {
 			fmt.Println("dial error:", err)
@@ -24,41 +33,23 @@ func TestBasicServerClient(t *testing.T) {
 		}
 		defer conn.Close()
 
-		peerA := NewSocketPeer(conn)
+		linkA := peer.NewJSONSocketLink(conn)
 
-		msg := Hello{
+		msg := message.Hello{
 			Id:      10,
 			Details: map[string]interface{}{"foo": "bar"},
 		}
-		peerA.Send(msg)
-	}()
+		linkA.Send(msg)
+		time.Sleep(time.Second)
+		done <- true
+	}(done)
 
-	time.Sleep(time.Millisecond * 500)
+	<-done
 
 	/*	peers := srv.PeerHandler.Peers()
 		if len(peers) != 1 {
 			t.Error("Unexpected Registered Peers size ", peers)
 		}
 		fmt.Println("Total Peer List is ", len(peers), peers)
-	*/
-	//Router Addition get in charge from ReadMessages Channel...so commented and wait!
-	/*
-		for _, p := range peers {
-			timeout := time.NewTimer(time.Second * 1)
-			select {
-			case m := <-p.ReadMessage():
-				if m == nil {
-					t.Error("Unexpected receive result")
-					r := <-p.ReadMessage()
-					fmt.Println("r is ", r)
-					t.Fail()
-				}
-				fmt.Println("Message is ", m)
-				if m.MessageType() != 0 {
-					t.Error("Error on received Hello Message ", m)
-				}
-			case <-timeout.C:
-				t.Error("Timeout receiving expected response")
-			}
 	*/
 }

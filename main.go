@@ -2,22 +2,22 @@ package main
 
 import (
 	"flag"
-	"github.com/marcosQuesada/mesh/server"
 	"log"
 	"os"
 	"os/signal"
 	"runtime"
 	"syscall"
+
+	"github.com/marcosQuesada/mesh/config"
+	"github.com/marcosQuesada/mesh/server"
 )
 
 func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
 	//Parse config
-	addr := flag.String("addr", "127.0.0.1:11000", "Port where Mesh is listen on")
-	raftAddr := flag.String("raft_addr", "127.0.0.1:12000", "cluster node listening address")
-	raftCluster := flag.String("raft_cluster", "127.0.0.1:12000,127.0.0.2:12001,127.0.0.3:12002", "cluster list definition separated by commas")
-	raftDataDir := flag.String("raft_data_dir", "./data/var0", "raft data store path")
+	addr := flag.String("addr", "127.0.0.1:12000", "Port where Mesh is listen on")
+	cluster := flag.String("cluster", "127.0.0.1:12000,127.0.0.1:12001,127.0.0.1:12002", "cluster list definition separated by commas")
 	//logFile := flag.String("logFile", "./log/log0.log", "log file")
 	flag.Parse()
 
@@ -25,10 +25,10 @@ func main() {
 	//f := handleFile(*logFile)
 	//defer f.Close()
 	//log.SetOutput(f)
-	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
+	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds | log.Lshortfile)
 
 	//Create COnfiguration
-	config := server.NewConfig(*addr, *raftAddr, *raftCluster, *raftDataDir)
+	config := config.NewConfig(*addr, *cluster)
 	//Define serfer from config
 	s := server.New(config)
 	c := make(chan os.Signal, 1)
@@ -49,7 +49,7 @@ func main() {
 	}()
 
 	//Server Run
-	s.Run()
+	s.Start()
 }
 
 func handleFile(logFile string) (f *os.File) {

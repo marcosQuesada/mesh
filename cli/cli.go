@@ -1,7 +1,7 @@
-package server
+package cli
 
 import (
-	"bufio"
+	//"bufio"
 	//"fmt"
 	"log"
 	"net"
@@ -9,24 +9,24 @@ import (
 )
 
 type CliSession struct {
-	conn   net.Conn
-	server *Server // Used as reflection
+	Conn net.Conn
+	//server *Server // Used as reflection
 	finish bool
 }
 
-func (c *CliSession) handle() {
-	defer c.conn.Close()
-	for !c.finish {
-		message, err := bufio.NewReader(c.conn).ReadString('\n')
-		if err != nil {
-			log.Print("Error Receiving on server, err ", err)
-			return
-		}
+func (c *CliSession) Handle() {
+	/*	defer c.conn.Close()
+		for !c.finish {
+			message, err := bufio.NewReader(c.conn).ReadString('\n')
+			if err != nil {
+				log.Print("Error Receiving on server, err ", err)
+				return
+			}
 
-		c.process(message)
+			c.process(message)
 
-		log.Println("Server received Message ", message)
-	}
+			log.Println("Server received Message ", message)
+		}*/
 }
 
 func (c *CliSession) process(line string) {
@@ -41,7 +41,7 @@ func (c *CliSession) process(line string) {
 					response = response + " " + key + "\n"
 				}*/
 	case "SHUTDOWN":
-		c.server.Close()
+		//c.server.Close()
 		response = "Server Shutting down \n"
 	case "EXIT":
 		c.finish = true
@@ -52,7 +52,7 @@ func (c *CliSession) process(line string) {
 }
 
 func (c *CliSession) send(response string) {
-	_, err := c.conn.Write([]byte(response))
+	_, err := c.Conn.Write([]byte(response))
 	if err != nil {
 		log.Println("Error Writting on socket ", err)
 	}

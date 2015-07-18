@@ -1,100 +1,110 @@
 package server
 
 import (
-	"fmt"
-	"io"
 	"log"
 	"net"
+
+	"github.com/marcosQuesada/mesh/cli"
+	"github.com/marcosQuesada/mesh/cluster"
+	"github.com/marcosQuesada/mesh/config"
+	"github.com/marcosQuesada/mesh/dispatcher"
+	n "github.com/marcosQuesada/mesh/node"
+	"github.com/marcosQuesada/mesh/peer"
+	"github.com/marcosQuesada/mesh/router"
 )
 
 type Server struct {
-	Router
-
-	config *Config
-
-	node *Node
-	exit chan bool
+	config *config.Config
+	node   n.Node
+	exit   chan bool
+	router router.Router
 }
 
-func New(c *Config) *Server {
+func New(c *config.Config) *Server {
 	return &Server{
-		Router: NewRouter(),
-
 		config: c,
 		exit:   make(chan bool),
-		node:   c.raft_addr,
+		node:   c.Addr,
+		router: router.New(c.Addr),
 	}
 }
 
-func (s *Server) Run() {
-	defer close(s.exit)
+func (s *Server) Start() {
+	c := cluster.StartCoordinator(s.node, s.config.Cluster)
+	go c.Run()
 
+	//s.router.RegisterHandler(message.ERROR, s.peerHandler.HandleError)
+
+	d := dispatcher.New()
+	d.RegisterListener(&peer.OnPeerConnectedEvent{}, c.OnPeerConnectedEvent)
+	d.RegisterListener(&peer.OnPeerDisconnectedEvent{}, c.OnPeerDisconnected)
+	d.RegisterListener(&peer.OnPeerAbortedEvent{}, c.OnPeerAborted)
+	d.RegisterListener(&peer.OnPeerErroredEvent{}, c.OnPeerErrored)
+
+	go d.Run()
+	go d.Aggregate(s.router.Events())
+
+	s.startDialPeers()
 	s.startServer()
+	s.run()
+}
 
+func (s *Server) Close() {
+	//d.Exit()
+
+	close(s.exit)
+}
+
+func (s *Server) run() {
 	for {
 		select {
 		case <-s.exit:
 			//Notify Exit to remote Peer
-			//Shutdown peer connections
 			return
-		default:
 		}
 	}
 }
 
-func (s *Server) Close() {
-	s.exit <- true
-}
-
 func (s *Server) startServer() {
-	log.Print("Starting server: ", s.config.raft_addr.Address())
-
-	listener, err := net.Listen("tcp", string(s.config.raft_addr.Address()))
+	listener, err := net.Listen("tcp", string(s.config.Addr.String()))
 	if err != nil {
 		log.Println("Error starting Socket Server: ", err)
 		return
 	}
-	go func() {
-		for {
-			conn, err := listener.Accept()
-			if err != nil {
-				log.Println("Error starting socket client to: ", s.node.Address(), "err: ", err)
-				return
-			}
 
-			peer := NewSocketPeer(conn)
-			go s.handleConnection(peer)
-			go s.Router.Accept(peer)
-
-		}
-	}()
+	go s.startAcceptorPeers(listener)
 }
 
-func (s *Server) handleConnection(peer *SocketPeer) {
-	defer peer.Conn.Close()
-	defer close(peer.RcvChan)
-	defer close(peer.exitChan)
-
-	log.Print("Handling Connection from: ", peer.Id())
-
+func (s *Server) startAcceptorPeers(listener net.Listener) {
 	for {
-		msg, err := peer.Receive()
+		conn, err := listener.Accept()
 		if err != nil {
-			if err != io.EOF {
-				log.Print("Error reading connection ", err)
-			}
-			break
-			//s.PeerHandler.Notify(peer.Id(), err)
+			log.Println("Error starting socket client to: ", s.node.String(), "err: ", err)
+			return
 		}
 
-		fmt.Println("Received Message ", msg)
-		peer.RcvChan <- msg
+		c := peer.NewAcceptor(conn, s.node)
+		go c.Run()
+
+		s.router.Accept(c)
+	}
+}
+
+//Start Dial Peers
+func (s *Server) startDialPeers() {
+	for _, node := range s.config.Cluster {
+		//avoid local connexion
+		if node.String() == s.node.String() {
+			continue
+		}
+
+		go s.router.InitDialClient(node)
 	}
 }
 
 // Cli Socket server
 func (s *Server) startCliServer() error {
-	listener, err := net.Listen("tcp", string(s.config.addr.Address()))
+	listener, err := net.Listen("tcp", s.config.Addr.String())
 	if err != nil {
 		log.Println("Error Listening Cli Server")
 		return err
@@ -115,12 +125,12 @@ func (s *Server) startCliServer() error {
 }
 
 // Socket Client access
-func (s *Server) handleCliConnection(c net.Conn) {
-	defer c.Close()
+func (s *Server) handleCliConnection(conn net.Conn) {
+	defer conn.Close()
 
-	cli := &CliSession{
-		conn:   c,
-		server: s,
+	c := &cli.CliSession{
+		Conn: conn,
+		//server: s,
 	}
-	cli.handle()
+	c.Handle()
 }
