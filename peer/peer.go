@@ -8,9 +8,11 @@ import (
 
 	"github.com/marcosQuesada/mesh/message"
 	n "github.com/marcosQuesada/mesh/node"
+	"github.com/socialpoint/sprocket/server/states"
 )
 
 const (
+	PeerStatusStarted      = message.Status("started")
 	PeerStatusConnecting   = message.Status("connecting")
 	PeerStatusConnected    = message.Status("connected")
 	PeerStatusDisconnected = message.Status("disconnected")
@@ -30,6 +32,7 @@ type NodePeer interface {
 	ReceiveChan() chan message.Message
 	Send(message.Message) error
 	Commit(message.Message)
+	State(message.Status)
 	SayHello() // Pending to remove, must be internal
 }
 
@@ -43,6 +46,7 @@ type Peer struct {
 	exitChan    chan bool
 	doneChan    chan bool
 	mode        string
+	state       message.Status
 }
 
 func NewDialer(from n.Node, destination n.Node) *Peer {
@@ -68,6 +72,7 @@ func NewDialer(from n.Node, destination n.Node) *Peer {
 		exitChan:    make(chan bool, 2),
 		doneChan:    make(chan bool, 1),
 		mode:        "client",
+		state:       PeerStatusStarted,
 	}
 }
 
@@ -81,6 +86,7 @@ func NewAcceptor(conn net.Conn, server n.Node) *Peer {
 		exitChan:    make(chan bool, 1),
 		doneChan:    make(chan bool, 1),
 		mode:        "server",
+		state:       PeerStatusStarted,
 	}
 }
 
@@ -112,6 +118,10 @@ func (p *Peer) Exit() {
 
 func (p *Peer) Node() n.Node {
 	return p.to
+}
+
+func (p *Peer) State(s message.Status) {
+	p.state = s
 }
 
 //Used on dev Only!
@@ -218,6 +228,8 @@ func (f *NopPeer) ReceiveChan() chan message.Message {
 func (f *NopPeer) Exit() {
 }
 func (f *NopPeer) SayHello() {
+}
+func (f *NopPeer) State(s message.Status) {
 }
 func (f *NopPeer) Identify(n n.Node) {
 }

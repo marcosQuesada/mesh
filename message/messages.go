@@ -30,6 +30,8 @@ func (mt MsgType) New() Message {
 		return &Done{}
 	case ERROR:
 		return &Error{}
+	case COMMAND:
+		return &Command{}
 	}
 
 	return nil
@@ -44,6 +46,7 @@ const (
 	GOODBYE = MsgType(5)
 	DONE    = MsgType(90)
 	ERROR   = MsgType(99)
+	COMMAND = MsgType(50)
 )
 
 // First connection message
@@ -198,6 +201,25 @@ func (h Error) Origin() n.Node {
 }
 
 func (h Error) Destination() n.Node {
+	return h.To
+}
+
+type Command struct {
+	Id      int
+	From    n.Node
+	To      n.Node
+	Details map[string]interface{}
+}
+
+func (w Command) MessageType() MsgType {
+	return COMMAND
+}
+
+func (h Command) Origin() n.Node {
+	return h.From
+}
+
+func (h Command) Destination() n.Node {
 	return h.To
 }
 
