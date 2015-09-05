@@ -62,8 +62,9 @@ func TestRouterAccept(t *testing.T) {
 		t.Error("Unexpected response type, expected 1 got", result.MessageType())
 	}
 
+	id :=  message.NewId()
 	msg := message.Ping{
-		Id:   999,
+		Id:  id,
 		From: nodeA,
 		To:   nodeB,
 	}
@@ -75,7 +76,7 @@ func TestRouterAccept(t *testing.T) {
 	}
 
 	pong := result.(*message.Pong)
-	if pong.Id != 999 {
+	if pong.Id != id {
 		t.Error("Unexpected result Id")
 	}
 	if pong.From != nodeB {

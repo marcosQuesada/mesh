@@ -51,11 +51,11 @@ func TestPeerMessagingUnderPipes(t *testing.T) {
 			select {
 			case r := <-c1.ReceiveChan():
 				msg := r.(*message.Hello)
-				msg.Id = 1
+				msg.Id = message.NewId()
 				resChan <- msg
 			case r := <-c1Mirror.ReceiveChan():
 				msg := r.(*message.Hello)
-				msg.Id = 2
+				msg.Id = message.NewId()
 				resChan <- msg
 			case <-doneChan:
 				close(resChan)
@@ -100,7 +100,7 @@ func TestBasicNopPeerTest(t *testing.T) {
 	fkc := &NopPeer{"localhost", 9000, ch}
 
 	msg := message.Hello{
-		Id:      999,
+		Id:      message.NewId(),
 		From:    node.Node{"localhost", 9000},
 		Details: map[string]interface{}{"foo": "bar"},
 	}

@@ -38,7 +38,7 @@ type defaultWatcher struct {
 type subject struct {
 	peer   peer.NodePeer
 	ticker *time.Ticker
-	id     int
+	id     message.ID
 	Done   chan bool
 	mutex  sync.Mutex
 }
@@ -47,10 +47,10 @@ func (s *subject) incId() {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	s.id++
+	s.id = message.NewId()
 }
 
-func (s *subject) getId() int {
+func (s *subject) getId() message.ID {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 

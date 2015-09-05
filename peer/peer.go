@@ -124,7 +124,7 @@ func (p *Peer) SayHello() (u *uuid.UUID, err error){
 	}
 
 	msg := message.Hello{
-		Id:      0,
+		Id:      message.NewId(),
 		From:    p.from,
 		Details: map[string]interface{}{"foo": "bar"},
 	}

@@ -2,9 +2,27 @@ package message
 
 import (
 	n "github.com/marcosQuesada/mesh/node"
+	"github.com/nu7hatch/gouuid"
+	"log"
 )
 
 type Status string
+
+type ID string
+
+func NewId() ID{
+	idV4, err := uuid.NewV4()
+	if err != nil {
+		log.Println("error generating v4 ID:", err)
+	}
+
+	id, err := uuid.NewV5(idV4, []byte("message"))
+	if err != nil {
+		log.Println("error generating v5 ID:", err)
+	}
+
+	return ID(id.String())
+}
 
 type Message interface {
 	MessageType() MsgType
@@ -54,7 +72,7 @@ const (
 
 // First connection message
 type Hello struct {
-	Id      int
+	Id      ID
 	From    n.Node
 	To      n.Node
 	Details map[string]interface{}
@@ -74,7 +92,7 @@ func (h Hello) Destination() n.Node {
 
 // Hello Accepted
 type Welcome struct {
-	Id      int
+	Id      ID
 	From    n.Node
 	To      n.Node
 	Details map[string]interface{}
@@ -94,7 +112,7 @@ func (h Welcome) Destination() n.Node {
 
 // Hello Rejected
 type Abort struct {
-	Id      int
+	Id      ID
 	From    n.Node
 	To      n.Node
 	Details map[string]interface{}
@@ -114,7 +132,7 @@ func (h Abort) Destination() n.Node {
 
 // Ping request to a remote node
 type Ping struct {
-	Id   int
+	Id   ID
 	From n.Node
 	To   n.Node
 }
@@ -133,7 +151,7 @@ func (h Ping) Destination() n.Node {
 
 // Pong response as a ping request
 type Pong struct {
-	Id   int
+	Id   ID
 	From n.Node
 	To   n.Node
 }
@@ -151,7 +169,7 @@ func (h Pong) Destination() n.Node {
 }
 
 type GoodBye struct {
-	Id      int
+	Id      ID
 	From    n.Node
 	To      n.Node
 	Details map[string]interface{}
@@ -170,7 +188,7 @@ func (h GoodBye) Destination() n.Node {
 }
 
 type Done struct {
-	Id      int
+	Id      ID
 	From    n.Node
 	To      n.Node
 	Details map[string]interface{}
@@ -189,7 +207,7 @@ func (h Done) Destination() n.Node {
 }
 
 type Error struct {
-	Id      int
+	Id      ID
 	From    n.Node
 	To      n.Node
 	Details map[string]interface{}
@@ -208,7 +226,7 @@ func (h Error) Destination() n.Node {
 }
 
 type Command struct {
-	Id      int
+	Id      ID
 	From    n.Node
 	To      n.Node
 	Details map[string]interface{}
@@ -228,7 +246,7 @@ func (h Command) Destination() n.Node {
 
 
 type Ack struct {
-	Id      int
+	Id      ID
 	From    n.Node
 	To      n.Node
 	Details map[string]interface{}

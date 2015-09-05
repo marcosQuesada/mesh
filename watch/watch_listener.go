@@ -27,7 +27,7 @@ func NewRequestListener() *RequestListener {
 	}
 }
 
-func (r *RequestListener) Id(n node.Node, id int) string {
+func (r *RequestListener) Id(n node.Node, id message.ID) string {
 	return fmt.Sprintf("node-%s-id-%d", n.String(), id)
 }
 
