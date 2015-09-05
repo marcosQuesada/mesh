@@ -62,13 +62,13 @@ func init() {
 	rand.Seed(time.Now().UTC().UnixNano())
 }
 
-func New(evCh chan dispatcher.Event, interval int) *defaultWatcher {
+func New(rqLst *RequestListener, evCh chan dispatcher.Event, interval int) *defaultWatcher {
 	return &defaultWatcher{
 		eventChan:       evCh,
 		exit:            make(chan bool, 0),
 		index:           make(map[string]*subject, 0),
 		pingInterval:    interval * 1000,
-		requestListener: NewRequestListener(),
+		requestListener: rqLst,
 	}
 }
 
@@ -83,6 +83,7 @@ func (w *defaultWatcher) Watch(p peer.NodePeer) {
 		peer:   p,
 		ticker: w.newTicker(),
 		Done:   subjectDone,
+		id: message.NewId(),
 	}
 	defer close(s.Done)
 
@@ -91,17 +92,14 @@ func (w *defaultWatcher) Watch(p peer.NodePeer) {
 	w.index[node.String()] = s
 	w.mutex.Unlock()
 
-/*	for {
+	for {
 		select {
 		case <-s.ticker.C:
-			p.Commit(&message.Ping{Id: s.getId(), From: p.From(), To: node})
+			requestId := s.getId()
+			p.Commit(&message.Ping{Id: requestId, From: p.From(), To: node})
 			s.ticker.Stop()
 
-			requestId := s.getId()
-			log.Println("Registering PONG Watcher", requestId)
 			w.requestListener.Register(requestId)
-			log.Println("PING", s.getId(), "to", node.String(), "Waiting ", requestId)
-
 			msg, err := w.requestListener.Wait(requestId)
 			if err != nil {
 				log.Println("RequestListener ", requestId, err)
@@ -114,14 +112,12 @@ func (w *defaultWatcher) Watch(p peer.NodePeer) {
 				panic(err)
 			}
 
-			log.Println("PING PONG OK", s.getId(), "to", node.String(), "Waiting ", requestId)
-
 			s.incId()
 			s.ticker = w.newTicker()
 		case <-s.Done:
 			return
 		}
-	}*/
+	}
 
 }
 
@@ -139,5 +135,5 @@ func (w *defaultWatcher) Exit() {
 }
 
 func (w *defaultWatcher) newTicker() *time.Ticker {
-	return time.NewTicker(time.Duration(w.pingInterval+rand.Intn(2000)) * time.Millisecond)
+	return time.NewTicker(time.Duration(w.pingInterval+rand.Intn(10000)) * time.Millisecond)
 }

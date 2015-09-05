@@ -40,7 +40,9 @@ type defaultRouter struct {
 
 func New(n node.Node) *defaultRouter {
 	evChan := make(chan dispatcher.Event, 10)
-	w := watch.New(evChan, 2)
+	reqList := watch.NewRequestListener()
+	w := watch.New(reqList, evChan, 2)
+
 	r := &defaultRouter{
 		handlers:        make(map[message.MsgType]handler.Handler),
 		from:            n,
@@ -49,7 +51,7 @@ func New(n node.Node) *defaultRouter {
 		eventChan:       evChan,
 		exit:            make(chan bool),
 		watcher:         w,
-		requestListener: watch.NewRequestListener(),
+		requestListener: reqList,
 	}
 
 	r.RegisterHandlers(r.Handlers())
@@ -90,15 +92,7 @@ func (r *defaultRouter) Route(msg message.Message) error {
 }
 
 func (r *defaultRouter) WaitResponse(c *peer.Peer, requestId message.ID) {
-	go func() {
-		r.requestListener.Register(requestId)
-		_, err := r.requestListener.Wait(requestId)
-		if err != nil {
-			log.Println("XXX WaitResponse RequestListener ", requestId, err)
-
-			return
-		}
-	}()
+	r.requestListener.Transaction(requestId)
 }
 
 func (r *defaultRouter) Accept(c *peer.Peer) {
@@ -123,6 +117,7 @@ func (r *defaultRouter) Accept(c *peer.Peer) {
 				if response != nil {
 					c.Commit(response)
 
+					//TODO: Solve this type handling mess
 					if response.MessageType() == message.ABORT {
 						c.Exit()
 						return
@@ -133,10 +128,12 @@ func (r *defaultRouter) Accept(c *peer.Peer) {
 						continue
 					}
 
-					r.WaitResponse(c, requestID)
+					if response.MessageType() != message.PONG {
+						r.WaitResponse(c, requestID)
+					}
 				}
 
-				if msg.MessageType() != message.HELLO {
+				if msg.MessageType() != message.HELLO && msg.MessageType() != message.PING  {
 					r.requestListener.Notify(msg, requestID)
 				}
 			case <-r.exit:
@@ -176,7 +173,6 @@ func (r *defaultRouter) Events() chan dispatcher.Event {
 
 func (r *defaultRouter) InitDialClient(destination node.Node) {
 	p, requestId := peer.InitDialClient(r.from, destination)
-
 	r.WaitResponse(p, requestId)
 	r.Accept(p)
 }

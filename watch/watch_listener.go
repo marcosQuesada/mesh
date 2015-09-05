@@ -40,6 +40,19 @@ func (r *RequestListener) Register(requestID message.ID) {
 	r.listeners[requestID] = make(chan message.Message, 1)
 }
 
+//TODO: Actually working just as timeout detection
+func (r *RequestListener) Transaction(requestId message.ID) {
+	go func() {
+		r.Register(requestId)
+		_, err := r.Wait(requestId)
+		if err != nil {
+			log.Println("XXX WaitResponse RequestListener error", requestId, err)
+
+			return
+		}
+	}()
+}
+
 func (r *RequestListener) Wait(requestID message.ID) (msg message.Message, err error) {
 	timeout := time.NewTimer(r.timeout)
 	waitChannel, ok := r.listeners[requestID]
