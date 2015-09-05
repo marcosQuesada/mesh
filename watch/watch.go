@@ -16,13 +16,14 @@ import (
 	"github.com/marcosQuesada/mesh/dispatcher"
 	"github.com/marcosQuesada/mesh/message"
 	"github.com/marcosQuesada/mesh/peer"
+	//"github.com/nu7hatch/gouuid"
 )
 
-type Watcher interface {
+/*type Watcher interface {
 	Watch(peer.NodePeer)
 	HandlePing(peer.NodePeer, message.Message) (message.Message, error)
 	HandlePong(peer.NodePeer, message.Message) (message.Message, error)
-}
+}*/
 
 type defaultWatcher struct {
 	eventChan       chan dispatcher.Event
@@ -30,7 +31,7 @@ type defaultWatcher struct {
 	pingInterval    int
 	mutex           sync.RWMutex
 	index           map[string]*subject
-	requestListener *requestListener
+	requestListener *RequestListener
 	wg              sync.WaitGroup
 }
 
@@ -67,7 +68,7 @@ func New(evCh chan dispatcher.Event, interval int) *defaultWatcher {
 		exit:            make(chan bool, 0),
 		index:           make(map[string]*subject, 0),
 		pingInterval:    interval * 1000,
-		requestListener: newRequestListener(),
+		requestListener: NewRequestListener(),
 	}
 }
 
@@ -98,8 +99,8 @@ func (w *defaultWatcher) Watch(p peer.NodePeer) {
 			p.Commit(&message.Ping{Id: s.getId(), From: p.From(), To: node})
 			s.ticker.Stop()
 
-			requestId := w.requestListener.Id(p.Node(), s.getId())
-			w.requestListener.register(requestId)
+/*			requestId := w.requestListener.Id(p.Node(), s.getId())
+			w.requestListener.Register(requestId)
 			log.Println("PING", s.getId(), "to", node.String(), "Waiting ", requestId)
 
 			msg, err := w.requestListener.wait(requestId)
@@ -107,17 +108,17 @@ func (w *defaultWatcher) Watch(p peer.NodePeer) {
 				log.Println("RequestListener ", requestId, err)
 
 				return
-			}
-
+			}*/
+/*
 			if msg.MessageType() != message.PONG {
-				log.Println("Error Unexpected Received type, expected PONG ", msg.MessageType(), "requestListener ", requestId, err)
+				log.Println("Error Unexpected Received type, expected PONG ", msg.MessageType(), "RequestListener ", requestId, err)
 				//@TODO: used to check development stability
 				panic(err)
 			}
 
 			log.Println("PING PONG OK", s.getId(), "to", node.String(), "Waiting ", requestId)
 
-			s.incId()
+			s.incId()*/
 			s.ticker = w.newTicker()
 		case <-s.Done:
 			return
@@ -137,22 +138,6 @@ func (w *defaultWatcher) Exit() {
 
 	w.wg.Wait()
 	log.Println("Exiting Done")
-}
-
-func (w *defaultWatcher) HandlePing(c peer.NodePeer, msg message.Message) (message.Message, error) {
-	ping := msg.(*message.Ping)
-	log.Println("Handle Ping", ping.Id, "from: ", ping.From.String())
-
-	return &message.Pong{Id: ping.Id, From: ping.To, To: ping.From}, nil
-}
-
-func (w *defaultWatcher) HandlePong(c peer.NodePeer, msg message.Message) (message.Message, error) {
-	pong := msg.(*message.Pong)
-	log.Println("Handle Pong ", pong.Id, c.Node(), "from: ", pong.From.String())
-	requestID := w.requestListener.Id(c.Node(), pong.Id)
-	go w.requestListener.notify(msg, requestID)
-
-	return nil, nil
 }
 
 func (w *defaultWatcher) newTicker() *time.Ticker {

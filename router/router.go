@@ -3,7 +3,6 @@ package router
 import (
 	"fmt"
 	"sync"
-
 	"log"
 
 	"github.com/marcosQuesada/mesh/dispatcher"
@@ -11,25 +10,24 @@ import (
 	"github.com/marcosQuesada/mesh/node"
 	"github.com/marcosQuesada/mesh/peer"
 	"github.com/marcosQuesada/mesh/watch"
+	"github.com/marcosQuesada/mesh/router/handler"
 )
 
 type Router interface {
 	Route(message.Message) error
 	Accept(*peer.Peer)
 	Handle(peer.NodePeer, message.Message) message.Message
-	RegisterHandler(message.MsgType, Handler)
+	RegisterHandlers(handlers map[message.MsgType]handler.Handler)
+	RegisterHandler(message.MsgType, handler.Handler)
 	Events() chan dispatcher.Event
 	Exit()
 
 	InitDialClient(destination node.Node) //HEre??? NO
 }
 
-//Handler represent a method to be invoked with message
-//error will be returned on unexpected handling
-type Handler func(peer.NodePeer, message.Message) (message.Message, error)
-
 type defaultRouter struct {
-	handlers  map[message.MsgType]Handler
+
+	handlers  map[message.MsgType]handler.Handler
 	from      node.Node
 	peers     map[string]peer.NodePeer
 	peerIDs   map[peer.ID]bool
@@ -37,6 +35,7 @@ type defaultRouter struct {
 	exit      chan bool
 	watcher   watch.Watcher
 	mutex     sync.Mutex
+	requestListener *watch.RequestListener
 }
 
 func New(n node.Node) *defaultRouter {
@@ -49,21 +48,22 @@ func New(n node.Node) *defaultRouter {
 		eventChan: evChan,
 		exit:      make(chan bool),
 		watcher:   w,
+		requestListener: watch.NewRequestListener(),
 	}
-	//initialize local handlers
-	r.handlers = map[message.MsgType]Handler{
-		message.HELLO:   r.HandleHello,
-		message.WELCOME: r.HandleWelcome,
-		message.ABORT:   r.HandleAbort,
-		message.ERROR:   r.HandleError,
-		message.PING:    w.HandlePing,
-		message.PONG:    w.HandlePong,
-	}
+
+	r.RegisterHandlers(r.Handlers())
+	r.RegisterHandlers(w.Handlers())
 
 	return r
 }
 
-func (r *defaultRouter) RegisterHandler(msgType message.MsgType, handler Handler) {
+func (r *defaultRouter) RegisterHandlers(handlers map[message.MsgType]handler.Handler) {
+	for msg, h := range handlers  {
+		r.RegisterHandler(msg, h)
+	}
+}
+
+func (r *defaultRouter) RegisterHandler(msgType message.MsgType, handler handler.Handler) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
@@ -149,13 +149,13 @@ func (r *defaultRouter) Events() chan dispatcher.Event {
 }
 
 func (r *defaultRouter) InitDialClient(destination node.Node) {
-	//Blocking call, wait until connection success
-	p := peer.NewDialer(r.from, destination)
-	go p.Run()
-	log.Println("Connected Dial Client from Node ", r.from.String(), "destination: ", destination.String(), p.Id())
+	p, _ := peer.InitDialClient(r.from, destination)
 
-	//Say Hello and wait response
-	p.SayHello()
+/*
+	requestId := r.requestListener.Id(p.Node(), id)
+	r.requestListener.Register(requestId)
+*/
+
 	r.Accept(p)
 }
 
@@ -172,6 +172,17 @@ func (r *defaultRouter) accept(p peer.NodePeer) error {
 	r.peerIDs[p.Id()] = true
 
 	return nil
+}
+
+
+func (r *defaultRouter) exists(p peer.NodePeer) bool {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+
+	var node node.Node = p.Node()
+	_, ok := r.peers[node.String()]
+
+	return ok
 }
 
 func (r *defaultRouter) remove(p peer.NodePeer) error {

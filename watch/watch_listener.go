@@ -9,28 +9,29 @@ import (
 
 	"github.com/marcosQuesada/mesh/message"
 	"github.com/marcosQuesada/mesh/node"
+	//"github.com/nu7hatch/gouuid"
 )
 
 const TIMEOUT = time.Second * 2
 
-type requestListener struct {
+type RequestListener struct {
 	listeners map[string]chan message.Message
 	timeout   time.Duration
 	mutex     sync.Mutex
 }
 
-func newRequestListener() *requestListener {
-	return &requestListener{
+func NewRequestListener() *RequestListener {
+	return &RequestListener{
 		listeners: make(map[string]chan message.Message, 0),
 		timeout:   TIMEOUT,
 	}
 }
 
-func (r *requestListener) Id(n node.Node, id int) string {
+func (r *RequestListener) Id(n node.Node, id int) string {
 	return fmt.Sprintf("node-%s-id-%d", n.String(), id)
 }
 
-func (r *requestListener) notify(msg message.Message, requestID string) {
+func (r *RequestListener) Notify(msg message.Message, requestID string) {
 	if l, ok := r.listeners[requestID]; ok {
 		l <- msg
 		log.Println("Notify done", requestID)
@@ -39,14 +40,14 @@ func (r *requestListener) notify(msg message.Message, requestID string) {
 	log.Println("No listener found for request", requestID, "type", msg.MessageType())
 }
 
-func (r *requestListener) register(requestID string) {
+func (r *RequestListener) Register(requestID string) {
 	log.Println("Register", requestID)
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 	r.listeners[requestID] = make(chan message.Message, 1)
 }
 
-func (r *requestListener) wait(requestID string) (msg message.Message, err error) {
+func (r *RequestListener) wait(requestID string) (msg message.Message, err error) {
 	timeout := time.NewTimer(r.timeout)
 	waitChannel, ok := r.listeners[requestID]
 	if !ok {

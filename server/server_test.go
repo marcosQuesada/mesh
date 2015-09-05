@@ -1,55 +1,58 @@
 package server
 
 import (
+/*
 	"fmt"
 	"net"
+*/
 	"testing"
-	"time"
+/*	"time"
 
 	"github.com/marcosQuesada/mesh/config"
 	"github.com/marcosQuesada/mesh/message"
 	"github.com/marcosQuesada/mesh/node"
 	"github.com/marcosQuesada/mesh/peer"
-	"github.com/marcosQuesada/mesh/router"
+	"github.com/marcosQuesada/mesh/router"*/
 )
 
 func TestBasicServerClient(t *testing.T) {
-	org := node.Node{Host: "localhost", Port: 8001}
-	config := &config.Config{
-		Addr: org,
-	}
-
-	srv := New(config)
-	srv.router = router.New(org)
-	srv.startServer()
-	time.Sleep(time.Millisecond * 100)
-
-	done := make(chan bool)
-	go func(d chan bool) {
-		conn, err := net.Dial("tcp", "localhost:8001")
-		if err != nil {
-			fmt.Println("dial error:", err)
-			return
+	/*
+		org := node.Node{Host: "localhost", Port: 8001}
+		config := &config.Config{
+			Addr: org,
 		}
-		defer conn.Close()
 
-		linkA := peer.NewJSONSocketLink(conn)
+		srv := New(config)
+		srv.router = router.New(org)
+		srv.startServer()
+		time.Sleep(time.Millisecond * 100)
 
-		msg := message.Hello{
-			Id:      10,
-			Details: map[string]interface{}{"foo": "bar"},
-		}
-		linkA.Send(msg)
-		time.Sleep(time.Second)
-		done <- true
-	}(done)
+		done := make(chan bool)
+		go func(d chan bool) {
+			conn, err := net.Dial("tcp", "localhost:8001")
+			if err != nil {
+				fmt.Println("dial error:", err)
+				return
+			}
+			defer conn.Close()
 
-	<-done
+			linkA := peer.NewJSONSocketLink(conn)
 
-	/*	peers := srv.PeerHandler.Peers()
-		if len(peers) != 1 {
-			t.Error("Unexpected Registered Peers size ", peers)
-		}
-		fmt.Println("Total Peer List is ", len(peers), peers)
-	*/
+			msg := message.Hello{
+				Id:      10,
+				Details: map[string]interface{}{"foo": "bar"},
+			}
+			linkA.Send(msg)
+			time.Sleep(time.Second)
+			done <- true
+		}(done)
+
+		<-done
+
+			peers := srv.PeerHandler.Peers()
+			if len(peers) != 1 {
+				t.Error("Unexpected Registered Peers size ", peers)
+			}
+			fmt.Println("Total Peer List is ", len(peers), peers)
+		*/
 }

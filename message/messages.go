@@ -4,6 +4,8 @@ import (
 	n "github.com/marcosQuesada/mesh/node"
 )
 
+type Status string
+
 type Message interface {
 	MessageType() MsgType
 	Origin() n.Node
@@ -15,7 +17,7 @@ type MsgType int
 func (mt MsgType) New() Message {
 	switch mt {
 	case HELLO:
-		return &Hello{} //from: n.Node{}
+		return &Hello{}
 	case WELCOME:
 		return &Welcome{}
 	case ABORT:
@@ -44,6 +46,7 @@ const (
 	PING    = MsgType(3)
 	PONG    = MsgType(4)
 	GOODBYE = MsgType(5)
+	ACK 	= MsgType(6)
 	DONE    = MsgType(90)
 	ERROR   = MsgType(99)
 	COMMAND = MsgType(50)
@@ -223,4 +226,24 @@ func (h Command) Destination() n.Node {
 	return h.To
 }
 
-type Status string
+
+type Ack struct {
+	Id      int
+	From    n.Node
+	To      n.Node
+	Details map[string]interface{}
+}
+
+func (w Ack) MessageType() MsgType {
+	return COMMAND
+}
+
+func (h Ack) Origin() n.Node {
+	return h.From
+}
+
+func (h Ack) Destination() n.Node {
+	return h.To
+}
+
+

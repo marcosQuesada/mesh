@@ -7,11 +7,12 @@ import (
 	"github.com/marcosQuesada/mesh/message"
 	"github.com/marcosQuesada/mesh/node"
 	"github.com/marcosQuesada/mesh/peer"
+	"github.com/marcosQuesada/mesh/router/handler"
 )
 
 func TestBasicRouterHandling(t *testing.T) {
 	r := &defaultRouter{
-		handlers: make(map[message.MsgType]Handler),
+		handlers: make(map[message.MsgType]handler.Handler),
 		exit:     make(chan bool, 1),
 	}
 
@@ -31,7 +32,7 @@ func TestBasicRouterHandling(t *testing.T) {
 
 func TestRouterAccept(t *testing.T) {
 	r := &defaultRouter{
-		handlers: make(map[message.MsgType]Handler),
+		handlers: make(map[message.MsgType]handler.Handler),
 		exit:     make(chan bool, 1),
 	}
 
