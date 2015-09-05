@@ -1,8 +1,8 @@
 package handler
 
-import(
-	"github.com/marcosQuesada/mesh/peer"
+import (
 	"github.com/marcosQuesada/mesh/message"
+	"github.com/marcosQuesada/mesh/peer"
 )
 
 //Handler represent a method to be invoked with message

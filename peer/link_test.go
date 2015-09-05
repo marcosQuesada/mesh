@@ -109,7 +109,7 @@ func TestBasicLinksOnServerClient(t *testing.T) {
 
 	id := message.NewId()
 	msg := message.Hello{
-		Id:     id,
+		Id:      id,
 		Details: map[string]interface{}{"foo": "bar"},
 	}
 	linkA.Send(msg)

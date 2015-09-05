@@ -8,7 +8,6 @@ import (
 
 	"github.com/marcosQuesada/mesh/message"
 	n "github.com/marcosQuesada/mesh/node"
-	"github.com/nu7hatch/gouuid"
 )
 
 const (
@@ -33,7 +32,7 @@ type NodePeer interface {
 	Send(message.Message) error
 	Commit(message.Message)
 	State(message.Status)
-	SayHello() (*uuid.UUID, error)// Pending to remove, must be internal
+	SayHello() (message.ID, error) // Pending to remove, must be internal
 }
 
 type Peer struct {
@@ -90,18 +89,18 @@ func NewAcceptor(conn net.Conn, server n.Node) *Peer {
 	}
 }
 
-func InitDialClient(from n.Node, destination n.Node)(*Peer, *uuid.UUID){
+func InitDialClient(from n.Node, destination n.Node) (*Peer, message.ID) {
 	//Blocking call, wait until connection success
 	p := NewDialer(from, destination)
 	go p.Run()
 	log.Println("Connected Dial Client from Node ", from.String(), "destination: ", destination.String(), p.Id())
 
 	//Say Hello and wait response
-	id , err := p.SayHello()
+	id, err := p.SayHello()
 	if err != nil {
 		log.Println("Error getting Hello Id ", err)
 	}
-	log.Println("Connected Dial Client from Node ", from.String(), "destination: ", destination.String(), id)
+	log.Println("HEllo Sended destination: ", destination.String(), id)
 
 	return p, id
 }
@@ -110,19 +109,7 @@ func (p *Peer) ReceiveChan() chan message.Message {
 	return p.messageChan
 }
 
-func (p *Peer) SayHello() (u *uuid.UUID, err error){
-	idV4, err := uuid.NewV4()
-	if err != nil {
-		log.Println("error:", err)
-		return nil, err
-	}
-
-	id, err := uuid.NewV5(idV4, []byte("message"))
-	if err != nil {
-		log.Println("error:", err)
-		return nil, err
-	}
-
+func (p *Peer) SayHello() (u message.ID, err error) {
 	msg := message.Hello{
 		Id:      message.NewId(),
 		From:    p.from,
@@ -130,7 +117,7 @@ func (p *Peer) SayHello() (u *uuid.UUID, err error){
 	}
 	p.Commit(msg)
 
-	return id, err
+	return msg.Id, err
 }
 
 func (p *Peer) Run() {
@@ -257,8 +244,8 @@ func (f *NopPeer) ReceiveChan() chan message.Message {
 
 func (f *NopPeer) Exit() {
 }
-func (f *NopPeer) SayHello() (*uuid.UUID, error){
-	return nil, nil
+func (f *NopPeer) SayHello() (message.ID, error) {
+	return message.ID("fake"), nil
 }
 func (f *NopPeer) State(s message.Status) {
 }

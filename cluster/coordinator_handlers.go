@@ -8,9 +8,9 @@ import (
 	"github.com/marcosQuesada/mesh/router/handler"
 )
 
-func (r *Coordinator) Handlers() map[message.MsgType]handler.Handler{
+func (r *Coordinator) Handlers() map[message.MsgType]handler.Handler {
 	return map[message.MsgType]handler.Handler{
-		message.COMMAND:   r.HandleCommand,
+		message.COMMAND: r.HandleCommand,
 	}
 }
 

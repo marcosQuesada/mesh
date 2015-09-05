@@ -1,19 +1,18 @@
 package server
 
 import (
-/*
-	"fmt"
-	"net"
-*/
+	/*
+		"fmt"
+		"net"
+	*/
 	"testing"
-/*	"time"
+	/*	"time"
 
-	"github.com/marcosQuesada/mesh/config"
-	"github.com/marcosQuesada/mesh/message"
-	"github.com/marcosQuesada/mesh/node"
-	"github.com/marcosQuesada/mesh/peer"
-	"github.com/marcosQuesada/mesh/router"*/
-)
+		"github.com/marcosQuesada/mesh/config"
+		"github.com/marcosQuesada/mesh/message"
+		"github.com/marcosQuesada/mesh/node"
+		"github.com/marcosQuesada/mesh/peer"
+		"github.com/marcosQuesada/mesh/router"*/)
 
 func TestBasicServerClient(t *testing.T) {
 	/*
@@ -54,5 +53,5 @@ func TestBasicServerClient(t *testing.T) {
 				t.Error("Unexpected Registered Peers size ", peers)
 			}
 			fmt.Println("Total Peer List is ", len(peers), peers)
-		*/
+	*/
 }

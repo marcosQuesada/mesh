@@ -8,6 +8,7 @@ import (
 	"github.com/marcosQuesada/mesh/node"
 	"github.com/marcosQuesada/mesh/peer"
 	"github.com/marcosQuesada/mesh/router/handler"
+	"github.com/marcosQuesada/mesh/watch"
 )
 
 func TestBasicRouterHandling(t *testing.T) {
@@ -32,8 +33,9 @@ func TestBasicRouterHandling(t *testing.T) {
 
 func TestRouterAccept(t *testing.T) {
 	r := &defaultRouter{
-		handlers: make(map[message.MsgType]handler.Handler),
-		exit:     make(chan bool, 1),
+		handlers:        make(map[message.MsgType]handler.Handler),
+		exit:            make(chan bool, 1),
+		requestListener: watch.NewRequestListener(),
 	}
 
 	hello := &message.Hello{}
@@ -62,9 +64,9 @@ func TestRouterAccept(t *testing.T) {
 		t.Error("Unexpected response type, expected 1 got", result.MessageType())
 	}
 
-	id :=  message.NewId()
+	id := message.NewId()
 	msg := message.Ping{
-		Id:  id,
+		Id:   id,
 		From: nodeA,
 		To:   nodeB,
 	}

@@ -4,15 +4,15 @@ import (
 	"log"
 
 	"github.com/marcosQuesada/mesh/message"
-	"github.com/marcosQuesada/mesh/router/handler"
 	"github.com/marcosQuesada/mesh/peer"
+	"github.com/marcosQuesada/mesh/router/handler"
 )
 
-func (r *defaultRouter) Handlers() map[message.MsgType]handler.Handler{
+func (r *defaultRouter) Handlers() map[message.MsgType]handler.Handler {
 	return map[message.MsgType]handler.Handler{
 		message.HELLO:   r.HandleHello,
 		message.WELCOME: r.HandleWelcome,
-		message.ACK:   	 r.HandleAck,
+		message.ACK:     r.HandleAck,
 		message.ABORT:   r.HandleAbort,
 		message.ERROR:   r.HandleError,
 	}
@@ -27,8 +27,7 @@ func (r *defaultRouter) HandleHello(c peer.NodePeer, msg message.Message) (messa
 
 	c.State(peer.PeerStatusConnecting)
 
-	requestID := r.requestListener.Id(c.Node(), msg.(*message.Hello).Id)
-	go r.requestListener.Notify(msg, requestID)
+	go r.requestListener.Notify(msg, msg.(*message.Hello).Id)
 
 	return &message.Welcome{Id: msg.(*message.Hello).Id, From: r.from}, nil
 }
@@ -44,12 +43,9 @@ func (r *defaultRouter) HandleWelcome(c peer.NodePeer, msg message.Message) (mes
 	c.State(peer.PeerStatusConnected)
 	r.eventChan <- &peer.OnPeerConnectedEvent{c.Node(), peer.PeerStatusConnected, c.Mode()}
 
-	requestID := r.requestListener.Id(c.Node(), msg.(*message.Welcome).Id)
-	go r.requestListener.Notify(msg, requestID)
-
 	go r.watcher.Watch(c)
 
-	return  &message.Ack{Id: msg.(*message.Hello).Id, From: r.from}, nil
+	return &message.Ack{Id: msg.(*message.Hello).Id, From: r.from}, nil
 
 }
 
@@ -64,9 +60,7 @@ func (r *defaultRouter) HandleAbort(c peer.NodePeer, msg message.Message) (messa
 func (r *defaultRouter) HandleAck(c peer.NodePeer, msg message.Message) (message.Message, error) {
 	err := r.accept(c)
 	if err != nil {
-		r.eventChan <- &peer.OnPeerAbortedEvent{msg.(*message.Hello).From, peer.PeerStatusError}
-
-		return &message.Abort{Id: msg.(*message.Hello).Id, From: r.from}, nil
+		log.Println("Unexpected Error accepting Peer on HandleAck ", c.Node(), "msg:", msg)
 	}
 
 	c.State(peer.PeerStatusConnected)

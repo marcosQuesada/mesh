@@ -8,46 +8,41 @@ import (
 	"sync"
 
 	"github.com/marcosQuesada/mesh/message"
-	"github.com/marcosQuesada/mesh/node"
-	//"github.com/nu7hatch/gouuid"
 )
 
 const TIMEOUT = time.Second * 2
 
 type RequestListener struct {
-	listeners map[string]chan message.Message
+	listeners map[message.ID]chan message.Message
 	timeout   time.Duration
 	mutex     sync.Mutex
 }
 
 func NewRequestListener() *RequestListener {
 	return &RequestListener{
-		listeners: make(map[string]chan message.Message, 0),
+		listeners: make(map[message.ID]chan message.Message, 0),
 		timeout:   TIMEOUT,
+		mutex:     sync.Mutex{},
 	}
 }
 
-func (r *RequestListener) Id(n node.Node, id message.ID) string {
-	return fmt.Sprintf("node-%s-id-%d", n.String(), id)
-}
-
-func (r *RequestListener) Notify(msg message.Message, requestID string) {
+func (r *RequestListener) Notify(msg message.Message, requestID message.ID) {
 	if l, ok := r.listeners[requestID]; ok {
 		l <- msg
-		log.Println("Notify done", requestID)
+		log.Println("XXX RequestListener Notify done", requestID, msg.MessageType())
 		return
 	}
-	log.Println("No listener found for request", requestID, "type", msg.MessageType())
+	log.Println("XXX No listener found for request", requestID, "type", msg.MessageType())
 }
 
-func (r *RequestListener) Register(requestID string) {
-	log.Println("Register", requestID)
+func (r *RequestListener) Register(requestID message.ID) {
+	log.Println("XXX Register RequestListener", requestID)
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 	r.listeners[requestID] = make(chan message.Message, 1)
 }
 
-func (r *RequestListener) wait(requestID string) (msg message.Message, err error) {
+func (r *RequestListener) Wait(requestID message.ID) (msg message.Message, err error) {
 	timeout := time.NewTimer(r.timeout)
 	waitChannel, ok := r.listeners[requestID]
 	if !ok {
@@ -65,5 +60,6 @@ func (r *RequestListener) wait(requestID string) (msg message.Message, err error
 	close(waitChannel)
 	delete(r.listeners, requestID)
 
+	fmt.Println("XXX Request Listener Response ", requestID, err)
 	return
 }

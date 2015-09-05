@@ -7,13 +7,12 @@ import (
 	"log"
 )
 
-func (w *defaultWatcher) Handlers() map[message.MsgType]handler.Handler{
+func (w *defaultWatcher) Handlers() map[message.MsgType]handler.Handler {
 	return map[message.MsgType]handler.Handler{
-		message.PING:   w.HandlePing,
-		message.PONG:   w.HandlePong,
+		message.PING: w.HandlePing,
+		message.PONG: w.HandlePong,
 	}
 }
-
 
 func (w *defaultWatcher) HandlePing(c peer.NodePeer, msg message.Message) (message.Message, error) {
 	ping := msg.(*message.Ping)
@@ -25,8 +24,7 @@ func (w *defaultWatcher) HandlePing(c peer.NodePeer, msg message.Message) (messa
 func (w *defaultWatcher) HandlePong(c peer.NodePeer, msg message.Message) (message.Message, error) {
 	pong := msg.(*message.Pong)
 	log.Println("Handle Pong ", pong.Id, c.Node(), "from: ", pong.From.String())
-	requestID := w.requestListener.Id(c.Node(), pong.Id)
-	go w.requestListener.Notify(msg, requestID)
+	go w.requestListener.Notify(msg, pong.Id)
 
 	return nil, nil
 }

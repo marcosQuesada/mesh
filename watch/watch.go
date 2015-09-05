@@ -99,17 +99,17 @@ func (w *defaultWatcher) Watch(p peer.NodePeer) {
 			p.Commit(&message.Ping{Id: s.getId(), From: p.From(), To: node})
 			s.ticker.Stop()
 
-/*			requestId := w.requestListener.Id(p.Node(), s.getId())
+			requestId := s.getId()
+			log.Println("Registering PONG Watcher", requestId)
 			w.requestListener.Register(requestId)
 			log.Println("PING", s.getId(), "to", node.String(), "Waiting ", requestId)
 
-			msg, err := w.requestListener.wait(requestId)
+			msg, err := w.requestListener.Wait(requestId)
 			if err != nil {
 				log.Println("RequestListener ", requestId, err)
 
 				return
-			}*/
-/*
+			}
 			if msg.MessageType() != message.PONG {
 				log.Println("Error Unexpected Received type, expected PONG ", msg.MessageType(), "RequestListener ", requestId, err)
 				//@TODO: used to check development stability
@@ -118,7 +118,7 @@ func (w *defaultWatcher) Watch(p peer.NodePeer) {
 
 			log.Println("PING PONG OK", s.getId(), "to", node.String(), "Waiting ", requestId)
 
-			s.incId()*/
+			s.incId()
 			s.ticker = w.newTicker()
 		case <-s.Done:
 			return
