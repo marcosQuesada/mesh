@@ -18,38 +18,33 @@ import (
 	"github.com/marcosQuesada/mesh/peer"
 )
 
-type Watcher interface {
-	Watch(peer.NodePeer)
-	HandlePing(peer.NodePeer, message.Message) (message.Message, error)
-	HandlePong(peer.NodePeer, message.Message) (message.Message, error)
-}
-
 type defaultWatcher struct {
 	eventChan       chan dispatcher.Event
 	exit            chan bool
 	pingInterval    int
 	mutex           sync.RWMutex
 	index           map[string]*subject
-	requestListener *requestListener
+	requestListener *RequestListener
 	wg              sync.WaitGroup
 }
 
 type subject struct {
 	peer   peer.NodePeer
 	ticker *time.Ticker
-	id     int
+	id     message.ID
 	Done   chan bool
 	mutex  sync.Mutex
+	lastSeen time.Time
 }
 
 func (s *subject) incId() {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	s.id++
+	s.id = message.NewId()
 }
 
-func (s *subject) getId() int {
+func (s *subject) getId() message.ID {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -61,29 +56,28 @@ func init() {
 	rand.Seed(time.Now().UTC().UnixNano())
 }
 
-func New(evCh chan dispatcher.Event, interval int) *defaultWatcher {
+func New(rqLst *RequestListener, evCh chan dispatcher.Event, interval int) *defaultWatcher {
 	return &defaultWatcher{
 		eventChan:       evCh,
 		exit:            make(chan bool, 0),
 		index:           make(map[string]*subject, 0),
 		pingInterval:    interval * 1000,
-		requestListener: newRequestListener(),
+		requestListener: rqLst,
 	}
 }
 
 func (w *defaultWatcher) Watch(p peer.NodePeer) {
-	defer log.Println("XXX Watcher", p.Node(), "Exits")
-
 	//add watcher to waitGroup
 	w.wg.Add(1)
 	defer w.wg.Done()
 
-	//@TODO: Randomize this
 	subjectDone := make(chan bool, 10)
 	s := &subject{
 		peer:   p,
 		ticker: w.newTicker(),
 		Done:   subjectDone,
+		id: message.NewId(),
+		lastSeen: time.Now(),
 	}
 	defer close(s.Done)
 
@@ -94,28 +88,27 @@ func (w *defaultWatcher) Watch(p peer.NodePeer) {
 
 	for {
 		select {
+		case <- s.peer.ResetWatcherChan():
+			s.ticker.Stop()
+			s.ticker = w.newTicker()
+			continue
 		case <-s.ticker.C:
-			p.Commit(&message.Ping{Id: s.getId(), From: p.From(), To: node})
+			requestId := s.getId()
+			p.Commit(&message.Ping{Id: requestId, From: p.From(), To: node})
 			s.ticker.Stop()
 
-			requestId := w.requestListener.Id(p.Node(), s.getId())
-			w.requestListener.register(requestId)
-			log.Println("PING", s.getId(), "to", node.String(), "Waiting ", requestId)
-
-			msg, err := w.requestListener.wait(requestId)
+			w.requestListener.Register(requestId)
+			msg, err := w.requestListener.Wait(requestId)
 			if err != nil {
 				log.Println("RequestListener ", requestId, err)
 
 				return
 			}
-
 			if msg.MessageType() != message.PONG {
-				log.Println("Error Unexpected Received type, expected PONG ", msg.MessageType(), "requestListener ", requestId, err)
+				log.Println("Error Unexpected Received type, expected PONG ", msg.MessageType(), "RequestListener ", requestId, err)
 				//@TODO: used to check development stability
 				panic(err)
 			}
-
-			log.Println("PING PONG OK", s.getId(), "to", node.String(), "Waiting ", requestId)
 
 			s.incId()
 			s.ticker = w.newTicker()
@@ -139,22 +132,6 @@ func (w *defaultWatcher) Exit() {
 	log.Println("Exiting Done")
 }
 
-func (w *defaultWatcher) HandlePing(c peer.NodePeer, msg message.Message) (message.Message, error) {
-	ping := msg.(*message.Ping)
-	log.Println("Handle Ping", ping.Id, "from: ", ping.From.String())
-
-	return &message.Pong{Id: ping.Id, From: ping.To, To: ping.From}, nil
-}
-
-func (w *defaultWatcher) HandlePong(c peer.NodePeer, msg message.Message) (message.Message, error) {
-	pong := msg.(*message.Pong)
-	log.Println("Handle Pong ", pong.Id, c.Node(), "from: ", pong.From.String())
-	requestID := w.requestListener.Id(c.Node(), pong.Id)
-	go w.requestListener.notify(msg, requestID)
-
-	return nil, nil
-}
-
 func (w *defaultWatcher) newTicker() *time.Ticker {
-	return time.NewTicker(time.Duration(w.pingInterval+rand.Intn(2000)) * time.Millisecond)
+	return time.NewTicker(time.Duration(w.pingInterval+rand.Intn(10000)) * time.Millisecond)
 }

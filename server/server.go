@@ -8,6 +8,7 @@ import (
 	"github.com/marcosQuesada/mesh/cluster"
 	"github.com/marcosQuesada/mesh/config"
 	"github.com/marcosQuesada/mesh/dispatcher"
+	//"github.com/marcosQuesada/mesh/message"
 	n "github.com/marcosQuesada/mesh/node"
 	"github.com/marcosQuesada/mesh/peer"
 	"github.com/marcosQuesada/mesh/router"
@@ -33,7 +34,7 @@ func (s *Server) Start() {
 	c := cluster.StartCoordinator(s.node, s.config.Cluster)
 	go c.Run()
 
-	//s.router.RegisterHandler(message.ERROR, s.peerHandler.HandleError)
+	s.router.RegisterHandlers(c.Handlers())
 
 	d := dispatcher.New()
 	d.RegisterListener(&peer.OnPeerConnectedEvent{}, c.OnPeerConnectedEvent)

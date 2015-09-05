@@ -2,14 +2,15 @@ package router
 
 import (
 	"fmt"
-	"sync"
-
 	"log"
+	"reflect"
+	"sync"
 
 	"github.com/marcosQuesada/mesh/dispatcher"
 	"github.com/marcosQuesada/mesh/message"
 	"github.com/marcosQuesada/mesh/node"
 	"github.com/marcosQuesada/mesh/peer"
+	"github.com/marcosQuesada/mesh/router/handler"
 	"github.com/marcosQuesada/mesh/watch"
 )
 
@@ -17,53 +18,56 @@ type Router interface {
 	Route(message.Message) error
 	Accept(*peer.Peer)
 	Handle(peer.NodePeer, message.Message) message.Message
-	RegisterHandler(message.MsgType, Handler)
+	RegisterHandlers(handlers map[message.MsgType]handler.Handler)
+	RegisterHandler(message.MsgType, handler.Handler)
 	Events() chan dispatcher.Event
 	Exit()
 
 	InitDialClient(destination node.Node) //HEre??? NO
 }
 
-//Handler represent a method to be invoked with message
-//error will be returned on unexpected handling
-type Handler func(peer.NodePeer, message.Message) (message.Message, error)
-
 type defaultRouter struct {
-	handlers  map[message.MsgType]Handler
-	from      node.Node
-	peers     map[string]peer.NodePeer
-	peerIDs   map[peer.ID]bool
-	eventChan chan dispatcher.Event
-	exit      chan bool
-	watcher   watch.Watcher
-	mutex     sync.Mutex
+	handlers        map[message.MsgType]handler.Handler
+	from            node.Node
+	peers           map[string]peer.NodePeer
+	peerIDs         map[peer.ID]bool
+	eventChan       chan dispatcher.Event
+	exit            chan bool
+	watcher         watch.Watcher
+	mutex           sync.Mutex
+	requestListener *watch.RequestListener
 }
 
 func New(n node.Node) *defaultRouter {
 	evChan := make(chan dispatcher.Event, 10)
-	w := watch.New(evChan, 2)
+	reqList := watch.NewRequestListener()
+	w := watch.New(reqList, evChan, 2)
+
 	r := &defaultRouter{
-		from:      n,
-		peers:     make(map[string]peer.NodePeer),
-		peerIDs:   make(map[peer.ID]bool, 0),
-		eventChan: evChan,
-		exit:      make(chan bool),
-		watcher:   w,
+		handlers:        make(map[message.MsgType]handler.Handler),
+		from:            n,
+		peers:           make(map[string]peer.NodePeer),
+		peerIDs:         make(map[peer.ID]bool, 0),
+		eventChan:       evChan,
+		exit:            make(chan bool),
+		watcher:         w,
+		requestListener: reqList,
 	}
-	//initialize local handlers
-	r.handlers = map[message.MsgType]Handler{
-		message.HELLO:   r.HandleHello,
-		message.WELCOME: r.HandleWelcome,
-		message.ABORT:   r.HandleAbort,
-		message.ERROR:   r.HandleError,
-		message.PING:    w.HandlePing,
-		message.PONG:    w.HandlePong,
-	}
+
+	r.RegisterHandlers(r.Handlers())
+	r.RegisterHandlers(w.Handlers())
 
 	return r
 }
 
-func (r *defaultRouter) RegisterHandler(msgType message.MsgType, handler Handler) {
+func (r *defaultRouter) RegisterHandlers(handlers map[message.MsgType]handler.Handler) {
+	for msg, h := range handlers {
+		fmt.Println("Registering ", msg)
+		r.RegisterHandler(msg, h)
+	}
+}
+
+func (r *defaultRouter) RegisterHandler(msgType message.MsgType, handler handler.Handler) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
@@ -87,6 +91,10 @@ func (r *defaultRouter) Route(msg message.Message) error {
 	return nil
 }
 
+func (r *defaultRouter) WaitResponse(c *peer.Peer, requestId message.ID) {
+	r.requestListener.Transaction(requestId)
+}
+
 func (r *defaultRouter) Accept(c *peer.Peer) {
 	go func() {
 		for {
@@ -102,17 +110,32 @@ func (r *defaultRouter) Accept(c *peer.Peer) {
 
 					return
 				}
+				log.Println("----------------RCV ", reflect.TypeOf(msg).String(), msg.ID(), msg.Origin())
 
+				requestID := msg.ID()
 				response := r.Handle(c, msg)
 				if response != nil {
 					c.Commit(response)
 
+					//TODO: Solve this type handling mess
 					if response.MessageType() == message.ABORT {
 						c.Exit()
 						return
 					}
+
+					if response.MessageType() == message.ACK {
+						r.requestListener.Notify(msg, requestID)
+						continue
+					}
+
+					if response.MessageType() != message.PONG {
+						r.WaitResponse(c, requestID)
+					}
 				}
 
+				if msg.MessageType() != message.HELLO && msg.MessageType() != message.PING {
+					r.requestListener.Notify(msg, requestID)
+				}
 			case <-r.exit:
 				log.Println("Exit", c.From(), c.Mode())
 				return
@@ -149,13 +172,8 @@ func (r *defaultRouter) Events() chan dispatcher.Event {
 }
 
 func (r *defaultRouter) InitDialClient(destination node.Node) {
-	//Blocking call, wait until connection success
-	p := peer.NewDialer(r.from, destination)
-	go p.Run()
-	log.Println("Connected Dial Client from Node ", r.from.String(), "destination: ", destination.String(), p.Id())
-
-	//Say Hello and wait response
-	p.SayHello()
+	p, requestId := peer.InitDialClient(r.from, destination)
+	r.WaitResponse(p, requestId)
 	r.Accept(p)
 }
 
@@ -172,6 +190,16 @@ func (r *defaultRouter) accept(p peer.NodePeer) error {
 	r.peerIDs[p.Id()] = true
 
 	return nil
+}
+
+func (r *defaultRouter) exists(p peer.NodePeer) bool {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+
+	var node node.Node = p.Node()
+	_, ok := r.peers[node.String()]
+
+	return ok
 }
 
 func (r *defaultRouter) remove(p peer.NodePeer) error {

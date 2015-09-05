@@ -2,12 +2,33 @@ package message
 
 import (
 	n "github.com/marcosQuesada/mesh/node"
+	"github.com/nu7hatch/gouuid"
+	"log"
 )
+
+type Status string
+
+type ID string
+
+func NewId() ID {
+	idV4, err := uuid.NewV4()
+	if err != nil {
+		log.Println("error generating v4 ID:", err)
+	}
+
+	id, err := uuid.NewV5(idV4, []byte("message"))
+	if err != nil {
+		log.Println("error generating v5 ID:", err)
+	}
+
+	return ID(id.String())
+}
 
 type Message interface {
 	MessageType() MsgType
 	Origin() n.Node
 	Destination() n.Node
+	ID() ID
 }
 
 type MsgType int
@@ -15,7 +36,7 @@ type MsgType int
 func (mt MsgType) New() Message {
 	switch mt {
 	case HELLO:
-		return &Hello{} //from: n.Node{}
+		return &Hello{}
 	case WELCOME:
 		return &Welcome{}
 	case ABORT:
@@ -30,6 +51,10 @@ func (mt MsgType) New() Message {
 		return &Done{}
 	case ERROR:
 		return &Error{}
+	case COMMAND:
+		return &Command{}
+	case ACK:
+		return &Ack{}
 	}
 
 	return nil
@@ -42,13 +67,15 @@ const (
 	PING    = MsgType(3)
 	PONG    = MsgType(4)
 	GOODBYE = MsgType(5)
+	ACK     = MsgType(6)
 	DONE    = MsgType(90)
 	ERROR   = MsgType(99)
+	COMMAND = MsgType(50)
 )
 
 // First connection message
 type Hello struct {
-	Id      int
+	Id      ID
 	From    n.Node
 	To      n.Node
 	Details map[string]interface{}
@@ -66,15 +93,19 @@ func (h Hello) Destination() n.Node {
 	return h.To
 }
 
+func (h Hello) ID() ID {
+	return h.Id
+}
+
 // Hello Accepted
 type Welcome struct {
-	Id      int
+	Id      ID
 	From    n.Node
 	To      n.Node
 	Details map[string]interface{}
 }
 
-func (w Welcome) MessageType() MsgType {
+func (h Welcome) MessageType() MsgType {
 	return WELCOME
 }
 
@@ -86,15 +117,19 @@ func (h Welcome) Destination() n.Node {
 	return h.To
 }
 
+func (h Welcome) ID() ID {
+	return h.Id
+}
+
 // Hello Rejected
 type Abort struct {
-	Id      int
+	Id      ID
 	From    n.Node
 	To      n.Node
 	Details map[string]interface{}
 }
 
-func (a Abort) MessageType() MsgType {
+func (h Abort) MessageType() MsgType {
 	return ABORT
 }
 
@@ -106,14 +141,18 @@ func (h Abort) Destination() n.Node {
 	return h.To
 }
 
+func (h Abort) ID() ID {
+	return h.Id
+}
+
 // Ping request to a remote node
 type Ping struct {
-	Id   int
+	Id   ID
 	From n.Node
 	To   n.Node
 }
 
-func (p Ping) MessageType() MsgType {
+func (h Ping) MessageType() MsgType {
 	return PING
 }
 
@@ -125,14 +164,18 @@ func (h Ping) Destination() n.Node {
 	return h.To
 }
 
+func (h Ping) ID() ID {
+	return h.Id
+}
+
 // Pong response as a ping request
 type Pong struct {
-	Id   int
+	Id   ID
 	From n.Node
 	To   n.Node
 }
 
-func (p Pong) MessageType() MsgType {
+func (h Pong) MessageType() MsgType {
 	return PONG
 }
 
@@ -144,14 +187,18 @@ func (h Pong) Destination() n.Node {
 	return h.To
 }
 
+func (h Pong) ID() ID {
+	return h.Id
+}
+
 type GoodBye struct {
-	Id      int
+	Id      ID
 	From    n.Node
 	To      n.Node
 	Details map[string]interface{}
 }
 
-func (g GoodBye) MessageType() MsgType {
+func (h GoodBye) MessageType() MsgType {
 	return GOODBYE
 }
 
@@ -163,14 +210,18 @@ func (h GoodBye) Destination() n.Node {
 	return h.To
 }
 
+func (h GoodBye) ID() ID {
+	return h.Id
+}
+
 type Done struct {
-	Id      int
+	Id      ID
 	From    n.Node
 	To      n.Node
 	Details map[string]interface{}
 }
 
-func (g Done) MessageType() MsgType {
+func (h Done) MessageType() MsgType {
 	return DONE
 }
 
@@ -182,14 +233,18 @@ func (h Done) Destination() n.Node {
 	return h.To
 }
 
+func (h Done) ID() ID {
+	return h.Id
+}
+
 type Error struct {
-	Id      int
+	Id      ID
 	From    n.Node
 	To      n.Node
 	Details map[string]interface{}
 }
 
-func (w Error) MessageType() MsgType {
+func (h Error) MessageType() MsgType {
 	return ERROR
 }
 
@@ -201,4 +256,52 @@ func (h Error) Destination() n.Node {
 	return h.To
 }
 
-type Status string
+func (h Error) ID() ID {
+	return h.Id
+}
+
+type Command struct {
+	Id      ID
+	From    n.Node
+	To      n.Node
+	Details map[string]interface{}
+}
+
+func (h Command) MessageType() MsgType {
+	return COMMAND
+}
+
+func (h Command) Origin() n.Node {
+	return h.From
+}
+
+func (h Command) Destination() n.Node {
+	return h.To
+}
+
+func (h Command) ID() ID {
+	return h.Id
+}
+
+type Ack struct {
+	Id      ID
+	From    n.Node
+	To      n.Node
+	Details map[string]interface{}
+}
+
+func (h Ack) MessageType() MsgType {
+	return ACK
+}
+
+func (h Ack) Origin() n.Node {
+	return h.From
+}
+
+func (h Ack) Destination() n.Node {
+	return h.To
+}
+
+func (h Ack) ID() ID {
+	return h.Id
+}

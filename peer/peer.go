@@ -1,16 +1,17 @@
 package peer
 
 import (
+	"github.com/marcosQuesada/mesh/message"
+	n "github.com/marcosQuesada/mesh/node"
 	"io"
 	"log"
 	"net"
+	"reflect"
 	"time"
-
-	"github.com/marcosQuesada/mesh/message"
-	n "github.com/marcosQuesada/mesh/node"
 )
 
 const (
+	PeerStatusStarted      = message.Status("started")
 	PeerStatusConnecting   = message.Status("connecting")
 	PeerStatusConnected    = message.Status("connected")
 	PeerStatusDisconnected = message.Status("disconnected")
@@ -30,24 +31,30 @@ type NodePeer interface {
 	ReceiveChan() chan message.Message
 	Send(message.Message) error
 	Commit(message.Message)
-	SayHello() // Pending to remove, must be internal
+	State(message.Status)
+	SayHello() (message.ID, error) // Pending to remove, must be internal
+	ResetWatcherChan() chan bool
 }
 
 type Peer struct {
 	Link
-	from        n.Node
-	to          n.Node
-	dataChan    chan message.Message
-	messageChan chan message.Message
-	sendChan    chan message.Message
-	exitChan    chan bool
-	doneChan    chan bool
-	mode        string
+	from         n.Node
+	to           n.Node
+	dataChan     chan message.Message
+	messageChan  chan message.Message
+	sendChan     chan message.Message
+	exitChan     chan bool
+	doneChan     chan bool
+	rstWatchChan chan bool
+	mode         string
+	state        message.Status
 }
 
 func NewDialer(from n.Node, destination n.Node) *Peer {
 	var conn net.Conn
 	var err error
+	log.Println("init dialer to:", destination.String())
+
 	for {
 		conn, err = net.Dial("tcp", string(destination.String()))
 		if err != nil {
@@ -59,42 +66,63 @@ func NewDialer(from n.Node, destination n.Node) *Peer {
 	}
 
 	return &Peer{
-		from:        from,
-		Link:        NewJSONSocketLink(conn),
-		to:          destination,
-		dataChan:    make(chan message.Message, 10),
-		messageChan: make(chan message.Message, 10),
-		sendChan:    make(chan message.Message, 0),
-		exitChan:    make(chan bool, 2),
-		doneChan:    make(chan bool, 1),
-		mode:        "client",
+		from:         from,
+		Link:         NewJSONSocketLink(conn),
+		to:           destination,
+		dataChan:     make(chan message.Message, 10),
+		messageChan:  make(chan message.Message, 10),
+		sendChan:     make(chan message.Message, 0),
+		exitChan:     make(chan bool, 2),
+		doneChan:     make(chan bool, 1),
+		rstWatchChan: make(chan bool, 1),
+		mode:         "client",
+		state:        PeerStatusStarted,
 	}
 }
 
 func NewAcceptor(conn net.Conn, server n.Node) *Peer {
 	return &Peer{
-		Link:        NewJSONSocketLink(conn),
-		from:        server,
-		dataChan:    make(chan message.Message, 10),
-		messageChan: make(chan message.Message, 10),
-		sendChan:    make(chan message.Message, 0),
-		exitChan:    make(chan bool, 1),
-		doneChan:    make(chan bool, 1),
-		mode:        "server",
+		Link:         NewJSONSocketLink(conn),
+		from:         server,
+		dataChan:     make(chan message.Message, 10),
+		messageChan:  make(chan message.Message, 10),
+		sendChan:     make(chan message.Message, 0),
+		exitChan:     make(chan bool, 1),
+		doneChan:     make(chan bool, 1),
+		rstWatchChan: make(chan bool, 1),
+		mode:         "server",
+		state:        PeerStatusStarted,
 	}
+}
+
+func InitDialClient(from n.Node, destination n.Node) (*Peer, message.ID) {
+	//Blocking call, wait until connection success
+	p := NewDialer(from, destination)
+	go p.Run()
+	log.Println("Connected Dial Client from Node ", from.String(), "destination: ", destination.String())
+
+	//Say Hello and wait response
+	id, err := p.SayHello()
+	if err != nil {
+		log.Println("Error getting Hello Id ", err)
+	}
+
+	return p, id
 }
 
 func (p *Peer) ReceiveChan() chan message.Message {
 	return p.messageChan
 }
 
-func (p *Peer) SayHello() {
+func (p *Peer) SayHello() (u message.ID, err error) {
 	msg := message.Hello{
-		Id:      0,
+		Id:      message.NewId(),
 		From:    p.from,
 		Details: map[string]interface{}{"foo": "bar"},
 	}
 	p.Commit(msg)
+
+	return msg.Id, err
 }
 
 func (p *Peer) Run() {
@@ -110,8 +138,16 @@ func (p *Peer) Exit() {
 	//	log.Println("exit done ", p.Node(), p.mode, p.Id())
 }
 
+func (p *Peer) ResetWatcherChan() chan bool {
+	return p.rstWatchChan
+}
+
 func (p *Peer) Node() n.Node {
 	return p.to
+}
+
+func (p *Peer) State(s message.Status) {
+	p.state = s
 }
 
 //Used on dev Only!
@@ -149,6 +185,7 @@ func (p *Peer) receiveLoop() {
 
 func (p *Peer) handle() {
 	defer close(p.doneChan)
+	defer close(p.rstWatchChan)
 
 	go p.handleSendChan()
 	for {
@@ -162,6 +199,7 @@ func (p *Peer) handle() {
 			}
 			p.messageChan <- msg
 
+			p.rstWatchChan <- true
 		case <-p.exitChan:
 			return
 		}
@@ -179,6 +217,7 @@ func (p *Peer) handleSendChan() {
 				log.Println("Send channel is closed, return", p.to, p.mode)
 				return
 			}
+			log.Println("------------------SND ", reflect.TypeOf(msg).String(), msg.ID(), p.Node())
 			p.Send(msg)
 		case <-p.exitChan:
 			return
@@ -214,10 +253,17 @@ func (f *NopPeer) Send(m message.Message) error {
 func (f *NopPeer) ReceiveChan() chan message.Message {
 	return f.MsgChan
 }
+func (f *NopPeer) ResetWatcherChan() chan bool {
+	ch := make(chan bool, 10000)
+	return ch
+}
 
 func (f *NopPeer) Exit() {
 }
-func (f *NopPeer) SayHello() {
+func (f *NopPeer) SayHello() (message.ID, error) {
+	return message.ID("fake"), nil
+}
+func (f *NopPeer) State(s message.Status) {
 }
 func (f *NopPeer) Identify(n n.Node) {
 }

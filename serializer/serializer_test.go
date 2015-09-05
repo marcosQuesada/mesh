@@ -10,7 +10,7 @@ func TestJsonSerializer(t *testing.T) {
 	node := n.Node{Host: "localhost", Port: 13123}
 
 	msg := m.Hello{
-		Id:      10,
+		Id:      m.NewId(),
 		From:    node,
 		Details: map[string]interface{}{"foo": "bar"},
 	}

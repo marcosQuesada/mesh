@@ -7,11 +7,13 @@ import (
 	"github.com/marcosQuesada/mesh/message"
 	"github.com/marcosQuesada/mesh/node"
 	"github.com/marcosQuesada/mesh/peer"
+	"github.com/marcosQuesada/mesh/router/handler"
+	"github.com/marcosQuesada/mesh/watch"
 )
 
 func TestBasicRouterHandling(t *testing.T) {
 	r := &defaultRouter{
-		handlers: make(map[message.MsgType]Handler),
+		handlers: make(map[message.MsgType]handler.Handler),
 		exit:     make(chan bool, 1),
 	}
 
@@ -31,8 +33,9 @@ func TestBasicRouterHandling(t *testing.T) {
 
 func TestRouterAccept(t *testing.T) {
 	r := &defaultRouter{
-		handlers: make(map[message.MsgType]Handler),
-		exit:     make(chan bool, 1),
+		handlers:        make(map[message.MsgType]handler.Handler),
+		exit:            make(chan bool, 1),
+		requestListener: watch.NewRequestListener(),
 	}
 
 	hello := &message.Hello{}
@@ -52,6 +55,17 @@ func TestRouterAccept(t *testing.T) {
 	c1Mirror.Identify(nodeA)
 	go c1Mirror.Run()
 
+	go func() {
+		for{
+			select {
+			case <-c1.ResetWatcherChan():
+				continue
+			case <-c1Mirror.ResetWatcherChan():
+				continue
+			}
+		}
+	}()
+
 	r.Accept(c1)
 
 	c1Mirror.SayHello()
@@ -61,8 +75,9 @@ func TestRouterAccept(t *testing.T) {
 		t.Error("Unexpected response type, expected 1 got", result.MessageType())
 	}
 
+	id := message.NewId()
 	msg := message.Ping{
-		Id:   999,
+		Id:   id,
 		From: nodeA,
 		To:   nodeB,
 	}
@@ -74,7 +89,7 @@ func TestRouterAccept(t *testing.T) {
 	}
 
 	pong := result.(*message.Pong)
-	if pong.Id != 999 {
+	if pong.Id != id {
 		t.Error("Unexpected result Id")
 	}
 	if pong.From != nodeB {

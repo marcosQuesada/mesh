@@ -31,9 +31,10 @@ func TestLinksOnPipes(t *testing.T) {
 	go tp.handleLink(linkA, node.Node{Host: "localhost", Port: 5000})
 	go tp.handleLink(linkB, node.Node{Host: "localhost", Port: 5005})
 
+	id := message.NewId()
 	//first message
 	msg := message.Hello{
-		Id:      0,
+		Id:      id,
 		From:    node.Node{Host: "localhost", Port: 5000},
 		Details: map[string]interface{}{"foo": "bar"},
 	}
@@ -44,7 +45,7 @@ func TestLinksOnPipes(t *testing.T) {
 	lastMessage := <-tp.outChan
 	fmt.Println("lastMessage A", lastMessage)
 
-	if int(lastMessage.Id) == 0 {
+	if lastMessage.Id == id {
 		t.Error("LastMessage must be bigger ")
 	}
 
@@ -80,7 +81,7 @@ func (ph *testLinkHandler) handleLink(p *SocketLink, from node.Node) {
 			} else {
 				newMsg.Details["foo"] = "PONG"
 			}
-			newMsg.Id++
+			newMsg.Id = message.NewId()
 			newMsg.From = from
 
 			err = p.Send(newMsg)
@@ -106,8 +107,9 @@ func TestBasicLinksOnServerClient(t *testing.T) {
 
 	linkA := NewJSONSocketLink(conn)
 
+	id := message.NewId()
 	msg := message.Hello{
-		Id:      10,
+		Id:      id,
 		Details: map[string]interface{}{"foo": "bar"},
 	}
 	linkA.Send(msg)
@@ -123,7 +125,7 @@ func TestBasicLinksOnServerClient(t *testing.T) {
 	}
 
 	newMsg := msgA.(*message.Hello)
-	if newMsg.Id != 10 {
+	if newMsg.Id != id {
 		t.Error("Error on received Hello Message ", msgA)
 	}
 

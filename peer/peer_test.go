@@ -16,28 +16,30 @@ func TestPeerMessagingUnderPipes(t *testing.T) {
 	a, b := net.Pipe()
 
 	c1 := &Peer{
-		Link:        NewJSONSocketLink(a),
-		from:        node.Node{Host: "foo"},
-		to:          node.Node{Host: "bar"},
-		dataChan:    make(chan message.Message, 10),
-		sendChan:    make(chan message.Message, 10),
-		messageChan: make(chan message.Message, 10),
-		exitChan:    make(chan bool),
-		doneChan:    make(chan bool),
-		mode:        "pipe",
+		Link:         NewJSONSocketLink(a),
+		from:         node.Node{Host: "foo"},
+		to:           node.Node{Host: "bar"},
+		dataChan:     make(chan message.Message, 10),
+		sendChan:     make(chan message.Message, 10),
+		messageChan:  make(chan message.Message, 10),
+		exitChan:     make(chan bool),
+		doneChan:     make(chan bool),
+		rstWatchChan: make(chan bool, 100),
+		mode:         "pipe",
 	}
 	go c1.Run()
 
 	c1Mirror := &Peer{
-		Link:        NewJSONSocketLink(b),
-		from:        node.Node{Host: "bar"},
-		to:          node.Node{Host: "foo"},
-		dataChan:    make(chan message.Message, 10),
-		sendChan:    make(chan message.Message, 10),
-		messageChan: make(chan message.Message, 10),
-		exitChan:    make(chan bool),
-		doneChan:    make(chan bool),
-		mode:        "pipe",
+		Link:         NewJSONSocketLink(b),
+		from:         node.Node{Host: "bar"},
+		to:           node.Node{Host: "foo"},
+		dataChan:     make(chan message.Message, 10),
+		sendChan:     make(chan message.Message, 10),
+		messageChan:  make(chan message.Message, 10),
+		exitChan:     make(chan bool),
+		doneChan:     make(chan bool),
+		rstWatchChan: make(chan bool, 100),
+		mode:         "pipe",
 	}
 	go c1Mirror.Run()
 
@@ -51,12 +53,16 @@ func TestPeerMessagingUnderPipes(t *testing.T) {
 			select {
 			case r := <-c1.ReceiveChan():
 				msg := r.(*message.Hello)
-				msg.Id = 1
+				msg.Id = message.NewId()
 				resChan <- msg
 			case r := <-c1Mirror.ReceiveChan():
 				msg := r.(*message.Hello)
-				msg.Id = 2
+				msg.Id = message.NewId()
 				resChan <- msg
+			case <-c1.ResetWatcherChan():
+				continue
+			case <-c1Mirror.ResetWatcherChan():
+				continue
 			case <-doneChan:
 				close(resChan)
 				wg.Done()
@@ -100,7 +106,7 @@ func TestBasicNopPeerTest(t *testing.T) {
 	fkc := &NopPeer{"localhost", 9000, ch}
 
 	msg := message.Hello{
-		Id:      999,
+		Id:      message.NewId(),
 		From:    node.Node{"localhost", 9000},
 		Details: map[string]interface{}{"foo": "bar"},
 	}
@@ -150,7 +156,12 @@ func TestBasicPingPongChannel(t *testing.T) {
 				wg.Done()
 
 				return
+			case <-c1.ResetWatcherChan():
+				continue
+			case <-c1Mirror.ResetWatcherChan():
+				continue
 			}
+
 		}
 		return
 	}()
@@ -233,6 +244,10 @@ func TestPeersUsingPipes(t *testing.T) {
 					return
 				}
 				total++
+			case <-c1.ResetWatcherChan():
+				continue
+			case <-c1Mirror.ResetWatcherChan():
+				continue
 			}
 		}
 	}()
