@@ -58,6 +58,11 @@ func (c *Coordinator) RunStatus() {
 		default:
 			time.Sleep(time.Second * 1)
 			complete := true
+
+			if len(c.connected) == 0 {
+				complete = false
+			}
+
 			for _, v := range c.connected {
 				if !v {
 					complete = false
