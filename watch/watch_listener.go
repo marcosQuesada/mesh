@@ -29,14 +29,12 @@ func NewRequestListener() *RequestListener {
 func (r *RequestListener) Notify(msg message.Message, requestID message.ID) {
 	if l, ok := r.listeners[requestID]; ok {
 		l <- msg
-		log.Println("XXX RequestListener Notify done", requestID, msg.MessageType())
 		return
 	}
 	log.Println("XXX No listener found for request", requestID, "type", msg.MessageType())
 }
 
 func (r *RequestListener) Register(requestID message.ID) {
-	log.Println("XXX Register RequestListener", requestID)
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 	r.listeners[requestID] = make(chan message.Message, 1)
@@ -60,6 +58,5 @@ func (r *RequestListener) Wait(requestID message.ID) (msg message.Message, err e
 	close(waitChannel)
 	delete(r.listeners, requestID)
 
-	fmt.Println("XXX Request Listener Response ", requestID, err)
 	return
 }

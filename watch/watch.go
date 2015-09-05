@@ -73,8 +73,6 @@ func New(evCh chan dispatcher.Event, interval int) *defaultWatcher {
 }
 
 func (w *defaultWatcher) Watch(p peer.NodePeer) {
-	defer log.Println("XXX Watcher", p.Node(), "Exits")
-
 	//add watcher to waitGroup
 	w.wg.Add(1)
 	defer w.wg.Done()
@@ -93,7 +91,7 @@ func (w *defaultWatcher) Watch(p peer.NodePeer) {
 	w.index[node.String()] = s
 	w.mutex.Unlock()
 
-	for {
+/*	for {
 		select {
 		case <-s.ticker.C:
 			p.Commit(&message.Ping{Id: s.getId(), From: p.From(), To: node})
@@ -123,7 +121,7 @@ func (w *defaultWatcher) Watch(p peer.NodePeer) {
 		case <-s.Done:
 			return
 		}
-	}
+	}*/
 
 }
 

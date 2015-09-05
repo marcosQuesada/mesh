@@ -21,13 +21,11 @@ func (r *defaultRouter) Handlers() map[message.MsgType]handler.Handler {
 //HandleHello Request
 func (r *defaultRouter) HandleHello(c peer.NodePeer, msg message.Message) (message.Message, error) {
 	c.Identify(msg.(*message.Hello).From)
-	if !r.exists(c) {
+	if r.exists(c) {
 		return &message.Abort{Id: msg.(*message.Hello).Id, From: r.from}, nil
 	}
 
 	c.State(peer.PeerStatusConnecting)
-
-	go r.requestListener.Notify(msg, msg.(*message.Hello).Id)
 
 	return &message.Welcome{Id: msg.(*message.Hello).Id, From: r.from}, nil
 }
@@ -45,7 +43,7 @@ func (r *defaultRouter) HandleWelcome(c peer.NodePeer, msg message.Message) (mes
 
 	go r.watcher.Watch(c)
 
-	return &message.Ack{Id: msg.(*message.Hello).Id, From: r.from}, nil
+	return &message.Ack{Id: msg.(*message.Welcome).Id, From: r.from}, nil
 
 }
 
@@ -64,7 +62,7 @@ func (r *defaultRouter) HandleAck(c peer.NodePeer, msg message.Message) (message
 	}
 
 	c.State(peer.PeerStatusConnected)
-	r.eventChan <- &peer.OnPeerConnectedEvent{msg.(*message.Hello).From, peer.PeerStatusConnected, c.Mode()}
+	r.eventChan <- &peer.OnPeerConnectedEvent{msg.(*message.Ack).From, peer.PeerStatusConnected, c.Mode()}
 
 	go r.watcher.Watch(c)
 

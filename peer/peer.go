@@ -5,7 +5,7 @@ import (
 	"log"
 	"net"
 	"time"
-
+	"reflect"
 	"github.com/marcosQuesada/mesh/message"
 	n "github.com/marcosQuesada/mesh/node"
 )
@@ -51,6 +51,8 @@ type Peer struct {
 func NewDialer(from n.Node, destination n.Node) *Peer {
 	var conn net.Conn
 	var err error
+	log.Println("init dialer to:", destination.String())
+
 	for {
 		conn, err = net.Dial("tcp", string(destination.String()))
 		if err != nil {
@@ -93,14 +95,13 @@ func InitDialClient(from n.Node, destination n.Node) (*Peer, message.ID) {
 	//Blocking call, wait until connection success
 	p := NewDialer(from, destination)
 	go p.Run()
-	log.Println("Connected Dial Client from Node ", from.String(), "destination: ", destination.String(), p.Id())
+	log.Println("Connected Dial Client from Node ", from.String(), "destination: ", destination.String())
 
 	//Say Hello and wait response
 	id, err := p.SayHello()
 	if err != nil {
 		log.Println("Error getting Hello Id ", err)
 	}
-	log.Println("HEllo Sended destination: ", destination.String(), id)
 
 	return p, id
 }
@@ -206,6 +207,7 @@ func (p *Peer) handleSendChan() {
 				log.Println("Send channel is closed, return", p.to, p.mode)
 				return
 			}
+			log.Println("------------------SND ", reflect.TypeOf(msg).String(), msg.ID() ,p.Node())
 			p.Send(msg)
 		case <-p.exitChan:
 			return

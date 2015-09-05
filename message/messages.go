@@ -53,6 +53,8 @@ func (mt MsgType) New() Message {
 		return &Error{}
 	case COMMAND:
 		return &Command{}
+	case ACK:
+		return &Ack{}
 	}
 
 	return nil
@@ -289,7 +291,7 @@ type Ack struct {
 }
 
 func (h Ack) MessageType() MsgType {
-	return COMMAND
+	return ACK
 }
 
 func (h Ack) Origin() n.Node {

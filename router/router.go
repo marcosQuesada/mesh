@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"sync"
+	"reflect"
 
 	"github.com/marcosQuesada/mesh/dispatcher"
 	"github.com/marcosQuesada/mesh/message"
@@ -91,16 +92,12 @@ func (r *defaultRouter) Route(msg message.Message) error {
 func (r *defaultRouter) WaitResponse(c *peer.Peer, requestId message.ID) {
 	go func() {
 		r.requestListener.Register(requestId)
-		log.Println("XXX WaitResponse Register", requestId, "to", r.from.String())
-
-		msg, err := r.requestListener.Wait(requestId)
+		_, err := r.requestListener.Wait(requestId)
 		if err != nil {
 			log.Println("XXX WaitResponse RequestListener ", requestId, err)
 
 			return
 		}
-
-		log.Println("XXX WaitResponse RequestListener Message result", requestId, msg)
 	}()
 }
 
@@ -119,22 +116,29 @@ func (r *defaultRouter) Accept(c *peer.Peer) {
 
 					return
 				}
+				log.Println("----------------RCV ", reflect.TypeOf(msg).String(), msg.ID(), msg.Origin())
 
 				requestID := msg.ID()
 				response := r.Handle(c, msg)
 				if response != nil {
 					c.Commit(response)
-					fmt.Println("Waiting response ", msg.MessageType(), requestID)
-					r.WaitResponse(c, requestID)
 
 					if response.MessageType() == message.ABORT {
 						c.Exit()
 						return
 					}
-					continue
-				}
-				go r.requestListener.Notify(msg, requestID)
 
+					if response.MessageType() == message.ACK {
+						r.requestListener.Notify(msg, requestID)
+						continue
+					}
+
+					r.WaitResponse(c, requestID)
+				}
+
+				if msg.MessageType() != message.HELLO {
+					r.requestListener.Notify(msg, requestID)
+				}
 			case <-r.exit:
 				log.Println("Exit", c.From(), c.Mode())
 				return
@@ -172,9 +176,6 @@ func (r *defaultRouter) Events() chan dispatcher.Event {
 
 func (r *defaultRouter) InitDialClient(destination node.Node) {
 	p, requestId := peer.InitDialClient(r.from, destination)
-
-	fmt.Println("XXX Register on InitDialClient ", requestId)
-	r.requestListener.Register(requestId)
 
 	r.WaitResponse(p, requestId)
 	r.Accept(p)
