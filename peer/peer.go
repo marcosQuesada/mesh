@@ -1,13 +1,13 @@
 package peer
 
 import (
+	"github.com/marcosQuesada/mesh/message"
+	n "github.com/marcosQuesada/mesh/node"
 	"io"
 	"log"
 	"net"
-	"time"
 	"reflect"
-	"github.com/marcosQuesada/mesh/message"
-	n "github.com/marcosQuesada/mesh/node"
+	"time"
 )
 
 const (
@@ -33,19 +33,21 @@ type NodePeer interface {
 	Commit(message.Message)
 	State(message.Status)
 	SayHello() (message.ID, error) // Pending to remove, must be internal
+	ResetWatcherChan() chan bool
 }
 
 type Peer struct {
 	Link
-	from        n.Node
-	to          n.Node
-	dataChan    chan message.Message
-	messageChan chan message.Message
-	sendChan    chan message.Message
-	exitChan    chan bool
-	doneChan    chan bool
-	mode        string
-	state       message.Status
+	from         n.Node
+	to           n.Node
+	dataChan     chan message.Message
+	messageChan  chan message.Message
+	sendChan     chan message.Message
+	exitChan     chan bool
+	doneChan     chan bool
+	rstWatchChan chan bool
+	mode         string
+	state        message.Status
 }
 
 func NewDialer(from n.Node, destination n.Node) *Peer {
@@ -64,30 +66,32 @@ func NewDialer(from n.Node, destination n.Node) *Peer {
 	}
 
 	return &Peer{
-		from:        from,
-		Link:        NewJSONSocketLink(conn),
-		to:          destination,
-		dataChan:    make(chan message.Message, 10),
-		messageChan: make(chan message.Message, 10),
-		sendChan:    make(chan message.Message, 0),
-		exitChan:    make(chan bool, 2),
-		doneChan:    make(chan bool, 1),
-		mode:        "client",
-		state:       PeerStatusStarted,
+		from:         from,
+		Link:         NewJSONSocketLink(conn),
+		to:           destination,
+		dataChan:     make(chan message.Message, 10),
+		messageChan:  make(chan message.Message, 10),
+		sendChan:     make(chan message.Message, 0),
+		exitChan:     make(chan bool, 2),
+		doneChan:     make(chan bool, 1),
+		rstWatchChan: make(chan bool, 1),
+		mode:         "client",
+		state:        PeerStatusStarted,
 	}
 }
 
 func NewAcceptor(conn net.Conn, server n.Node) *Peer {
 	return &Peer{
-		Link:        NewJSONSocketLink(conn),
-		from:        server,
-		dataChan:    make(chan message.Message, 10),
-		messageChan: make(chan message.Message, 10),
-		sendChan:    make(chan message.Message, 0),
-		exitChan:    make(chan bool, 1),
-		doneChan:    make(chan bool, 1),
-		mode:        "server",
-		state:       PeerStatusStarted,
+		Link:         NewJSONSocketLink(conn),
+		from:         server,
+		dataChan:     make(chan message.Message, 10),
+		messageChan:  make(chan message.Message, 10),
+		sendChan:     make(chan message.Message, 0),
+		exitChan:     make(chan bool, 1),
+		doneChan:     make(chan bool, 1),
+		rstWatchChan: make(chan bool, 1),
+		mode:         "server",
+		state:        PeerStatusStarted,
 	}
 }
 
@@ -134,6 +138,10 @@ func (p *Peer) Exit() {
 	//	log.Println("exit done ", p.Node(), p.mode, p.Id())
 }
 
+func (p *Peer) ResetWatcherChan() chan bool {
+	return p.rstWatchChan
+}
+
 func (p *Peer) Node() n.Node {
 	return p.to
 }
@@ -177,6 +185,7 @@ func (p *Peer) receiveLoop() {
 
 func (p *Peer) handle() {
 	defer close(p.doneChan)
+	defer close(p.rstWatchChan)
 
 	go p.handleSendChan()
 	for {
@@ -190,6 +199,7 @@ func (p *Peer) handle() {
 			}
 			p.messageChan <- msg
 
+			p.rstWatchChan <- true
 		case <-p.exitChan:
 			return
 		}
@@ -207,7 +217,7 @@ func (p *Peer) handleSendChan() {
 				log.Println("Send channel is closed, return", p.to, p.mode)
 				return
 			}
-			log.Println("------------------SND ", reflect.TypeOf(msg).String(), msg.ID() ,p.Node())
+			log.Println("------------------SND ", reflect.TypeOf(msg).String(), msg.ID(), p.Node())
 			p.Send(msg)
 		case <-p.exitChan:
 			return
@@ -242,6 +252,10 @@ func (f *NopPeer) Send(m message.Message) error {
 }
 func (f *NopPeer) ReceiveChan() chan message.Message {
 	return f.MsgChan
+}
+func (f *NopPeer) ResetWatcherChan() chan bool {
+	ch := make(chan bool, 10000)
+	return ch
 }
 
 func (f *NopPeer) Exit() {

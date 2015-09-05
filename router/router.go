@@ -3,8 +3,8 @@ package router
 import (
 	"fmt"
 	"log"
-	"sync"
 	"reflect"
+	"sync"
 
 	"github.com/marcosQuesada/mesh/dispatcher"
 	"github.com/marcosQuesada/mesh/message"
@@ -133,7 +133,7 @@ func (r *defaultRouter) Accept(c *peer.Peer) {
 					}
 				}
 
-				if msg.MessageType() != message.HELLO && msg.MessageType() != message.PING  {
+				if msg.MessageType() != message.HELLO && msg.MessageType() != message.PING {
 					r.requestListener.Notify(msg, requestID)
 				}
 			case <-r.exit:

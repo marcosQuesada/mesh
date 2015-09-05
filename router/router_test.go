@@ -55,6 +55,17 @@ func TestRouterAccept(t *testing.T) {
 	c1Mirror.Identify(nodeA)
 	go c1Mirror.Run()
 
+	go func() {
+		for{
+			select {
+			case <-c1.ResetWatcherChan():
+				continue
+			case <-c1Mirror.ResetWatcherChan():
+				continue
+			}
+		}
+	}()
+
 	r.Accept(c1)
 
 	c1Mirror.SayHello()

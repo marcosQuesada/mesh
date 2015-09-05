@@ -31,7 +31,7 @@ func (r *RequestListener) Notify(msg message.Message, requestID message.ID) {
 		l <- msg
 		return
 	}
-	log.Println("XXX No listener found for request", requestID, "type", msg.MessageType())
+	log.Println("No listener found for request", requestID, "type", msg.MessageType())
 }
 
 func (r *RequestListener) Register(requestID message.ID) {
@@ -46,7 +46,7 @@ func (r *RequestListener) Transaction(requestId message.ID) {
 		r.Register(requestId)
 		_, err := r.Wait(requestId)
 		if err != nil {
-			log.Println("XXX WaitResponse RequestListener error", requestId, err)
+			log.Println("Transaction RequestListener error", requestId, err)
 
 			return
 		}

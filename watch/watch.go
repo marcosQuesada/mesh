@@ -16,14 +16,7 @@ import (
 	"github.com/marcosQuesada/mesh/dispatcher"
 	"github.com/marcosQuesada/mesh/message"
 	"github.com/marcosQuesada/mesh/peer"
-	//"github.com/nu7hatch/gouuid"
 )
-
-/*type Watcher interface {
-	Watch(peer.NodePeer)
-	HandlePing(peer.NodePeer, message.Message) (message.Message, error)
-	HandlePong(peer.NodePeer, message.Message) (message.Message, error)
-}*/
 
 type defaultWatcher struct {
 	eventChan       chan dispatcher.Event
@@ -41,6 +34,7 @@ type subject struct {
 	id     message.ID
 	Done   chan bool
 	mutex  sync.Mutex
+	lastSeen time.Time
 }
 
 func (s *subject) incId() {
@@ -77,13 +71,13 @@ func (w *defaultWatcher) Watch(p peer.NodePeer) {
 	w.wg.Add(1)
 	defer w.wg.Done()
 
-	//@TODO: Randomize this
 	subjectDone := make(chan bool, 10)
 	s := &subject{
 		peer:   p,
 		ticker: w.newTicker(),
 		Done:   subjectDone,
 		id: message.NewId(),
+		lastSeen: time.Now(),
 	}
 	defer close(s.Done)
 
@@ -94,6 +88,10 @@ func (w *defaultWatcher) Watch(p peer.NodePeer) {
 
 	for {
 		select {
+		case <- s.peer.ResetWatcherChan():
+			s.ticker.Stop()
+			s.ticker = w.newTicker()
+			continue
 		case <-s.ticker.C:
 			requestId := s.getId()
 			p.Commit(&message.Ping{Id: requestId, From: p.From(), To: node})
