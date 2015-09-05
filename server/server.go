@@ -33,7 +33,7 @@ func New(c *config.Config) *Server {
 func (s *Server) Start() {
 	c := cluster.StartCoordinator(s.node, s.config.Cluster)
 	go c.Run()
-
+	go c.RunStatus()
 	s.router.RegisterHandlers(c.Handlers())
 
 	d := dispatcher.New()
