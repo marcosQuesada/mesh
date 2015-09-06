@@ -151,10 +151,6 @@ func (r *defaultRouter) Route(msg message.Message) error {
 	return nil
 }
 
-func (r *defaultRouter) WaitResponse(c *peer.Peer, requestId message.ID) {
-	r.requestListener.Transaction(requestId)
-}
-
 func (r *defaultRouter) Accept(c *peer.Peer) {
 	go func() {
 		for {
@@ -188,27 +184,17 @@ func (r *defaultRouter) Accept(c *peer.Peer) {
 				if response != nil {
 					c.Commit(response)
 
-					//TODO: Solve this type handling mess
 					if response.MessageType() == message.ABORT {
 						c.Exit()
 						return
 					}
 
-					if response.MessageType() == message.ACK {
-						//TODO: On ACK there's no response so nil cannot be notified!!
-						//r.requestListener.Notify(msg, requestID)
+					if response.MessageType() == message.ACK || response.MessageType() == message.PONG {
 						continue
 					}
 
-					if response.MessageType() != message.PONG {
-						r.WaitResponse(c, requestID)
-					}
+					go r.requestListener.Transaction(requestID)
 				}
-
-/*				if msg.MessageType() != message.HELLO && msg.MessageType() != message.PING {
-					//TODO: same applies here!!! has to notify response!
-					r.requestListener.Notify(msg, requestID)
-				}*/
 			}
 		}
 	}()
@@ -243,7 +229,7 @@ func (r *defaultRouter) Events() chan dispatcher.Event {
 
 func (r *defaultRouter) InitDialClient(destination node.Node) {
 	p, requestId := peer.InitDialClient(r.from, destination)
-	r.WaitResponse(p, requestId)
+	go r.requestListener.Transaction(requestId)
 	r.Accept(p)
 }
 

@@ -16,6 +16,7 @@ import (
 	"github.com/marcosQuesada/mesh/dispatcher"
 	"github.com/marcosQuesada/mesh/message"
 	"github.com/marcosQuesada/mesh/peer"
+	"errors"
 )
 
 type defaultWatcher struct {
@@ -96,18 +97,12 @@ func (w *defaultWatcher) Watch(p peer.NodePeer) {
 			requestId := s.getId()
 			p.Commit(&message.Ping{Id: requestId, From: p.From(), To: node})
 			s.ticker.Stop()
+			msg := w.requestListener.Transaction(requestId)
 
-			w.requestListener.Register(requestId)
-			msg, err := w.requestListener.Wait(requestId)
-			if err != nil {
-				log.Println("RequestListener ", requestId, err)
-
-				return
-			}
 			if msg.MessageType() != message.PONG {
-				log.Println("Error Unexpected Received type, expected PONG ", msg.MessageType(), "RequestListener ", requestId, err)
+				log.Println("Error Unexpected Received type, expected PONG ", msg.MessageType(), "RequestListener ", requestId)
 				//@TODO: used to check development stability
-				panic(err)
+				panic(errors.New("PONG CRASH"))
 			}
 
 			s.incId()
