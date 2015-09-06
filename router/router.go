@@ -18,8 +18,7 @@ type Router interface {
 	Route(message.Message) error
 	Accept(*peer.Peer)
 	Handle(peer.NodePeer, message.Message) message.Message
-	RegisterHandlers(handlers map[message.MsgType]handler.Handler)
-	RegisterHandler(message.MsgType, handler.Handler)
+	RegisterHandlers(handler.MessageHandler)
 	Events() chan dispatcher.Event
 	AggregateChan(chan message.Message)
 	Exit()
@@ -28,13 +27,14 @@ type Router interface {
 }
 
 type defaultRouter struct {
-	handlers        map[message.MsgType]handler.Handler
 	from            node.Node
 	peers           map[string]peer.NodePeer
 	peerIDs         map[peer.ID]bool
 	eventChan       chan dispatcher.Event
 	exit            chan bool
 	watcher         watch.Watcher
+	handlers        map[message.MsgType]handler.Handler
+	notifiers       map[message.MsgType]bool
 	mutex           sync.Mutex
 	requestListener *watch.RequestListener
 }
@@ -45,30 +45,45 @@ func New(n node.Node) *defaultRouter {
 	w := watch.New(reqList, evChan, 2)
 
 	r := &defaultRouter{
-		handlers:        make(map[message.MsgType]handler.Handler),
 		from:            n,
 		peers:           make(map[string]peer.NodePeer),
 		peerIDs:         make(map[peer.ID]bool, 0),
 		eventChan:       evChan,
+		handlers:        make(map[message.MsgType]handler.Handler),
+		notifiers:       make(map[message.MsgType]bool),
 		exit:            make(chan bool),
 		watcher:         w,
 		requestListener: reqList,
 	}
 
-	r.RegisterHandlers(r.Handlers())
-	r.RegisterHandlers(w.Handlers())
+	r.registerHandlers(r.Handlers())
+	r.registerNotifiers(r.Notifiers())
+
+	//RegisterHandlers & Notifiers from watcher
+	r.RegisterHandlers(w)
 
 	return r
 }
 
-func (r *defaultRouter) RegisterHandlers(handlers map[message.MsgType]handler.Handler) {
-	for msg, h := range handlers {
-		fmt.Println("Registering ", msg)
-		r.RegisterHandler(msg, h)
+func (r *defaultRouter) RegisterHandlers(h handler.MessageHandler) {
+	r.registerHandlers(h.Handlers())
+
+	log.Println("Before Casting")
+	n, ok := h.(handler.NotifyHandler)
+	log.Println("Casting ", ok)
+
+	if ok {
+		r.registerNotifiers(n.Notifiers())
 	}
 }
 
-func (r *defaultRouter) RegisterHandler(msgType message.MsgType, handler handler.Handler) {
+func (r *defaultRouter) registerHandlers(handlers map[message.MsgType]handler.Handler) {
+	for msg, h := range handlers {
+		r.registerHandler(msg, h)
+	}
+}
+
+func (r *defaultRouter) registerHandler(msgType message.MsgType, handler handler.Handler) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
@@ -78,6 +93,25 @@ func (r *defaultRouter) RegisterHandler(msgType message.MsgType, handler handler
 	}
 
 	r.handlers[msgType] = handler
+}
+
+func (r *defaultRouter) registerNotifiers(notifiers map[message.MsgType]bool) {
+	for msg, s := range notifiers {
+		fmt.Println("Registering ", msg)
+		r.registerNotifier(msg, s)
+	}
+}
+
+func (r *defaultRouter) registerNotifier(msgType message.MsgType, st bool) {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+
+	if _, ok := r.notifiers[msgType]; ok {
+		log.Fatal("Notifier already registered")
+		return
+	}
+
+	r.notifiers[msgType] = st
 }
 
 func (r *defaultRouter) AggregateChan(ch chan message.Message) {
@@ -90,7 +124,7 @@ func (r *defaultRouter) AggregateChan(ch chan message.Message) {
 				}
 
 				err := r.Route(msg)
-				if err != nil{
+				if err != nil {
 					log.Println("Forwarding Msg from aggregateChan ERROR", err, msg)
 					continue
 				}
@@ -142,6 +176,14 @@ func (r *defaultRouter) Accept(c *peer.Peer) {
 				log.Println("----------------RCV ", reflect.TypeOf(msg).String(), msg.ID(), msg.Origin())
 
 				requestID := msg.ID()
+				v, ok := r.notifiers[msg.MessageType()]
+				if  !ok {
+					log.Fatal("Notifier not found ", msg.MessageType())
+				}
+				if v {
+					r.requestListener.Notify(msg, requestID)
+				}
+
 				response := r.Handle(c, msg)
 				if response != nil {
 					c.Commit(response)
@@ -154,7 +196,7 @@ func (r *defaultRouter) Accept(c *peer.Peer) {
 
 					if response.MessageType() == message.ACK {
 						//TODO: On ACK there's no response so nil cannot be notified!!
-						r.requestListener.Notify(msg, requestID)
+						//r.requestListener.Notify(msg, requestID)
 						continue
 					}
 
@@ -163,10 +205,10 @@ func (r *defaultRouter) Accept(c *peer.Peer) {
 					}
 				}
 
-				if msg.MessageType() != message.HELLO && msg.MessageType() != message.PING {
+/*				if msg.MessageType() != message.HELLO && msg.MessageType() != message.PING {
 					//TODO: same applies here!!! has to notify response!
 					r.requestListener.Notify(msg, requestID)
-				}
+				}*/
 			}
 		}
 	}()

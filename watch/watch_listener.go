@@ -34,6 +34,12 @@ func (r *RequestListener) Notify(msg message.Message, requestID message.ID) {
 	log.Println("No listener found for request", requestID, "type", msg.MessageType())
 }
 
+func (r *RequestListener) RegisterChan(requestID message.ID, ch chan message.Message) {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+	r.listeners[requestID] = ch
+}
+
 func (r *RequestListener) Register(requestID message.ID) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()

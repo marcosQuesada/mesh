@@ -12,3 +12,13 @@ type Handler func(peer.NodePeer, message.Message) (message.Message, error)
 type MessageHandler interface {
 	Handlers() map[message.MsgType]Handler
 }
+
+type NotifyHandler interface {
+	Notifiers() map[message.MsgType]bool
+}
+
+//On responseChan nil, no Wait required
+type Request struct {
+	responseChan chan message.Message
+	msg          message.Message
+}

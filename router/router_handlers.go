@@ -17,6 +17,15 @@ func (r *defaultRouter) Handlers() map[message.MsgType]handler.Handler {
 		message.ERROR:   r.HandleError,
 	}
 }
+func (r *defaultRouter) Notifiers() map[message.MsgType]bool{
+	return map[message.MsgType]bool{
+		message.HELLO:   false,
+		message.WELCOME: true,
+		message.ACK:     true,
+		message.ABORT:   true,
+		message.ERROR:   false,
+	}
+}
 
 //HandleHello Request
 func (r *defaultRouter) HandleHello(c peer.NodePeer, msg message.Message) (message.Message, error) {

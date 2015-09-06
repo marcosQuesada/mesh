@@ -18,7 +18,7 @@ func TestBasicRouterHandling(t *testing.T) {
 	}
 
 	msg := &message.Ping{}
-	r.RegisterHandler(msg.MessageType(), fakePingHandler)
+	r.registerHandler(msg.MessageType(), fakePingHandler)
 	/*
 		nodeA := node.Node{Host: "A", Port: 1}
 		a, _ := net.Pipe()
@@ -34,15 +34,17 @@ func TestBasicRouterHandling(t *testing.T) {
 func TestRouterAccept(t *testing.T) {
 	r := &defaultRouter{
 		handlers:        make(map[message.MsgType]handler.Handler),
+		notifiers:        make(map[message.MsgType]bool),
 		exit:            make(chan bool, 1),
 		requestListener: watch.NewRequestListener(),
 	}
 
 	hello := &message.Hello{}
 	ping := &message.Ping{}
-	r.RegisterHandler(hello.MessageType(), fakeHelloHandler)
-	r.RegisterHandler(ping.MessageType(), fakePingHandler)
-
+	r.registerHandler(hello.MessageType(), fakeHelloHandler)
+	r.registerHandler(ping.MessageType(), fakePingHandler)
+	r.registerNotifier(hello.MessageType(), true)
+	r.registerNotifier(ping.MessageType(), true)
 	nodeA := node.Node{Host: "A", Port: 1}
 	nodeB := node.Node{Host: "B", Port: 2}
 	a, b := net.Pipe()

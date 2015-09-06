@@ -44,7 +44,8 @@ func (s *Server) Start() {
 	go d.Run()
 	go d.Aggregate(s.router.Events())
 
-	s.router.RegisterHandlers(c.Handlers())
+	s.router.RegisterHandlers(c)
+
 	s.startDialPeers()
 	s.startServer()
 	s.run()
