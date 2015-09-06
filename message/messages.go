@@ -54,7 +54,7 @@ func (mt MsgType) New() Message {
 	case COMMAND:
 		return &Command{}
 	case RESPONSE:
-		return &Command{}
+		return &Response{}
 	case ACK:
 		return &Ack{}
 	}

@@ -15,12 +15,11 @@ import (
 )
 
 type Router interface {
-	Route(message.Message) error
 	Accept(*peer.Peer)
 	Handle(peer.NodePeer, message.Message) message.Message
 	RegisterHandlers(handler.MessageHandler)
 	Events() chan dispatcher.Event
-	AggregateChan(chan message.Message)
+	AggregateChan(chan handler.Request)
 	Exit()
 
 	InitDialClient(destination node.Node) //HEre??? NO
@@ -56,22 +55,18 @@ func New(n node.Node) *defaultRouter {
 		requestListener: reqList,
 	}
 
-	r.registerHandlers(r.Handlers())
-	r.registerNotifiers(r.Notifiers())
-
 	//RegisterHandlers & Notifiers from watcher
 	r.RegisterHandlers(w)
+
+	r.registerHandlers(r.Handlers())
+	r.registerNotifiers(r.Notifiers())
 
 	return r
 }
 
 func (r *defaultRouter) RegisterHandlers(h handler.MessageHandler) {
 	r.registerHandlers(h.Handlers())
-
-	log.Println("Before Casting")
 	n, ok := h.(handler.NotifyHandler)
-	log.Println("Casting ", ok)
-
 	if ok {
 		r.registerNotifiers(n.Notifiers())
 	}
@@ -97,7 +92,6 @@ func (r *defaultRouter) registerHandler(msgType message.MsgType, handler handler
 
 func (r *defaultRouter) registerNotifiers(notifiers map[message.MsgType]bool) {
 	for msg, s := range notifiers {
-		fmt.Println("Registering ", msg)
 		r.registerNotifier(msg, s)
 	}
 }
@@ -114,7 +108,7 @@ func (r *defaultRouter) registerNotifier(msgType message.MsgType, st bool) {
 	r.notifiers[msgType] = st
 }
 
-func (r *defaultRouter) AggregateChan(ch chan message.Message) {
+func (r *defaultRouter) AggregateChan(ch chan handler.Request) {
 	go func() {
 		for {
 			select {
@@ -122,13 +116,14 @@ func (r *defaultRouter) AggregateChan(ch chan message.Message) {
 				if !open {
 					return
 				}
-
-				err := r.Route(msg)
+				response, err := r.route(msg.Msg)
 				if err != nil {
 					log.Println("Forwarding Msg from aggregateChan ERROR", err, msg)
+					msg.ResponseChan <- message.Error{Id: msg.Msg.ID()}
+
 					continue
 				}
-				log.Println("Forwarding Msg from aggregateChan ", msg)
+				msg.ResponseChan <- response
 
 			case <-r.exit:
 				log.Println("Exit Aggregate Loop")
@@ -138,17 +133,18 @@ func (r *defaultRouter) AggregateChan(ch chan message.Message) {
 	}()
 }
 
-func (r *defaultRouter) Route(msg message.Message) error {
+func (r *defaultRouter) route(msg message.Message) (message.Message, error) {
 	from := msg.Destination()
 	peer, ok := r.peers[from.String()]
 	if !ok {
-		return fmt.Errorf("Router error: Destination Peer Not found")
+		return nil, fmt.Errorf("Router error: Destination Peer Not found")
 	}
 
-	//TODO: Implement transaction and refactor Accept Part
 	peer.Commit(msg)
+	//Wait response
+	response := r.requestListener.Transaction(msg.ID())
 
-	return nil
+	return response, nil
 }
 
 func (r *defaultRouter) Accept(c *peer.Peer) {
@@ -173,7 +169,7 @@ func (r *defaultRouter) Accept(c *peer.Peer) {
 
 				requestID := msg.ID()
 				v, ok := r.notifiers[msg.MessageType()]
-				if  !ok {
+				if !ok {
 					log.Fatal("Notifier not found ", msg.MessageType())
 				}
 				if v {
@@ -189,11 +185,9 @@ func (r *defaultRouter) Accept(c *peer.Peer) {
 						return
 					}
 
-					if response.MessageType() == message.ACK || response.MessageType() == message.PONG {
-						continue
+					if response.MessageType() == message.WELCOME {
+						go r.requestListener.Transaction(requestID)
 					}
-
-					go r.requestListener.Transaction(requestID)
 				}
 			}
 		}

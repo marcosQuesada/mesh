@@ -97,8 +97,9 @@ func (w *defaultWatcher) Watch(p peer.NodePeer) {
 			requestId := s.getId()
 			p.Commit(&message.Ping{Id: requestId, From: p.From(), To: node})
 			s.ticker.Stop()
-			msg := w.requestListener.Transaction(requestId)
 
+			//wait ping response
+			msg := w.requestListener.Transaction(requestId)
 			if msg.MessageType() != message.PONG {
 				log.Println("Error Unexpected Received type, expected PONG ", msg.MessageType(), "RequestListener ", requestId)
 				//@TODO: used to check development stability

@@ -26,7 +26,7 @@ func (r *Coordinator) HandleCommand(c peer.NodePeer, msg message.Message) (messa
 	from := c.From()
 	log.Println("HandleCommand, from peer", from.String())
 
-	return nil, nil
+	return &message.Response{Id: msg.(*message.Command).Id, From: r.from}, nil
 }
 
 func (r *Coordinator) HandleResponse(c peer.NodePeer, msg message.Message) (message.Message, error) {

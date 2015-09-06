@@ -45,13 +45,13 @@ func (s *Server) Start() {
 	go d.Aggregate(s.router.Events())
 
 	s.router.RegisterHandlers(c)
+	//aggregate coordinator snd chan
+	s.router.AggregateChan(c.SndChan())
 
 	s.startDialPeers()
 	s.startServer()
 	s.run()
 
-	//aggregate coordinator snd chan
-	s.router.AggregateChan(c.SndChan())
 
 	//TODO: aggregate watcher snd chan
 	//s.router.AggregateChan(c.SndChan())
