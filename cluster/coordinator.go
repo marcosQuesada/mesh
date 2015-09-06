@@ -28,6 +28,7 @@ type Coordinator struct {
 	members   map[string]n.Node
 	connected map[string]bool
 	exitChan  chan bool
+	sndChan   chan message.Message
 	status    message.Status
 }
 
@@ -37,6 +38,7 @@ func StartCoordinator(from n.Node, members map[string]n.Node) *Coordinator {
 		members:   members,
 		connected: make(map[string]bool, len(members)-1),
 		exitChan:  make(chan bool, 0),
+		sndChan:   make(chan message.Message, 1),
 		status:    ClusterStatusStarting,
 	}
 }
@@ -53,7 +55,7 @@ func (c *Coordinator) Run() {
 func (c *Coordinator) RunStatus() {
 	for {
 		select {
-		case <- c.exitChan:
+		case <-c.exitChan:
 			return
 		default:
 			time.Sleep(time.Second * 1)
@@ -76,7 +78,7 @@ func (c *Coordinator) RunStatus() {
 				}
 			}
 
-			if c.status == ClusterStatusInService && !complete{
+			if c.status == ClusterStatusInService && !complete {
 				c.status = ClusterStatusDegraded
 				log.Println("+++++++++++++++++++++Cluster Degraded!!!")
 			}
@@ -87,6 +89,10 @@ func (c *Coordinator) RunStatus() {
 
 func (c *Coordinator) Exit() {
 	close(c.exitChan)
+}
+
+func (c *Coordinator) SndChan() chan message.Message {
+	return c.sndChan
 }
 
 func (c *Coordinator) OnPeerConnectedEvent(e dispatcher.Event) {

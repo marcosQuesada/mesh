@@ -34,7 +34,6 @@ func (s *Server) Start() {
 	c := cluster.StartCoordinator(s.node, s.config.Cluster)
 	go c.Run()
 	go c.RunStatus()
-	s.router.RegisterHandlers(c.Handlers())
 
 	d := dispatcher.New()
 	d.RegisterListener(&peer.OnPeerConnectedEvent{}, c.OnPeerConnectedEvent)
@@ -45,12 +44,21 @@ func (s *Server) Start() {
 	go d.Run()
 	go d.Aggregate(s.router.Events())
 
+	s.router.RegisterHandlers(c.Handlers())
 	s.startDialPeers()
 	s.startServer()
 	s.run()
+
+	//aggregate coordinator snd chan
+	s.router.AggregateChan(c.SndChan())
+
+	//TODO: aggregate watcher snd chan
+	//s.router.AggregateChan(c.SndChan())
+
 }
 
 func (s *Server) Close() {
+	//TODO: fix dispatcher Shutdown
 	//d.Exit()
 
 	close(s.exit)

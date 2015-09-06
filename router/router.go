@@ -21,6 +21,7 @@ type Router interface {
 	RegisterHandlers(handlers map[message.MsgType]handler.Handler)
 	RegisterHandler(message.MsgType, handler.Handler)
 	Events() chan dispatcher.Event
+	AggregateChan(chan message.Message)
 	Exit()
 
 	InitDialClient(destination node.Node) //HEre??? NO
@@ -79,13 +80,38 @@ func (r *defaultRouter) RegisterHandler(msgType message.MsgType, handler handler
 	r.handlers[msgType] = handler
 }
 
+func (r *defaultRouter) AggregateChan(ch chan message.Message) {
+	go func() {
+		for {
+			select {
+			case msg, open := <-ch:
+				if !open {
+					return
+				}
+
+				err := r.Route(msg)
+				if err != nil{
+					log.Println("Forwarding Msg from aggregateChan ERROR", err, msg)
+					continue
+				}
+				log.Println("Forwarding Msg from aggregateChan ", msg)
+
+			case <-r.exit:
+				log.Println("Exit Aggregate Loop")
+				return
+			}
+		}
+	}()
+}
+
 func (r *defaultRouter) Route(msg message.Message) error {
 	from := msg.Destination()
 	peer, ok := r.peers[from.String()]
 	if !ok {
-		return fmt.Errorf("Peer Not found")
+		return fmt.Errorf("Router error: Destination Peer Not found")
 	}
 
+	//TODO: Implement transaction and refactor Accept Part
 	peer.Commit(msg)
 
 	return nil
@@ -99,6 +125,9 @@ func (r *defaultRouter) Accept(c *peer.Peer) {
 	go func() {
 		for {
 			select {
+			case <-r.exit:
+				log.Println("Exit", c.From(), c.Mode())
+				return
 			case msg, open := <-c.ReceiveChan():
 				if !open {
 					if _, ok := r.peerIDs[c.Id()]; ok {
@@ -124,6 +153,7 @@ func (r *defaultRouter) Accept(c *peer.Peer) {
 					}
 
 					if response.MessageType() == message.ACK {
+						//TODO: On ACK there's no response so nil cannot be notified!!
 						r.requestListener.Notify(msg, requestID)
 						continue
 					}
@@ -134,11 +164,9 @@ func (r *defaultRouter) Accept(c *peer.Peer) {
 				}
 
 				if msg.MessageType() != message.HELLO && msg.MessageType() != message.PING {
+					//TODO: same applies here!!! has to notify response!
 					r.requestListener.Notify(msg, requestID)
 				}
-			case <-r.exit:
-				log.Println("Exit", c.From(), c.Mode())
-				return
 			}
 		}
 	}()
