@@ -1,10 +1,8 @@
 package cluster
 
 import (
-	"github.com/marcosQuesada/mesh/dispatcher"
 	"github.com/marcosQuesada/mesh/message"
 	n "github.com/marcosQuesada/mesh/node"
-	"github.com/marcosQuesada/mesh/peer"
 	"github.com/marcosQuesada/mesh/router/handler"
 	"log"
 	"reflect"
@@ -17,12 +15,6 @@ import (
 // Leader election
 // Execute Pool mechanisms and consesus resolution
 
-const (
-	ClusterStatusStarting  = message.Status("starting")
-	ClusterStatusInService = message.Status("in service")
-	ClusterStatusDegraded  = message.Status("degraded")
-	ClusterStatusExit      = message.Status("exit")
-)
 
 type Coordinator struct {
 	from      n.Node
@@ -65,7 +57,7 @@ func (c *Coordinator) RunStatus() {
 				if c.status != ClusterStatusInService {
 					c.status = ClusterStatusInService
 					log.Println("+++++++++++++++++++++Cluster Complete!!!")
-					result := c.PoolCommand()
+					result := c.PoolRequest()
 					for node, res := range result {
 						log.Println("XXXXXX Result from ", node, reflect.TypeOf(res).String())
 					}
@@ -81,7 +73,7 @@ func (c *Coordinator) RunStatus() {
 	}
 }
 
-func (c *Coordinator) PoolCommand() map[string] message.Message{
+func (c *Coordinator) PoolRequest() map[string] message.Message{
 	time.Sleep(time.Second * 1)
 	responseChn := make(chan message.Message)
 	response := make(map[string]message.Message, len(c.connected))
@@ -107,44 +99,16 @@ func (c *Coordinator) SndChan() chan handler.Request {
 	return c.sndChan
 }
 
-func (c *Coordinator) OnPeerConnectedEvent(e dispatcher.Event) {
-	event := e.(*peer.OnPeerConnectedEvent)
-	c.members[event.Node.String()] = event.Node
-	c.connected[event.Node.String()] = true
-	log.Println("OnPeerConnectedEvent, adding peer", event.Node.String(), "mode:", event.Mode)
-}
-
-func (c *Coordinator) OnPeerDisconnected(e dispatcher.Event) {
-	event := e.(*peer.OnPeerDisconnectedEvent)
-	c.members[event.Node.String()] = event.Node
-
-	c.connected[event.Node.String()] = false
-	log.Println("OnPeerDisconnectedEvent, removing peer", event.Node.String())
-}
-
-func (c *Coordinator) OnPeerAborted(e dispatcher.Event) {
-	n := e.(*peer.OnPeerAbortedEvent)
-	log.Println("OnPeerAbortedEvent", n.Node.String())
-}
-
-func (c *Coordinator) OnPeerErrored(e dispatcher.Event) {
-	n := e.(*peer.OnPeerErroredEvent)
-	c.connected[n.Node.String()] = false
-	log.Println("OnPeerErroredEvent", n.Node.String())
-}
-
 func(c *Coordinator) isComplete() bool {
-	complete := true
-
-	if len(c.connected) == 0 {
-		complete = false
+	if len(c.connected) != len(c.members) -1 {
+		return false
 	}
 
 	for _, v := range c.connected {
 		if !v {
-			complete = false
+			return false
 		}
 	}
 
-	return complete
+	return true
 }

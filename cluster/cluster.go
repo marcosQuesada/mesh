@@ -1,24 +1,46 @@
 package cluster
 
 import (
+	"github.com/marcosQuesada/mesh/message"
 	"github.com/marcosQuesada/mesh/node"
 	"time"
 )
 
-type Cluster struct{
-	leader node.Node
+const (
+	ClusterStatusStarting  = message.Status("starting")
+	ClusterStatusInService = message.Status("in service")
+	ClusterStatusDegraded  = message.Status("degraded")
+	ClusterStatusExit      = message.Status("exit")
+)
+
+type LeadHandler interface {
+	Vote(message.Message)
+	Candidate(message.Message)
+	Affirm(message.Message)
+}
+
+type Manager struct {
+	leader         node.Node
 	leaderLastSeen time.Time
-	members map[string] node.Node
+	neighbours     map[string]node.Node
+	status         message.Status
 }
 
-func (c *Cluster) Start() {
+func NewManager() *Manager {
+	return &Manager{
+	//leaderLastSeen: time.Now(),
+	}
+}
+func (c *Manager) Start() {
 
 }
 
-func (c *Cluster) Run() {
+func (c *Manager) Run() {
 
 }
 
-func (c *Cluster) Stop() {
+func (c *Manager) Stop() {
 
 }
+
+/// Handles Master Election
