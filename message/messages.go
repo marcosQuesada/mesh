@@ -268,6 +268,7 @@ type Command struct {
 	From    n.Node
 	To      n.Node
 	Details map[string]interface{}
+	Command interface{} //@TODO: Provisional
 }
 
 func (h Command) MessageType() MsgType {
