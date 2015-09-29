@@ -1,7 +1,7 @@
 package cluster
 
 import (
-	"log"
+	//"log"
 
 	"github.com/marcosQuesada/mesh/message"
 	"github.com/marcosQuesada/mesh/peer"
@@ -23,15 +23,15 @@ func (r *Coordinator) Notifiers() map[message.MsgType]bool {
 }
 
 func (r *Coordinator) HandleCommand(c peer.NodePeer, msg message.Message) (message.Message, error) {
-	from := c.From()
-	log.Println("HandleCommand, from peer", from.String())
+	//from := c.From()
+	//log.Println("HandleCommand, from peer", from.String())
 
 	return &message.Response{Id: msg.(*message.Command).Id, From: r.from}, nil
 }
 
 func (r *Coordinator) HandleResponse(c peer.NodePeer, msg message.Message) (message.Message, error) {
-	from := c.From()
-	log.Println("HandleResponse, from peer", from.String())
+	//from := c.From()
+	//log.Println("HandleResponse, from peer", from.String())
 
 	return nil, nil
 }

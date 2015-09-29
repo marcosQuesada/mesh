@@ -43,9 +43,11 @@ func Start(from n.Node, members map[string]n.Node) *Coordinator {
 	log.Println("Starting coordinator on Node %s members: ", from.String(), members)
 
 	//@TODO: Remove this!!!
-	mates := make([]n.Node, len(members))
+	mates := make([]n.Node, 0)
 	for _, v := range members {
-		mates = append(mates, v)
+		if v != from {
+			mates = append(mates, v)
+		}
 	}
 
 	r := raft.New(from, mates)
@@ -66,15 +68,18 @@ func Start(from n.Node, members map[string]n.Node) *Coordinator {
 }
 
 func (c *Coordinator) Run() {
+	log.Println("XXXXXX RUN")
 	complete := make(chan bool,0)
+	var done bool
 	for {
 		select {
 		case <-c.exitChan:
+			log.Println("Exit")
 			return
 		case <- complete:
+			done = true
 			log.Println("XXXXXX Complete, boot Manageer")
-			c.manager.Run()
-
+			go c.manager.Run()
 		case <- c.manager.Ready():
 			log.Println("XXXXXX Manager Ready")
 
@@ -85,7 +90,9 @@ func (c *Coordinator) Run() {
 			}
 
 		default:
-			go c.waitUntilComplete(complete)
+			if !done {
+				go c.waitUntilComplete(complete)
+			}
 		}
 	}
 }
@@ -129,6 +136,7 @@ func (c *Coordinator) PoolRequest(cmd interface{}) map[string]message.Message {
 		//fire request to router && store response
 		response[nodeString] = <-c.sendRequest(msg)
 	}
+	log.Println("Pool Request response ", response)
 
 	return response
 }

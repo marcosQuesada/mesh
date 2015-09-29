@@ -12,7 +12,7 @@ import (
 
 const (
 	NodeStatus                    = message.Status("starting")
-	PingIntervalBaseDuration      = time.Second * 2
+	PingIntervalBaseDuration      = time.Second * 10
 	MaxRandomDuration             = 5000
 	PingIntervalMaxRandomDuration = time.Millisecond * MaxRandomDuration
 )
@@ -40,19 +40,19 @@ type Raft struct {
 type StateHandler func() StateHandler
 
 type votationResult struct {
-expected  string
-responses []string
+	expected  string
+	responses []string
 }
 
 type FSM struct {
-State interface{}
-request chan interface{}
-response chan interface{}
+	State    interface{}
+	request  chan interface{}
+	response chan interface{}
 }
 
 func New(node node.Node, mates []node.Node) *FSM {
-	request :=      make(chan interface{}, 10)
-	response :=     make(chan interface{}, 10)
+	request := make(chan interface{}, 10)
+	response := make(chan interface{}, 10)
 
 	r := &Raft{
 		node:         node,
@@ -64,7 +64,7 @@ func New(node node.Node, mates []node.Node) *FSM {
 		ready:        make(chan bool, 0),
 	}
 
-	log.Println("Booting Raft FSM")
+	log.Println("Booting Raft FSM MATESSSSSSSSSSSSSSS", mates)
 
 	return &FSM{State: r, request: request, response: response}
 }
@@ -75,6 +75,7 @@ func (f *FSM) Run() {
 		log.Println("FMT state not found!")
 		return
 	}
+	log.Println("-----------------------------------------------------------BEGIN-----------------------------------------------------------")
 
 	for state := e.FollowerState; state != nil; {
 		state = state()
@@ -107,16 +108,16 @@ func (r *Raft) FollowerState() StateHandler {
 	}
 
 	timeout := time.NewTimer(PingIntervalMaxRandomDuration)
-	for {
 		select {
 		case msg := <-r.response:
 			timeout.Reset(r.pingInterval)
 			log.Println("MSG RESPONSE ", msg)
+			return r.FollowerState
+
 		case <-timeout.C:
 			log.Println("MSG TIMEOUT RESPONSE ")
 			return r.CandidateState
 		}
-	}
 }
 
 func (r *Raft) CandidateState() StateHandler {
@@ -124,7 +125,7 @@ func (r *Raft) CandidateState() StateHandler {
 
 	//Send Vote request
 	for _, n := range r.mates {
-		log.Println("ping ", n)
+		log.Println("Vote Request to ", n)
 		r.request <- Request{n, &VoteRequest{r.node}}
 	}
 
@@ -132,10 +133,11 @@ func (r *Raft) CandidateState() StateHandler {
 	select {
 	case msg := <-r.response:
 		timeout.Reset(r.pingInterval)
-		log.Println("MSG RESPONSE ", msg)
+		log.Println("MSG CANDIDATE RESPONSE ", msg)
 
 		//evaluate response
-		return r.LeaderState
+		//return r.LeaderState
+		return r.CandidateState
 	case <-timeout.C:
 		log.Println("On Candidate Timeout")
 		return r.FollowerState
@@ -147,22 +149,22 @@ func (r *Raft) CandidateState() StateHandler {
 func (r *Raft) LeaderState() StateHandler {
 	log.Println("On Leader State")
 	ping := time.NewTicker(r.pingInterval)
-	for {
-		select {
-		case msg := <-r.response:
-			ping.Stop()
+	/*	for {*/
+	select {
+	case msg := <-r.response:
+		ping.Stop()
 
-			log.Println("MSG RESPONSE ", msg)
+		log.Println("MSG RESPONSE ", msg)
 
-			return r.FollowerState
-		case <-ping.C:
-			for _, n := range r.mates {
-				log.Println("ping ", n)
+		return r.FollowerState
+	case <-ping.C:
+		for _, n := range r.mates {
+			log.Println("ping ", n)
 
-				r.request <- Request{n, &PingRequest{}}
-			}
+			r.request <- Request{n, &PingRequest{}}
 		}
 	}
+	/*	}*/
 
 	return nil
 }

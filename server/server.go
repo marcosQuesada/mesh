@@ -32,7 +32,6 @@ func New(c *config.Config) *Server {
 
 func (s *Server) Start() {
 	c := cluster.Start(s.node, s.config.Cluster)
-	go c.Run()
 
 	d := dispatcher.New()
 	d.RegisterListener(&peer.OnPeerConnectedEvent{}, c.OnPeerConnectedEvent)

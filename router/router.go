@@ -41,7 +41,7 @@ type defaultRouter struct {
 func New(n node.Node) *defaultRouter {
 	evChan := make(chan dispatcher.Event, 10)
 	reqList := watch.NewRequestListener()
-	w := watch.New(reqList, evChan, 2)
+	w := watch.New(reqList, evChan, 10)
 
 	r := &defaultRouter{
 		from:            n,
