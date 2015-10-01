@@ -31,15 +31,15 @@ var flagtests = []struct {
 	result  bool
 	responses votationResult
 }{
-	{true , votationResult{"B", []string{"B", "B"}}},
-	{false, votationResult{"B", []string{"A", "C"}}},
-	{false, votationResult{"A", []string{"B", "B", "A"}}},
+	{true , votationResult{"B", PoolResult{"B":"B", "C":"B"}}},
+	{false, votationResult{"B", PoolResult{"B":"A", "C":"C"}}},
+	{false, votationResult{"A", PoolResult{"B":"B", "C":"B", "D":"A"}}},
 }
 
 func TestEvaluateResponses(t *testing.T) {
 	r := &Raft{
 		node:         node.Node{"A",1},
-		mates:        []node.Node{node.Node{"B",2}, node.Node{"C",3}},
+		mates:        map[string]node.Node{"B:2":node.Node{"B",2}, "C:3":node.Node{"C",3}},
 	}
 
 	for _, item := range flagtests {

@@ -39,26 +39,26 @@ func (d *defaultDispatcher) RegisterListener(e Event, l Listener) {
 	d.listeners[e.GetEventType()] = append(d.listeners[e.GetEventType()], l)
 }
 
-func (d *defaultDispatcher) Run() {
+func (d *defaultDispatcher) ConsumeEventChan() {
 	for {
 		select {
 		case e, open := <-d.EventChan:
 			if !open {
-				log.Println("Exiting Dispatcher Run loop")
+				log.Println("Closed EventChan, Exiting ConsumeEventChan Run loop")
 				return
 			}
-
 			d.dispatch(e)
 		}
 	}
 }
 
 //Enable event channel aggregation
-func (d *defaultDispatcher) Aggregate(e chan Event) {
+func (d *defaultDispatcher) AggregateChan(e chan Event) {
 	for {
 		select {
 		case m, open := <-e:
 			if !open {
+				log.Println("Closed EventChan, Exiting AggregateChan Run loop")
 				return
 			}
 			d.EventChan <- m

@@ -32,7 +32,7 @@ func TestDispatcherRun(t *testing.T) {
 
 	d := New()
 	d.RegisterListener(&OnFakeEvent{}, l.Listener)
-	go d.Run()
+	go d.ConsumeEventChan()
 
 	event := &OnFakeEvent{Id: 123}
 	d.EventChan <- event
@@ -42,7 +42,7 @@ func TestDispatcherRun(t *testing.T) {
 	}
 
 	e := make(chan Event, 0)
-	go d.Aggregate(e)
+	go d.AggregateChan(e)
 	eventB := &OnFakeEvent{Id: 456}
 	e <- eventB
 

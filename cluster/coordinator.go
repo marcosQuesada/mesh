@@ -7,6 +7,7 @@ import (
 	"github.com/marcosQuesada/mesh/router/handler"
 	"log"
 	"reflect"
+	"sync"
 	"time"
 )
 
@@ -24,9 +25,10 @@ const (
 
 type Manager interface {
 	Run()
-	Ready()chan bool
+	Ready() chan bool
 	Request() chan interface{}
 	Response() chan interface{}
+	Exit()
 }
 
 type Coordinator struct {
@@ -42,25 +44,18 @@ type Coordinator struct {
 func Start(from n.Node, members map[string]n.Node) *Coordinator {
 	log.Println("Starting coordinator on Node %s members: ", from.String(), members)
 
-	//@TODO: Remove this!!!
-	mates := make([]n.Node, 0)
-	for _, v := range members {
-		if v != from {
-			mates = append(mates, v)
-		}
-	}
-
-	r := raft.New(from, mates)
+	r := raft.New(from, members)
 	c := &Coordinator{
 		manager:   r,
 		from:      from,
 		members:   members,
 		connected: make(map[string]bool, len(members)-1),
 		exitChan:  make(chan bool, 0),
-		sndChan:   make(chan handler.Request, 1),
+		sndChan:   make(chan handler.Request, 10),
 		status:    ClusterStatusStarting,
 	}
 
+	//enable manager to send and receive requests
 	c.addSender(r.Request(), r.Response())
 	go c.Run()
 
@@ -68,42 +63,42 @@ func Start(from n.Node, members map[string]n.Node) *Coordinator {
 }
 
 func (c *Coordinator) Run() {
-	log.Println("XXXXXX RUN")
-	complete := make(chan bool,0)
-	var done bool
+	var runOnce sync.Once
+	complete := make(chan bool, 0)
+	go c.waitUntilComplete(complete)
+
 	for {
 		select {
 		case <-c.exitChan:
 			log.Println("Exit")
 			return
-		case <- complete:
-			done = true
-			log.Println("XXXXXX Complete, boot Manageer")
-			go c.manager.Run()
-		case <- c.manager.Ready():
-			log.Println("XXXXXX Manager Ready")
-
-			// Example transaction
-			result := c.PoolRequest("fooCommand")
-			for node, res := range result {
-				log.Println("XXXXXX Result from ", node, reflect.TypeOf(res).String())
-			}
-
-		default:
-			if !done {
-				go c.waitUntilComplete(complete)
-			}
+		case <-complete:
+			runOnce.Do(func() {
+				log.Println("Boot manager just once")
+				go c.manager.Run()
+			})
+		case <-c.manager.Ready():
+			log.Println("XXXXXXXXXXXXXXXXXXXXXXX CLUSTER IN SERVICE! XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX")
 		}
 	}
 }
 
-func (c *Coordinator) addSender(s chan interface{}, r chan interface{}) {
-	go func(){
-		for{
-			select{
-			case msg := <-s:
-				log.Println("On Add sender msg ", msg)
-				r <- c.PoolRequest(msg)
+func (c *Coordinator) Exit() {
+	close(c.exitChan)
+}
+
+func (c *Coordinator) SndChan() chan handler.Request {
+	return c.sndChan
+}
+
+func (c *Coordinator) addSender(sendChan chan interface{}, rcvChan chan interface{}) {
+	go func() {
+		for {
+			select {
+			case msg := <-sendChan:
+				go func() {
+					rcvChan <- c.poolRequest(msg)
+				}()
 			}
 		}
 	}()
@@ -126,34 +121,43 @@ func (c *Coordinator) waitUntilComplete(done chan bool) {
 	}
 }
 
-func (c *Coordinator) PoolRequest(cmd interface{}) map[string]message.Message {
-	time.Sleep(time.Second * 1)
-	response := make(map[string]message.Message, len(c.connected))
-	for nodeString, _ := range c.connected {
-		node := c.members[nodeString]
-		msg := &message.Command{Id: message.NewId(), From: c.from, To: node, Command: cmd}
+func (c *Coordinator) poolRequest(cmd interface{}) raft.PoolResult {
+	response := make(raft.PoolResult, len(c.members))
+	result := make(chan message.Message, len(c.members))
 
-		//fire request to router && store response
-		response[nodeString] = <-c.sendRequest(msg)
+	var wg sync.WaitGroup
+	for nodeString, connected := range c.connected {
+		if connected {
+			wg.Add(1)
+			go func(n string) {
+				node := c.members[n]
+				msg := message.Command{Id: message.NewId(), From: c.from, To: node, Command: cmd}
+				result <- <-c.sendRequest(msg)
+				wg.Done()
+			}(nodeString)
+		}
 	}
-	log.Println("Pool Request response ", response)
+
+	wg.Wait()
+	close(result)
+
+	for item := range result {
+		rsp, ok := item.(*message.Response)
+		if !ok {
+			log.Println("------------------ PoolRequest unexpected type ", reflect.TypeOf(rsp).String())
+			continue
+		}
+		response[rsp.From.String()] = rsp.Result.(string)
+	}
 
 	return response
 }
 
 func (c *Coordinator) sendRequest(msg message.Message) chan message.Message {
-	responseChn := make(chan message.Message)
+	responseChn := make(chan message.Message, 1)
 	c.sndChan <- handler.Request{responseChn, msg}
 
 	return responseChn
-}
-
-func (c *Coordinator) Exit() {
-	close(c.exitChan)
-}
-
-func (c *Coordinator) SndChan() chan handler.Request {
-	return c.sndChan
 }
 
 func (c *Coordinator) isComplete() bool {

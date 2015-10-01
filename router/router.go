@@ -17,7 +17,7 @@ import (
 type Router interface {
 	Accept(*peer.Peer)
 	Handle(peer.NodePeer, message.Message) message.Message
-	RegisterHandlers(handler.MessageHandler)
+	RegisterHandlersFromInstance(handler.MessageHandler)
 	Events() chan dispatcher.Event
 	AggregateChan(chan handler.Request)
 	Exit()
@@ -56,7 +56,7 @@ func New(n node.Node) *defaultRouter {
 	}
 
 	//RegisterHandlers & Notifiers from watcher
-	r.RegisterHandlers(w)
+	r.RegisterHandlersFromInstance(w)
 
 	r.registerHandlers(r.Handlers())
 	r.registerNotifiers(r.Notifiers())
@@ -64,7 +64,7 @@ func New(n node.Node) *defaultRouter {
 	return r
 }
 
-func (r *defaultRouter) RegisterHandlers(h handler.MessageHandler) {
+func (r *defaultRouter) RegisterHandlersFromInstance(h handler.MessageHandler) {
 	r.registerHandlers(h.Handlers())
 	n, ok := h.(handler.NotifyHandler)
 	if ok {
@@ -109,28 +109,28 @@ func (r *defaultRouter) registerNotifier(msgType message.MsgType, st bool) {
 }
 
 func (r *defaultRouter) AggregateChan(ch chan handler.Request) {
-	go func() {
-		for {
-			select {
-			case msg, open := <-ch:
-				if !open {
-					return
-				}
-				response, err := r.route(msg.Msg)
-				if err != nil {
-					log.Println("Forwarding Msg from aggregateChan ERROR", err, msg)
-					msg.ResponseChan <- message.Error{Id: msg.Msg.ID()}
-
-					continue
-				}
-				msg.ResponseChan <- response
-
-			case <-r.exit:
-				log.Println("Exit Aggregate Loop")
+	for {
+		select {
+		case msg, open := <-ch:
+			if !open {
 				return
 			}
+			go func(h handler.Request){
+				response, err := r.route(h.Msg)
+				if err != nil {
+					log.Println("Forwarding Msg from aggregateChan ERROR", err, h)
+					h.ResponseChan <- message.Error{Id: h.Msg.ID()}
+
+					return
+				}
+				h.ResponseChan <- response
+			}(msg)
+
+		case <-r.exit:
+			log.Println("Exit Aggregate Loop")
+			return
 		}
-	}()
+	}
 }
 
 func (r *defaultRouter) route(msg message.Message) (message.Message, error) {
@@ -165,7 +165,13 @@ func (r *defaultRouter) Accept(c *peer.Peer) {
 
 					return
 				}
-				log.Println("----------------RCV ", reflect.TypeOf(msg).String(), msg.ID(), msg.Origin())
+
+				//@TODO: REMOVE IT, JUST DEVELOPMENT
+				cmdData := ""
+				if cmd, ok := msg.(*message.Command); ok {
+					cmdData = reflect.TypeOf(cmd.Command).String()
+				}
+				log.Println("----------------RCV ", reflect.TypeOf(msg).String(), msg.ID(), msg.Origin(), cmdData)
 
 				requestID := msg.ID()
 				v, ok := r.notifiers[msg.MessageType()]
@@ -222,8 +228,8 @@ func (r *defaultRouter) Events() chan dispatcher.Event {
 }
 
 func (r *defaultRouter) InitDialClient(destination node.Node) {
-	p, requestId := peer.InitDialClient(r.from, destination)
-	go r.requestListener.Transaction(requestId)
+	p, requestID := peer.InitDialClient(r.from, destination)
+	go r.requestListener.Transaction(requestID)
 	r.Accept(p)
 }
 

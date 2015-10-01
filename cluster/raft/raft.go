@@ -2,93 +2,116 @@ package raft
 
 import (
 	"fmt"
-	"github.com/marcosQuesada/mesh/message"
 	"github.com/marcosQuesada/mesh/node"
 	"log"
 	"math"
 	"math/rand"
+	"reflect"
 	"time"
 )
 
 const (
-	NodeStatus                    = message.Status("starting")
-	PingIntervalBaseDuration      = time.Second * 10
-	MaxRandomDuration             = 5000
-	PingIntervalMaxRandomDuration = time.Millisecond * MaxRandomDuration
+	PingIntervalBaseDuration = time.Second * 10
+	MaxRandomDuration        = 10000
 )
 
 type raftAction interface {
 	action() string
 }
 
-type Request struct {
-	destination node.Node
-	command     raftAction
-}
-
 type Raft struct {
-	node         node.Node
-	mates        []node.Node
-	leader       node.Node
-	request      chan interface{}
-	response     chan interface{}
-	ready        chan bool
-	pingInterval time.Duration
-	state        string
+	node    node.Node
+	mates   map[string]node.Node
+	leader  node.Node
+	sndChan chan interface{}
+	rcvChan chan interface{}
+	ready   chan bool
+	timer   *raftTimer
 }
 
-type StateHandler func() StateHandler
+type raftTimer struct {
+	timerIn     chan time.Duration
+	timerStop   chan bool
+	timerSignal chan bool
+}
+
+type PoolResult map[string]string
+
+type RaftRequest struct {
+	ResponseChan chan interface{}
+	Cmd          interface{}
+}
 
 type votationResult struct {
 	expected  string
-	responses []string
+	responses PoolResult
 }
 
+type StateHandler func() StateHandler
 type FSM struct {
-	State    interface{}
-	request  chan interface{}
-	response chan interface{}
+	node  node.Node
+	State interface{}
+	exit  chan struct{}
 }
 
-func New(node node.Node, mates []node.Node) *FSM {
-	request := make(chan interface{}, 10)
-	response := make(chan interface{}, 10)
-
+func New(node node.Node, mates map[string]node.Node) *FSM {
+	t := &raftTimer{
+		timerIn:     make(chan time.Duration, 10),
+		timerStop:   make(chan bool, 10),
+		timerSignal: make(chan bool, 10),
+	}
 	r := &Raft{
-		node:         node,
-		mates:        mates,
-		state:        "new",
-		request:      request,
-		response:     response,
-		pingInterval: PingIntervalBaseDuration + getRandomDuration(),
-		ready:        make(chan bool, 0),
+		node:        node,
+		mates:       mates,
+		sndChan:     make(chan interface{}, 10),
+		rcvChan:     make(chan interface{}, 10),
+		ready:       make(chan bool, 0),
+		timer:       t,
 	}
 
-	log.Println("Booting Raft FSM MATESSSSSSSSSSSSSSS", mates)
-
-	return &FSM{State: r, request: request, response: response}
+	return &FSM{
+		node:  node,
+		State: r,
+		exit:  make(chan struct{}),
+	}
 }
 
 func (f *FSM) Run() {
-	e, ok := f.State.(*Raft)
+	log.Println("Begin Raft Manager")
+
+	r, ok := f.State.(*Raft)
 	if !ok {
 		log.Println("FMT state not found!")
 		return
 	}
-	log.Println("-----------------------------------------------------------BEGIN-----------------------------------------------------------")
+	go r.RunTimer()
+	defer close(r.sndChan)
+	defer close(r.rcvChan)
+	defer close(r.ready)
+	defer close(r.timer.timerIn)
+	defer close(r.timer.timerSignal)
 
-	for state := e.FollowerState; state != nil; {
-		state = state()
+	for state := r.FollowerState; state != nil; {
+		select {
+		case <-f.exit:
+			return
+		default:
+			state = state()
+		}
 	}
 
-	fmt.Println("Done!")
+	log.Println("Done!")
 
+}
+
+func (f *FSM) Exit() {
+	close(f.exit)
 }
 
 func (f *FSM) Ready() chan bool {
 	e, ok := f.State.(*Raft)
 	if !ok {
-		log.Panic("FMT Ready state not found!")
+		log.Panic("FMT State is not Raft!")
 
 		return nil
 	}
@@ -96,49 +119,82 @@ func (f *FSM) Ready() chan bool {
 	return e.ready
 }
 
+func (r *Raft) RunTimer() {
+	var timeout *time.Timer = time.NewTimer(time.Hour)
+	for {
+		select {
+		case tSize := <-r.timer.timerIn:
+			timeout.Reset(tSize)
+		case <-timeout.C:
+			r.timer.timerSignal <- true
+		}
+	}
+}
+
 //on follower state expects pings from leader on t intervals
 //on nil leader wait random time and switch candida
 func (r *Raft) FollowerState() StateHandler {
-	log.Println("----------------------------------------------------------On Follower State")
-	if r.leader == (node.Node{}) {
-		time.Sleep(getRandomDuration())
-		log.Println("NO LEADER On Follower State")
-
-		return r.CandidateState
+	log.Println("On Follower State")
+	if r.voidLeader() {
+		tWait := getRandomDuration(r.node)
+		log.Println("NO LEADER On Follower State, TWAIT IS ", tWait)
+		r.timer.timerIn <- tWait
 	}
 
-	timeout := time.NewTimer(PingIntervalMaxRandomDuration)
-		select {
-		case msg := <-r.response:
-			timeout.Reset(r.pingInterval)
-			log.Println("MSG RESPONSE ", msg)
-			return r.FollowerState
+	select {
+	case msg := <-r.rcvChan:
+		cmd, ok := msg.(RaftRequest)
+		if ok {
+			vr, ok := cmd.Cmd.(*VoteRequest)
+			if ok {
+				if r.voidLeader() {
+					cmd.ResponseChan <- vr.Candidate.String()
+				} else {
+					cmd.ResponseChan <- r.leader.String()
+				}
+			}
 
-		case <-timeout.C:
-			log.Println("MSG TIMEOUT RESPONSE ")
-			return r.CandidateState
+			ping, castOk := cmd.Cmd.(*PingRequest)
+			if castOk {
+				r.setLeader(ping.Leader)
+				log.Println("RAFT PING! from ", ping.Leader)
+				r.timer.timerIn <- PingIntervalBaseDuration
+
+				//@TODO: Required to solve transactions, until implement pure Messages
+				cmd.ResponseChan <- r.leader.String()
+			}
 		}
+
+		return r.FollowerState
+
+	case <-r.timer.timerSignal:
+		return r.CandidateState
+	}
 }
 
 func (r *Raft) CandidateState() StateHandler {
-	log.Println("On Candidate State")
-
+	log.Println("On CandidateState")
 	//Send Vote request
-	for _, n := range r.mates {
-		log.Println("Vote Request to ", n)
-		r.request <- Request{n, &VoteRequest{r.node}}
-	}
-
-	timeout := time.NewTimer(time.Second * 2)
+	r.sndChan <- &VoteRequest{r.node}
+	r.timer.timerIn <- time.Second * 2
 	select {
-	case msg := <-r.response:
-		timeout.Reset(r.pingInterval)
-		log.Println("MSG CANDIDATE RESPONSE ", msg)
+	case msg := <-r.rcvChan:
+		r.timer.timerIn <- time.Hour
+		switch v := msg.(type) {
+		case RaftRequest:
+			msg.(RaftRequest).ResponseChan <- r.node.String()
 
-		//evaluate response
-		//return r.LeaderState
+		case PoolResult:
+			if r.evaluate(votationResult{expected: r.node.String(), responses: msg.(PoolResult)}) {
+				return r.LeaderState
+			}
+		default:
+			log.Println("Candidate command unknown", reflect.TypeOf(v).String())
+		}
+
 		return r.CandidateState
-	case <-timeout.C:
+
+	case <-r.timer.timerSignal:
 		log.Println("On Candidate Timeout")
 		return r.FollowerState
 	}
@@ -147,26 +203,80 @@ func (r *Raft) CandidateState() StateHandler {
 
 //leader pings followers on random time < Max time -10
 func (r *Raft) LeaderState() StateHandler {
-	log.Println("On Leader State")
-	ping := time.NewTicker(r.pingInterval)
-	/*	for {*/
-	select {
-	case msg := <-r.response:
-		ping.Stop()
+	log.Println("XXXXXXX On Leader State XXXXX")
 
-		log.Println("MSG RESPONSE ", msg)
-
-		return r.FollowerState
-	case <-ping.C:
-		for _, n := range r.mates {
-			log.Println("ping ", n)
-
-			r.request <- Request{n, &PingRequest{}}
-		}
+	if r.voidLeader() {
+		r.timer.timerIn <- time.Second * 2
+		r.sndChan <- &PingRequest{r.node}
 	}
-	/*	}*/
+	r.setLeader(r.node)
 
-	return nil
+	select {
+	case msg := <-r.rcvChan:
+		switch v := msg.(type) {
+		case RaftRequest:
+			cmd, ok := msg.(RaftRequest)
+			if ok {
+				_, ok := cmd.Cmd.(*VoteRequest)
+				if ok {
+					log.Println("Voting to me", r.node.String())
+					cmd.ResponseChan <- r.node.String()
+				}
+
+				ping, castOk := cmd.Cmd.(*PingRequest)
+				if castOk {
+					log.Println("PING! received from ", ping.Leader)
+					r.timer.timerIn <- time.Hour
+
+					return r.CandidateState
+				}
+			}
+		case PoolResult:
+			//@TODO: Only evaluate on VoteRequest
+			if r.evaluate(votationResult{expected: r.node.String(), responses: msg.(PoolResult)}) {
+				return r.LeaderState
+			}
+		default:
+			fmt.Println("unknown", reflect.TypeOf(v).String())
+		}
+
+	case <-r.timer.timerSignal:
+		r.sndChan <- &PingRequest{r.node}
+		r.timer.timerIn <- time.Second * 2
+	}
+
+	return r.LeaderState
+}
+
+func (f *FSM) Request() chan interface{} {
+	r, ok := f.State.(*Raft)
+	if !ok {
+		log.Println("FMT state not found!")
+		return nil
+	}
+	return r.sndChan
+}
+
+func (f *FSM) Response() chan interface{} {
+	r, ok := f.State.(*Raft)
+	if !ok {
+		log.Println("FMT state not found!")
+		return nil
+	}
+	return r.rcvChan
+}
+
+func (r *Raft) voidLeader() bool {
+	return r.leader == (node.Node{})
+}
+
+func (r *Raft) setLeader(n node.Node) {
+	if r.voidLeader() {
+		//send ready Signal
+		r.ready <- true
+	}
+	r.leader = n
+
 }
 
 func (r *Raft) evaluate(vr votationResult) bool {
@@ -178,38 +288,15 @@ func (r *Raft) evaluate(vr votationResult) bool {
 		}
 		negVotes++
 	}
-	reqMajority := int(math.Floor(float64(len(vr.responses)+1)/2)) + 1
+	reqMajority := int(math.Floor(float64(len(r.mates))/2)) + 1
 	log.Println("FavVotes ", favVotes, "NegVotes", negVotes, "required", reqMajority)
 
 	return favVotes >= reqMajority
 }
 
-func (f *FSM) Request() chan interface{} {
-	return f.request
-}
+func getRandomDuration(node node.Node) time.Duration {
+	rand.Seed(time.Now().Unix() * int64(node.Port))
+	rnd := rand.Intn(MaxRandomDuration)
 
-func (f *FSM) Response() chan interface{} {
-	return f.response
-}
-
-// Request Types
-type VoteRequest struct {
-	Candidate node.Node
-}
-
-func (v *VoteRequest) action() string {
-	return "voteRequest"
-}
-
-type PingRequest struct {
-}
-
-func (v *PingRequest) action() string {
-	return "PingRequest"
-}
-
-func getRandomDuration() time.Duration {
-	rand.Seed(time.Now().Unix())
-
-	return time.Millisecond * time.Duration(rand.Intn(MaxRandomDuration))
+	return time.Millisecond * time.Duration(rnd)
 }

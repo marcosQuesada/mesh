@@ -10,6 +10,7 @@ import (
 
 	"github.com/marcosQuesada/mesh/config"
 	"github.com/marcosQuesada/mesh/server"
+	"fmt"
 )
 
 func main() {
@@ -22,6 +23,14 @@ func main() {
 
 	//Init logger
 	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds | log.Lshortfile)
+
+	f, err := os.OpenFile(fmt.Sprintf("%s.log", *addr), os.O_RDWR | os.O_CREATE | os.O_APPEND, 0666)
+	if err != nil {
+		log.Panic("error opening file: %v", err)
+	}
+	defer f.Close()
+
+	//log.SetOutput(f)
 
 	//Create Configuration
 	config := config.NewConfig(*addr, *cluster)

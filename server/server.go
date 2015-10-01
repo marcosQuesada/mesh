@@ -33,23 +33,21 @@ func New(c *config.Config) *Server {
 func (s *Server) Start() {
 	c := cluster.Start(s.node, s.config.Cluster)
 
-	d := dispatcher.New()
-	d.RegisterListener(&peer.OnPeerConnectedEvent{}, c.OnPeerConnectedEvent)
-	d.RegisterListener(&peer.OnPeerDisconnectedEvent{}, c.OnPeerDisconnected)
-	d.RegisterListener(&peer.OnPeerAbortedEvent{}, c.OnPeerAborted)
-	d.RegisterListener(&peer.OnPeerErroredEvent{}, c.OnPeerErrored)
+	disp := dispatcher.New()
+	disp.RegisterListener(&peer.OnPeerConnectedEvent{}, c.OnPeerConnectedEvent)
+	disp.RegisterListener(&peer.OnPeerDisconnectedEvent{}, c.OnPeerDisconnected)
+	disp.RegisterListener(&peer.OnPeerAbortedEvent{}, c.OnPeerAborted)
+	disp.RegisterListener(&peer.OnPeerErroredEvent{}, c.OnPeerErrored)
+	go disp.ConsumeEventChan()
+	go disp.AggregateChan(s.router.Events())
 
-	go d.Run()
-	go d.Aggregate(s.router.Events())
-
-	s.router.RegisterHandlers(c)
+	s.router.RegisterHandlersFromInstance(c)
 	//aggregate coordinator snd chan
-	s.router.AggregateChan(c.SndChan())
+	go s.router.AggregateChan(c.SndChan())
 
 	s.startDialPeers()
 	s.startServer()
 	s.run()
-
 
 	//TODO: aggregate watcher snd chan
 	//s.router.AggregateChan(c.SndChan())

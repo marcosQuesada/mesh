@@ -7,9 +7,10 @@ type Commandable interface {
 type Command struct {
 	Name string
 	Args Args
+	Type Type
 	Response Response
 }
 
 type Args []interface{}
-
 type Response interface{}
+type Type interface{}

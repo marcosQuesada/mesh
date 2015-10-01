@@ -55,6 +55,8 @@ func (mt MsgType) New() Message {
 		return &Command{}
 	case RESPONSE:
 		return &Response{}
+	case RAFTCOMMAND:
+		return &RaftCommand{}
 	case ACK:
 		return &Ack{}
 	}
@@ -63,17 +65,18 @@ func (mt MsgType) New() Message {
 }
 
 const (
-	HELLO    = MsgType(0)
-	WELCOME  = MsgType(1)
-	ABORT    = MsgType(2)
-	PING     = MsgType(3)
-	PONG     = MsgType(4)
-	GOODBYE  = MsgType(5)
-	ACK      = MsgType(6)
-	DONE     = MsgType(90)
-	ERROR    = MsgType(99)
-	COMMAND  = MsgType(50)
-	RESPONSE = MsgType(51)
+	HELLO       = MsgType(0)
+	WELCOME     = MsgType(1)
+	ABORT       = MsgType(2)
+	PING        = MsgType(3)
+	PONG        = MsgType(4)
+	GOODBYE     = MsgType(5)
+	ACK         = MsgType(6)
+	DONE        = MsgType(90)
+	ERROR       = MsgType(99)
+	COMMAND     = MsgType(50)
+	RESPONSE    = MsgType(51)
+	RAFTCOMMAND = MsgType(52)
 )
 
 // First connection message
@@ -292,6 +295,7 @@ type Response struct {
 	From    n.Node
 	To      n.Node
 	Details map[string]interface{}
+	Result  interface{}
 }
 
 func (h Response) MessageType() MsgType {
@@ -330,5 +334,29 @@ func (h Ack) Destination() n.Node {
 }
 
 func (h Ack) ID() ID {
+	return h.Id
+}
+
+type RaftCommand struct {
+	Id      ID
+	From    n.Node
+	To      n.Node
+	Details map[string]interface{}
+	Command interface{} //@TODO: Provisional
+}
+
+func (h RaftCommand) MessageType() MsgType {
+	return RAFTCOMMAND
+}
+
+func (h RaftCommand) Origin() n.Node {
+	return h.From
+}
+
+func (h RaftCommand) Destination() n.Node {
+	return h.To
+}
+
+func (h RaftCommand) ID() ID {
 	return h.Id
 }

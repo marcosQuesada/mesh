@@ -135,7 +135,6 @@ func (p *Peer) Exit() {
 	close(p.exitChan)
 	<-p.doneChan
 	close(p.messageChan)
-	//	log.Println("exit done ", p.Node(), p.mode, p.Id())
 }
 
 func (p *Peer) ResetWatcherChan() chan bool {
@@ -217,7 +216,12 @@ func (p *Peer) handleSendChan() {
 				log.Println("Send channel is closed, return", p.to, p.mode)
 				return
 			}
-			log.Println("------------------SND ", reflect.TypeOf(msg).String(), msg.ID(), p.Node())
+			//@TODO: PROVISIONAL
+			cmdData := ""
+			if cmd, ok := msg.(message.Command); ok {
+				cmdData = reflect.TypeOf(cmd.Command).String()
+			}
+			log.Println("------------------SND ", reflect.TypeOf(msg).String(), msg.ID(), p.Node(), cmdData)
 			p.Send(msg)
 		case <-p.exitChan:
 			return
@@ -225,6 +229,7 @@ func (p *Peer) handleSendChan() {
 	}
 }
 
+//@TODO: Remove this shit!
 func (p *Peer) nilSendChan() {
 	go func() {
 		p.sendChan = nil
