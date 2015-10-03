@@ -84,7 +84,7 @@ func (f *FSM) Run() {
 		log.Println("FMT state not found!")
 		return
 	}
-	go r.RunTimer()
+	go r.runTimer()
 	defer close(r.sndChan)
 	defer close(r.rcvChan)
 	defer close(r.ready)
@@ -117,18 +117,6 @@ func (f *FSM) Ready() chan bool {
 	}
 
 	return e.ready
-}
-
-func (r *Raft) RunTimer() {
-	var timeout *time.Timer = time.NewTimer(time.Hour)
-	for {
-		select {
-		case tSize := <-r.timer.timerIn:
-			timeout.Reset(tSize)
-		case <-timeout.C:
-			r.timer.timerSignal <- true
-		}
-	}
 }
 
 //on follower state expects pings from leader on t intervals
@@ -264,6 +252,20 @@ func (f *FSM) Response() chan interface{} {
 		return nil
 	}
 	return r.rcvChan
+}
+
+func (r *Raft) runTimer() {
+	var timeout *time.Timer = time.NewTimer(time.Hour)
+	for {
+		select {
+		case tSize := <-r.timer.timerIn:
+			timeout.Reset(tSize)
+		case <-r.timer.timerStop:
+			timeout.Stop()
+		case <-timeout.C:
+			r.timer.timerSignal <- true
+		}
+	}
 }
 
 func (r *Raft) voidLeader() bool {
