@@ -105,7 +105,7 @@ func TestRouterAccept(t *testing.T) {
 
 func fakeHelloHandler(c peer.NodePeer, msg message.Message) (message.Message, error) {
 	hello := msg.(*message.Hello)
-	return &message.Welcome{hello.Id, hello.To, hello.From, hello.Details}, nil
+	return &message.Welcome{hello.Id, hello.To, hello.From}, nil
 }
 
 func fakePingHandler(c peer.NodePeer, msg message.Message) (message.Message, error) {

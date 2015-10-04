@@ -222,7 +222,7 @@ func TestPeersUsingPipes(t *testing.T) {
 				if msg.MessageType() != 0 {
 					t.Error("Unexpected message type")
 				}
-				c1.Commit(&message.Abort{Id: msg.(*message.Hello).Id, From: msg.(*message.Hello).From, Details: map[string]interface{}{"foo_bar": 1231}})
+				c1.Commit(&message.Abort{Id: msg.(*message.Hello).Id, From: msg.(*message.Hello).From})
 
 				if total == 100 {
 					wg.Done()

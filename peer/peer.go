@@ -118,7 +118,6 @@ func (p *Peer) SayHello() (u message.ID, err error) {
 	msg := message.Hello{
 		Id:      message.NewId(),
 		From:    p.from,
-		Details: map[string]interface{}{"foo": "bar"},
 	}
 	p.Commit(msg)
 
@@ -221,7 +220,7 @@ func (p *Peer) handleSendChan() {
 			if cmd, ok := msg.(message.Command); ok {
 				cmdData = reflect.TypeOf(cmd.Command).String()
 			}
-			log.Println("------------------SND ", reflect.TypeOf(msg).String(), msg.ID(), p.Node(), cmdData)
+			log.Println("-----SND ", reflect.TypeOf(msg).String(), msg.ID(), p.Node(), cmdData)
 			p.Send(msg)
 		case <-p.exitChan:
 			return

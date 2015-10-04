@@ -6,9 +6,9 @@ import (
 	n "github.com/marcosQuesada/mesh/node"
 	"github.com/marcosQuesada/mesh/router/handler"
 	"log"
-	"reflect"
 	"sync"
 	"time"
+"reflect"
 )
 
 // Coordinator takes cares on all cluster related tasks
@@ -28,6 +28,8 @@ type Manager interface {
 	Ready() chan bool
 	Request() chan interface{}
 	Response() chan interface{}
+	Handlers() map[message.MsgType]handler.Handler
+	Notifiers() map[message.MsgType]bool
 	Exit()
 }
 
@@ -74,7 +76,6 @@ func (c *Coordinator) Run() {
 			return
 		case <-complete:
 			runOnce.Do(func() {
-				log.Println("Boot manager just once")
 				go c.manager.Run()
 			})
 		case <-c.manager.Ready():
@@ -91,14 +92,31 @@ func (c *Coordinator) SndChan() chan handler.Request {
 	return c.sndChan
 }
 
+func (c *Coordinator) Manager() Manager{
+	return c.manager
+}
+
 func (c *Coordinator) addSender(sendChan chan interface{}, rcvChan chan interface{}) {
 	go func() {
 		for {
 			select {
 			case msg := <-sendChan:
-				go func() {
-					rcvChan <- c.poolRequest(msg)
-				}()
+				switch v := msg.(type) {
+				//On Vote Request my answer is that I'm Candidate to leader
+				case message.Message:
+					go func() {
+						r := c.sendRequest(msg.(message.Message))
+						if r != nil {
+							rcvChan <- r
+						}
+					}()
+				case []message.Message:
+					go func() {
+						rcvChan <-c.poolRequest(msg.([]message.Message))
+					}()
+				default:
+					log.Println("Coordinator addSender unexpected request type",v, reflect.TypeOf(msg).String())
+				}
 			}
 		}
 	}()
@@ -121,20 +139,23 @@ func (c *Coordinator) waitUntilComplete(done chan bool) {
 	}
 }
 
-func (c *Coordinator) poolRequest(cmd interface{}) raft.PoolResult {
+func (c *Coordinator) poolRequest(msgs []message.Message) raft.PoolResult {
 	response := make(raft.PoolResult, len(c.members))
 	result := make(chan message.Message, len(c.members))
 
 	var wg sync.WaitGroup
-	for nodeString, connected := range c.connected {
+	for _, msg := range msgs {
+		dest := msg.Destination()
+		connected := c.connected[dest.String()]
 		if connected {
 			wg.Add(1)
-			go func(n string) {
-				node := c.members[n]
-				msg := message.Command{Id: message.NewId(), From: c.from, To: node, Command: cmd}
-				result <- <-c.sendRequest(msg)
+			go func(m message.Message) {
+				r := c.sendRequest(m)
+				if r != nil {
+					result <- r
+				}
 				wg.Done()
-			}(nodeString)
+			}(msg)
 		}
 	}
 
@@ -142,22 +163,26 @@ func (c *Coordinator) poolRequest(cmd interface{}) raft.PoolResult {
 	close(result)
 
 	for item := range result {
-		rsp, ok := item.(*message.Response)
+		rsp, ok := item.(*message.RaftVoteResponse)
 		if !ok {
 			log.Println("------------------ PoolRequest unexpected type ", reflect.TypeOf(rsp).String())
 			continue
 		}
-		response[rsp.From.String()] = rsp.Result.(string)
+		response[rsp.From.String()] = rsp.Vote
 	}
 
 	return response
 }
 
-func (c *Coordinator) sendRequest(msg message.Message) chan message.Message {
-	responseChn := make(chan message.Message, 1)
+func (c *Coordinator) sendRequest(msg message.Message) message.Message {
+	responseChn := make(chan interface{}, 1)
 	c.sndChan <- handler.Request{responseChn, msg}
 
-	return responseChn
+	result := <- responseChn
+	if result == nil {
+		return nil
+	}
+	return result.(message.Message)
 }
 
 func (c *Coordinator) isComplete() bool {

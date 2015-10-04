@@ -54,7 +54,7 @@ func (mt MsgType) New() Message {
 	case RAFTVOTEREQUEST:
 		return &RaftVoteRequest{Candidate: n.Node{}}
 	case RAFTVOTERESPONSE:
-		return &RaftVoteResponse{Vote: n.Node{}}
+		return &RaftVoteResponse{} //Vote: n.Node{}
 	case RAFTHEARTBEATREQUEST:
 		return &RaftHeartBeatRequest{Leader: n.Node{}}
 	case ACK:
@@ -84,6 +84,7 @@ type Hello struct {
 	Id   ID
 	From n.Node
 	To   n.Node
+	Details map[string]interface{}
 }
 
 func (h Hello) MessageType() MsgType {
@@ -312,7 +313,7 @@ type RaftVoteResponse struct {
 	Id   ID
 	From n.Node
 	To   n.Node
-	Vote n.Node
+	Vote string //Vote: n.Node
 }
 
 func (h RaftVoteResponse) MessageType() MsgType {

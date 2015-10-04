@@ -19,6 +19,6 @@ type NotifyHandler interface {
 
 //On responseChan nil, no Wait required
 type Request struct {
-	ResponseChan chan message.Message
+	ResponseChan chan interface{}
 	Msg          message.Message
 }

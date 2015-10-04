@@ -1,5 +1,5 @@
 package raft
-import "github.com/marcosQuesada/mesh/node"
+/*import "github.com/marcosQuesada/mesh/node"
 
 type VoteRequest struct {
 	Candidate node.Node
@@ -25,7 +25,8 @@ type HeartBeatRequest struct {
 
 func (v *HeartBeatRequest) action() string {
 	return "HeartBeatRequest"
-}
+}*/
+/*
 
 func NewRaftAction(action string) raftAction {
 	switch action {
@@ -36,4 +37,4 @@ func NewRaftAction(action string) raftAction {
 
 	}
 	return nil
-}
+}*/

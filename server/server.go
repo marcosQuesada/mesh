@@ -42,6 +42,7 @@ func (s *Server) Start() {
 	go disp.AggregateChan(s.router.Events())
 
 	s.router.RegisterHandlersFromInstance(c)
+	s.router.RegisterHandlersFromInstance(c.Manager())
 	//aggregate coordinator snd chan
 	go s.router.AggregateChan(c.SndChan())
 

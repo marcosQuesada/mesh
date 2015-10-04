@@ -115,8 +115,8 @@ func (r *defaultRouter) AggregateChan(ch chan handler.Request) {
 			if !open {
 				return
 			}
-			go func(h handler.Request){
-				response, err := r.route(h.Msg)
+			go func(h handler.Request) {
+				response, err := r.route(h.Msg.(message.Message))
 				if err != nil {
 					log.Println("Forwarding Msg from aggregateChan ERROR", err, h)
 					h.ResponseChan <- message.Error{Id: h.Msg.ID()}
@@ -134,17 +134,23 @@ func (r *defaultRouter) AggregateChan(ch chan handler.Request) {
 }
 
 func (r *defaultRouter) route(msg message.Message) (message.Message, error) {
-	from := msg.Destination()
-	peer, ok := r.peers[from.String()]
+	to := msg.Destination()
+	peer, ok := r.peers[to.String()]
 	if !ok {
-		return nil, fmt.Errorf("Router error: Destination Peer Not found")
+		return nil, fmt.Errorf("Router error: Destination Peer Not found ", to.String())
 	}
 
 	peer.Commit(msg)
-	//Wait response
-	response := r.requestListener.Transaction(msg.ID())
 
-	return response, nil
+	//@TODO: Solve Transaction mess
+	//Wait response
+	if msg.MessageType() != message.RAFTHEARTBEATREQUEST {
+		response := r.requestListener.Transaction(msg.ID())
+
+		return response, nil
+	}
+
+	return nil, nil
 }
 
 func (r *defaultRouter) Accept(c *peer.Peer) {
@@ -171,7 +177,7 @@ func (r *defaultRouter) Accept(c *peer.Peer) {
 				if cmd, ok := msg.(*message.Command); ok {
 					cmdData = reflect.TypeOf(cmd.Command).String()
 				}
-				log.Println("----------------RCV ", reflect.TypeOf(msg).String(), msg.ID(), msg.Origin(), cmdData)
+				log.Println("---RCV ", reflect.TypeOf(msg).String(), msg.ID(), msg.Origin(), cmdData)
 
 				requestID := msg.ID()
 				v, ok := r.notifiers[msg.MessageType()]
