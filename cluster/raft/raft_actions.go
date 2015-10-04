@@ -1,21 +1,30 @@
 package raft
 import "github.com/marcosQuesada/mesh/node"
 
-// Request Types
 type VoteRequest struct {
 	Candidate node.Node
+	ResponseChan chan interface{}
 }
 
 func (v *VoteRequest) action() string {
-	return "voteRequest"
+	return "VoteRequest"
 }
 
-type PingRequest struct {
+// Request Types
+type VoteResponse struct {
+	Vote node.Node
+}
+
+func (v *VoteResponse) action() string {
+	return "VoteResponse"
+}
+
+type HeartBeatRequest struct {
 	Leader node.Node
 }
 
-func (v *PingRequest) action() string {
-	return "pingRequest"
+func (v *HeartBeatRequest) action() string {
+	return "HeartBeatRequest"
 }
 
 func NewRaftAction(action string) raftAction {
@@ -23,7 +32,7 @@ func NewRaftAction(action string) raftAction {
 	case "voteRequest":
 		return &VoteRequest{}
 	case "pingRequest":
-		return &PingRequest{}
+		return &HeartBeatRequest{}
 
 	}
 	return nil

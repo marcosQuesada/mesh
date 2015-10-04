@@ -1,24 +1,55 @@
 package raft
+
 import (
-	"github.com/marcosQuesada/mesh/peer"
 	"github.com/marcosQuesada/mesh/message"
+	"github.com/marcosQuesada/mesh/peer"
+	"github.com/marcosQuesada/mesh/router/handler"
 	"log"
 )
 
-func (r *Raft) HandleRaftCommand(p peer.NodePeer, msg message.Message) (message.Message, error) {
-	from := p.From()
-	cmd := msg.(*message.Command)
+func (r *Raft) Handlers() map[message.MsgType]handler.Handler {
+	return map[message.MsgType]handler.Handler{
+		message.RAFTVOTEREQUEST:      r.HandleRaftVoteRequest,
+		message.RAFTVOTERESPONSE:     r.HandleRaftVoteResponse,
+		message.RAFTHEARTBEATREQUEST: r.HandleRaftHeartBeat,
+	}
+}
+func (r *Raft) Notifiers() map[message.MsgType]bool {
+	return map[message.MsgType]bool{
+		message.RAFTVOTEREQUEST:      false,
+		message.RAFTVOTERESPONSE:     true,
+		message.RAFTHEARTBEATREQUEST: false,
+	}
+}
 
-	log.Println("HandleCommand, from peer", from.String(), cmd.Command)
+func (r *Raft) HandleRaftVoteRequest(p peer.NodePeer, msg message.Message) (message.Message, error) {
+	cmdMsg := msg.(*message.RaftVoteRequest)
 
-	log.Println("HandleCommand Forward request to raft")
-	responseChn := make(chan interface{})
-	r.rcvChan <- RaftRequest{responseChn, cmd}
+	log.Println("HandleRaftVoteRequest, from peer", cmdMsg.From.String(), "candidate: ", cmdMsg.Candidate.String())
 
-	log.Println("HandleCommand Waiting result")
-
+	responseChn := make(chan interface{}, 1)
+	r.sndChan <- &VoteRequest{Candidate: cmdMsg.Candidate, ResponseChan: responseChn}
 	result := <-responseChn
-	log.Println("HandleCommand Forward result", result)
 
-	return message.Response{Id: msg.(*message.Command).Id, From: r.node, Result: result}, nil
+	return message.RaftVoteResponse{Id: cmdMsg.Id, From: r.node, Vote: result}, nil
+}
+
+func (r *Raft) HandleRaftVoteResponse(p peer.NodePeer, msg message.Message) (message.Message, error) {
+	cmdMsg := msg.(*message.RaftVoteResponse)
+
+	log.Println("HandleRaftVoteResponse, from peer", cmdMsg.From.String(), "vote: ", cmdMsg.Vote.String())
+
+	r.sndChan <- &VoteResponse{Vote: cmdMsg.Vote}
+
+	return nil, nil
+}
+
+func (r *Raft) HandleRaftHeartBeat(p peer.NodePeer, msg message.Message) (message.Message, error) {
+	cmdMsg := msg.(*message.RaftHeartBeatRequest)
+
+	log.Println("HandleRaftHeartBeat, from peer", cmdMsg.From.String(), "leader: ", cmdMsg.Leader.String())
+
+	r.sndChan <- &HeartBeatRequest{Leader: cmdMsg.Leader}
+
+	return nil, nil
 }
