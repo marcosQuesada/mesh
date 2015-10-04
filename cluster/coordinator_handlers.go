@@ -21,6 +21,13 @@ func (r *Coordinator) Notifiers() map[message.MsgType]bool {
 	}
 }
 
+func (r *Coordinator) Transactions() map[message.MsgType]bool {
+	return map[message.MsgType]bool{
+		message.COMMAND:  true,
+		message.RESPONSE: false,
+	}
+}
+
 func (c *Coordinator) HandleCommand(p peer.NodePeer, msg message.Message) (message.Message, error) {
 	cmdMsg := msg.(*message.Command)
 	log.Println("HandleCommand, from peer", cmdMsg.From.String(), msg.ID())

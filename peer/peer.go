@@ -215,6 +215,7 @@ func (p *Peer) handleSendChan() {
 				log.Println("Send channel is closed, return", p.to, p.mode)
 				return
 			}
+
 			//@TODO: PROVISIONAL
 			cmdData := ""
 			if cmd, ok := msg.(message.Command); ok {

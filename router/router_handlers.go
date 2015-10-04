@@ -27,10 +27,20 @@ func (r *defaultRouter) Notifiers() map[message.MsgType]bool{
 	}
 }
 
+func (r *defaultRouter) Transactions() map[message.MsgType]bool{
+	return map[message.MsgType]bool{
+		message.HELLO:   true,
+		message.WELCOME: true,
+		message.ACK:     false,
+		message.ABORT:   false,
+		message.ERROR:   false,
+	}
+}
+
 //HandleHello Request
 func (r *defaultRouter) HandleHello(c peer.NodePeer, msg message.Message) (message.Message, error) {
 	c.Identify(msg.(*message.Hello).From)
-	if r.exists(c) {
+	if r.existPeer(c) {
 		return &message.Abort{Id: msg.(*message.Hello).Id, From: r.from}, nil
 	}
 

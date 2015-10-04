@@ -34,6 +34,7 @@ type defaultRouter struct {
 	watcher         watch.Watcher
 	handlers        map[message.MsgType]handler.Handler
 	notifiers       map[message.MsgType]bool
+	transactionals map[message.MsgType]bool
 	mutex           sync.Mutex
 	requestListener *watch.RequestListener
 }
@@ -50,6 +51,7 @@ func New(n node.Node) *defaultRouter {
 		eventChan:       evChan,
 		handlers:        make(map[message.MsgType]handler.Handler),
 		notifiers:       make(map[message.MsgType]bool),
+		transactionals:  make(map[message.MsgType]bool),
 		exit:            make(chan bool),
 		watcher:         w,
 		requestListener: reqList,
@@ -58,8 +60,10 @@ func New(n node.Node) *defaultRouter {
 	//RegisterHandlers & Notifiers from watcher
 	r.RegisterHandlersFromInstance(w)
 
+	//Register locals
 	r.registerHandlers(r.Handlers())
 	r.registerNotifiers(r.Notifiers())
+	r.registerTransactionals(r.Transactions())
 
 	return r
 }
@@ -70,42 +74,10 @@ func (r *defaultRouter) RegisterHandlersFromInstance(h handler.MessageHandler) {
 	if ok {
 		r.registerNotifiers(n.Notifiers())
 	}
-}
-
-func (r *defaultRouter) registerHandlers(handlers map[message.MsgType]handler.Handler) {
-	for msg, h := range handlers {
-		r.registerHandler(msg, h)
+	t, ok := h.(handler.TransactionHandler)
+	if ok {
+		r.registerTransactionals(t.Transactions())
 	}
-}
-
-func (r *defaultRouter) registerHandler(msgType message.MsgType, handler handler.Handler) {
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
-
-	if _, ok := r.handlers[msgType]; ok {
-		log.Fatal("Handler already registered")
-		return
-	}
-
-	r.handlers[msgType] = handler
-}
-
-func (r *defaultRouter) registerNotifiers(notifiers map[message.MsgType]bool) {
-	for msg, s := range notifiers {
-		r.registerNotifier(msg, s)
-	}
-}
-
-func (r *defaultRouter) registerNotifier(msgType message.MsgType, st bool) {
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
-
-	if _, ok := r.notifiers[msgType]; ok {
-		log.Fatal("Notifier already registered")
-		return
-	}
-
-	r.notifiers[msgType] = st
 }
 
 func (r *defaultRouter) AggregateChan(ch chan handler.Request) {
@@ -133,26 +105,6 @@ func (r *defaultRouter) AggregateChan(ch chan handler.Request) {
 	}
 }
 
-func (r *defaultRouter) route(msg message.Message) (message.Message, error) {
-	to := msg.Destination()
-	peer, ok := r.peers[to.String()]
-	if !ok {
-		return nil, fmt.Errorf("Router error: Destination Peer Not found ", to.String())
-	}
-
-	peer.Commit(msg)
-
-	//@TODO: Solve Transaction mess
-	//Wait response
-	if msg.MessageType() != message.RAFTHEARTBEATREQUEST {
-		response := r.requestListener.Transaction(msg.ID())
-
-		return response, nil
-	}
-
-	return nil, nil
-}
-
 func (r *defaultRouter) Accept(c *peer.Peer) {
 	go func() {
 		for {
@@ -162,43 +114,20 @@ func (r *defaultRouter) Accept(c *peer.Peer) {
 				return
 			case msg, open := <-c.ReceiveChan():
 				if !open {
-					if _, ok := r.peerIDs[c.Id()]; ok {
-						log.Println("Unregister Peer:", c.Node(), "mode:", c.Mode(), "id", c.Id())
-						r.remove(c)
-						r.eventChan <- &peer.OnPeerDisconnectedEvent{c.From(), peer.PeerStatusDisconnected}
-						go r.InitDialClient(c.Node())
-					}
-
+					r.startPeerRecovering(c)
 					return
 				}
 
-				//@TODO: REMOVE IT, JUST DEVELOPMENT
-				cmdData := ""
-				if cmd, ok := msg.(*message.Command); ok {
-					cmdData = reflect.TypeOf(cmd.Command).String()
-				}
-				log.Println("---RCV ", reflect.TypeOf(msg).String(), msg.ID(), msg.Origin(), cmdData)
-
-				requestID := msg.ID()
-				v, ok := r.notifiers[msg.MessageType()]
-				if !ok {
-					log.Fatal("Notifier not found ", msg.MessageType())
-				}
-				if v {
-					r.requestListener.Notify(msg, requestID)
-				}
-
+				r.logCommand(msg)
+				r.notifyTransaction(msg)
 				response := r.Handle(c, msg)
 				if response != nil {
 					c.Commit(response)
+					r.startTransaction(response)
 
 					if response.MessageType() == message.ABORT {
 						c.Exit()
 						return
-					}
-
-					if response.MessageType() == message.WELCOME {
-						go r.requestListener.Transaction(requestID)
 					}
 				}
 			}
@@ -225,10 +154,6 @@ func (r *defaultRouter) Handle(c peer.NodePeer, msg message.Message) message.Mes
 	return result
 }
 
-func (r *defaultRouter) Exit() {
-	close(r.exit)
-}
-
 func (r *defaultRouter) Events() chan dispatcher.Event {
 	return r.eventChan
 }
@@ -237,6 +162,10 @@ func (r *defaultRouter) InitDialClient(destination node.Node) {
 	p, requestID := peer.InitDialClient(r.from, destination)
 	go r.requestListener.Transaction(requestID)
 	r.Accept(p)
+}
+
+func (r *defaultRouter) Exit() {
+	close(r.exit)
 }
 
 func (r *defaultRouter) accept(p peer.NodePeer) error {
@@ -254,7 +183,122 @@ func (r *defaultRouter) accept(p peer.NodePeer) error {
 	return nil
 }
 
-func (r *defaultRouter) exists(p peer.NodePeer) bool {
+func (r *defaultRouter) route(msg message.Message) (message.Message, error) {
+	to := msg.Destination()
+	peer, ok := r.peers[to.String()]
+	if !ok {
+		return nil, fmt.Errorf("Router error: Destination Peer Not found ", to.String())
+	}
+
+	peer.Commit(msg)
+
+	//Open transaction iif required and wait response
+	v, ok := r.transactionals[msg.MessageType()]
+	if !ok {
+		log.Fatal("Transactioner not found ", msg.MessageType())
+	}
+	if v {
+		response := r.requestListener.Transaction(msg.ID())
+
+		return response, nil
+	}
+
+	return nil, nil
+}
+
+func (r *defaultRouter) startPeerRecovering(c *peer.Peer) {
+	if _, ok := r.peerIDs[c.Id()]; ok {
+		log.Println("Unregister Peer:", c.Node(), "mode:", c.Mode(), "id", c.Id())
+		r.removePeer(c)
+		r.eventChan <- &peer.OnPeerDisconnectedEvent{c.From(), peer.PeerStatusDisconnected}
+		go r.InitDialClient(c.Node())
+	}
+}
+
+func (r *defaultRouter) logCommand(msg message.Message) {
+	cmdData := ""
+	if cmd, ok := msg.(*message.Command); ok {
+		cmdData = reflect.TypeOf(cmd.Command).String()
+	}
+	log.Println("---RCV ", reflect.TypeOf(msg).String(), msg.ID(), msg.Origin(), cmdData)
+}
+
+func (r *defaultRouter) notifyTransaction(msg message.Message) {
+	v, ok := r.notifiers[msg.MessageType()]
+	if !ok {
+		log.Fatal("Notifier not found ", msg.MessageType())
+	}
+	if v {
+		r.requestListener.Notify(msg, msg.ID())
+	}
+}
+
+func (r *defaultRouter) startTransaction(msg message.Message) {
+	v, ok := r.transactionals[msg.MessageType()]
+	if !ok {
+		log.Fatal("Transactioner not found ", msg.MessageType())
+	}
+
+	if v {
+		go r.requestListener.Transaction(msg.ID())
+	}
+}
+
+func (r *defaultRouter) registerHandlers(handlers map[message.MsgType]handler.Handler) {
+	for msg, h := range handlers {
+		r.registerHandler(msg, h)
+	}
+}
+
+func (r *defaultRouter) registerHandler(msgType message.MsgType, handler handler.Handler) {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+
+	if _, ok := r.handlers[msgType]; ok {
+		log.Fatal("Handler already registered")
+		return
+	}
+
+	r.handlers[msgType] = handler
+}
+
+func (r *defaultRouter) registerNotifiers(notifiers map[message.MsgType]bool) {
+	for msg, s := range notifiers {
+		r.registerNotifier(msg, s)
+	}
+}
+
+func (r *defaultRouter) registerTransactionals(transactionals map[message.MsgType]bool) {
+	for msg, s := range transactionals {
+		r.registerTransactional(msg, s)
+	}
+}
+
+func (r *defaultRouter) registerNotifier(msgType message.MsgType, st bool) {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+
+	if _, ok := r.notifiers[msgType]; ok {
+		log.Fatal("Notifier already registered")
+		return
+	}
+
+	r.notifiers[msgType] = st
+}
+
+func (r *defaultRouter) registerTransactional(msgType message.MsgType, st bool) {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+
+	if _, ok := r.transactionals[msgType]; ok {
+		log.Fatal("Transactioner already registered")
+		return
+	}
+
+	r.transactionals[msgType] = st
+}
+
+func (r *defaultRouter) existPeer(p peer.NodePeer) bool {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
@@ -264,7 +308,7 @@ func (r *defaultRouter) exists(p peer.NodePeer) bool {
 	return ok
 }
 
-func (r *defaultRouter) remove(p peer.NodePeer) error {
+func (r *defaultRouter) removePeer(p peer.NodePeer) error {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 

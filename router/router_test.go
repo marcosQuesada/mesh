@@ -34,17 +34,25 @@ func TestBasicRouterHandling(t *testing.T) {
 func TestRouterAccept(t *testing.T) {
 	r := &defaultRouter{
 		handlers:        make(map[message.MsgType]handler.Handler),
-		notifiers:        make(map[message.MsgType]bool),
+		notifiers:       make(map[message.MsgType]bool),
+		transactionals:  make(map[message.MsgType]bool),
 		exit:            make(chan bool, 1),
 		requestListener: watch.NewRequestListener(),
 	}
 
 	hello := &message.Hello{}
+	welcome := &message.Welcome{}
 	ping := &message.Ping{}
+	pong := &message.Pong{}
 	r.registerHandler(hello.MessageType(), fakeHelloHandler)
 	r.registerHandler(ping.MessageType(), fakePingHandler)
-	r.registerNotifier(hello.MessageType(), true)
+	r.registerNotifier(hello.MessageType(), false)
 	r.registerNotifier(ping.MessageType(), true)
+	r.registerTransactional(hello.MessageType(), false)
+	r.registerTransactional(ping.MessageType(), true)
+	r.registerTransactional(pong.MessageType(), true)
+	r.registerTransactional(welcome.MessageType(), false)
+
 	nodeA := node.Node{Host: "A", Port: 1}
 	nodeB := node.Node{Host: "B", Port: 2}
 	a, b := net.Pipe()
@@ -58,7 +66,7 @@ func TestRouterAccept(t *testing.T) {
 	go c1Mirror.Run()
 
 	go func() {
-		for{
+		for {
 			select {
 			case <-c1.ResetWatcherChan():
 				continue
@@ -90,7 +98,7 @@ func TestRouterAccept(t *testing.T) {
 		t.Error("Unexpected response type, expected 1 got", result.MessageType())
 	}
 
-	pong := result.(*message.Pong)
+	pong = result.(*message.Pong)
 	if pong.Id != id {
 		t.Error("Unexpected result Id")
 	}

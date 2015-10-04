@@ -6,9 +6,9 @@ import (
 	n "github.com/marcosQuesada/mesh/node"
 	"github.com/marcosQuesada/mesh/router/handler"
 	"log"
+	"reflect"
 	"sync"
 	"time"
-"reflect"
 )
 
 // Coordinator takes cares on all cluster related tasks
@@ -16,11 +16,12 @@ import (
 // Cluster member definition & cluster status
 // Leader election
 // Execute Pool mechanisms and consesus resolution
+
 const (
 	ClusterStatusStarting  = message.Status("starting")
+	ClusterMatesJoined     = message.Status("mates joined")
 	ClusterStatusInService = message.Status("in service")
 	ClusterStatusDegraded  = message.Status("degraded")
-	ClusterStatusExit      = message.Status("exit")
 )
 
 type Manager interface {
@@ -79,21 +80,22 @@ func (c *Coordinator) Run() {
 				go c.manager.Run()
 			})
 		case <-c.manager.Ready():
-			log.Println("XXXXXXXXXXXXXXXXXXXXXXX CLUSTER IN SERVICE! XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX")
+			c.status = ClusterStatusInService
+			log.Println("XXX CLUSTER IN SERVICE! XXX")
 		}
 	}
-}
-
-func (c *Coordinator) Exit() {
-	close(c.exitChan)
 }
 
 func (c *Coordinator) SndChan() chan handler.Request {
 	return c.sndChan
 }
 
-func (c *Coordinator) Manager() Manager{
+func (c *Coordinator) Manager() Manager {
 	return c.manager
+}
+
+func (c *Coordinator) Exit() {
+	close(c.exitChan)
 }
 
 func (c *Coordinator) addSender(sendChan chan interface{}, rcvChan chan interface{}) {
@@ -102,7 +104,6 @@ func (c *Coordinator) addSender(sendChan chan interface{}, rcvChan chan interfac
 			select {
 			case msg := <-sendChan:
 				switch v := msg.(type) {
-				//On Vote Request my answer is that I'm Candidate to leader
 				case message.Message:
 					go func() {
 						r := c.sendRequest(msg.(message.Message))
@@ -112,10 +113,10 @@ func (c *Coordinator) addSender(sendChan chan interface{}, rcvChan chan interfac
 					}()
 				case []message.Message:
 					go func() {
-						rcvChan <-c.poolRequest(msg.([]message.Message))
+						rcvChan <- c.poolRequest(msg.([]message.Message))
 					}()
 				default:
-					log.Println("Coordinator addSender unexpected request type",v, reflect.TypeOf(msg).String())
+					log.Println("Coordinator addSender unexpected request type", v, reflect.TypeOf(msg).String())
 				}
 			}
 		}
@@ -127,9 +128,9 @@ func (c *Coordinator) waitUntilComplete(done chan bool) {
 		time.Sleep(time.Second * 1)
 
 		if c.isComplete() {
-			if c.status != ClusterStatusInService {
-				c.status = ClusterStatusInService
-				log.Println("+++++++++++++++++++++Cluster Complete!!!")
+			if c.status != ClusterMatesJoined {
+				c.status = ClusterMatesJoined
+				log.Println("XXX CLUSTER MATES JOINED! XXX")
 
 				done <- true
 
@@ -165,7 +166,7 @@ func (c *Coordinator) poolRequest(msgs []message.Message) raft.PoolResult {
 	for item := range result {
 		rsp, ok := item.(*message.RaftVoteResponse)
 		if !ok {
-			log.Println("------------------ PoolRequest unexpected type ", reflect.TypeOf(rsp).String())
+			log.Println("--- PoolRequest unexpected type ", reflect.TypeOf(rsp).String())
 			continue
 		}
 		response[rsp.From.String()] = rsp.Vote
@@ -178,7 +179,7 @@ func (c *Coordinator) sendRequest(msg message.Message) message.Message {
 	responseChn := make(chan interface{}, 1)
 	c.sndChan <- handler.Request{responseChn, msg}
 
-	result := <- responseChn
+	result := <-responseChn
 	if result == nil {
 		return nil
 	}

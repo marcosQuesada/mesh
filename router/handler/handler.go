@@ -17,6 +17,10 @@ type NotifyHandler interface {
 	Notifiers() map[message.MsgType]bool
 }
 
+type TransactionHandler interface {
+	Transactions() map[message.MsgType]bool
+}
+
 //On responseChan nil, no Wait required
 type Request struct {
 	ResponseChan chan interface{}

@@ -20,6 +20,13 @@ func (w *defaultWatcher) Notifiers() map[message.MsgType]bool {
 	}
 }
 
+func (w *defaultWatcher) Transactions() map[message.MsgType]bool {
+	return map[message.MsgType]bool{
+		message.PING: true,
+		message.PONG: false,
+	}
+}
+
 func (w *defaultWatcher) HandlePing(c peer.NodePeer, msg message.Message) (message.Message, error) {
 	ping := msg.(*message.Ping)
 

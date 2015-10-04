@@ -24,11 +24,16 @@ func (f *FSM) Notifiers() map[message.MsgType]bool {
 	}
 }
 
+func (f *FSM) Transactions() map[message.MsgType]bool {
+	return map[message.MsgType]bool{
+		message.RAFTVOTEREQUEST:      true,
+		message.RAFTVOTERESPONSE:     false,
+		message.RAFTHEARTBEATREQUEST: false,
+	}
+}
+
 func (r *Raft) HandleRaftVoteRequest(p peer.NodePeer, msg message.Message) (message.Message, error) {
 	cmdMsg := msg.(*message.RaftVoteRequest)
-
-	//log.Println("HandleRaftVoteRequest, from peer", cmdMsg.From.String(), "candidate: ", cmdMsg.Candidate.String())
-
 	responseChn := make(chan interface{}, 1)
 	r.rcvChan <-handler.Request{ResponseChan:responseChn, Msg:cmdMsg}
 	result := <-responseChn
@@ -37,19 +42,11 @@ func (r *Raft) HandleRaftVoteRequest(p peer.NodePeer, msg message.Message) (mess
 }
 
 func (r *Raft) HandleRaftVoteResponse(p peer.NodePeer, msg message.Message) (message.Message, error) {
-	//cmdMsg := msg.(*message.RaftVoteResponse)
-
-	//log.Println("HandleRaftVoteResponse, from peer", cmdMsg.From.String(), "vote: ", cmdMsg.Vote)
-
 	return nil, nil
 }
 
 func (r *Raft) HandleRaftHeartBeat(p peer.NodePeer, msg message.Message) (message.Message, error) {
-	cmdMsg := msg.(*message.RaftHeartBeatRequest)
-
-	//log.Println("HandleRaftHeartBeat, from peer", cmdMsg.From.String(), "leader: ", cmdMsg.Leader.String())
-
-	r.rcvChan <- cmdMsg
+	r.rcvChan <- msg.(*message.RaftHeartBeatRequest)
 
 	return nil, nil
 }
