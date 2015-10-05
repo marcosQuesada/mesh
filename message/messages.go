@@ -81,9 +81,9 @@ const (
 
 // First connection message
 type Hello struct {
-	Id   ID
-	From n.Node
-	To   n.Node
+	Id      ID
+	From    n.Node
+	To      n.Node
 	Details map[string]interface{}
 }
 
@@ -287,10 +287,13 @@ func (h Response) ID() ID {
 }
 
 type RaftVoteRequest struct {
-	Id        ID
-	From      n.Node
-	To        n.Node
-	Candidate n.Node
+	Id           ID
+	From         n.Node
+	To           n.Node
+	Candidate    n.Node
+	Term         int
+	LastLogIndex ID
+	LastLogTerm  ID
 }
 
 func (h RaftVoteRequest) MessageType() MsgType {
@@ -310,10 +313,12 @@ func (h RaftVoteRequest) ID() ID {
 }
 
 type RaftVoteResponse struct {
-	Id   ID
-	From n.Node
-	To   n.Node
-	Vote string //Vote: n.Node
+	Id          ID
+	From        n.Node
+	To          n.Node
+	Vote        string //@TODO: PROVISIONAL
+	Term        int
+	VoteGranted bool
 }
 
 func (h RaftVoteResponse) MessageType() MsgType {

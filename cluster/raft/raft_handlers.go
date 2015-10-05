@@ -38,9 +38,19 @@ func (r *Raft) HandleRaftVoteRequest(p peer.NodePeer, msg message.Message) (mess
 	r.rcvChan <-handler.Request{ResponseChan:responseChn, Msg:cmdMsg}
 	result := <-responseChn
 
-	return &message.RaftVoteResponse{Id: cmdMsg.Id, From: r.node, Vote: result.(string)}, nil
+	r.termMutex.Lock()
+	term := r.currentTerm
+	r.termMutex.Unlock()
+
+	return &message.RaftVoteResponse{
+		Id: cmdMsg.Id,
+		From: r.node,
+		Term: term,
+		VoteGranted: result.(bool),
+	}, nil
 }
 
+//Handled using request listeners on coordinator poolRequest
 func (r *Raft) HandleRaftVoteResponse(p peer.NodePeer, msg message.Message) (message.Message, error) {
 	return nil, nil
 }

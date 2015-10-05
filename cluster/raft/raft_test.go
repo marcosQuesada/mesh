@@ -1,12 +1,11 @@
 package raft
 
-import(
-	"testing"
-	"os"
+import (
 	"github.com/marcosQuesada/mesh/node"
-/*	"time"
-	"log"*/
-)
+	"os"
+	"testing"
+	/*	"time"
+		"log"*/)
 
 func TestMain(m *testing.M) {
 	os.Exit(m.Run())
@@ -28,21 +27,45 @@ func TestMain(m *testing.M) {
 }*/
 
 var flagtests = []struct {
-	result  bool
-	responses votationResult
+	result    bool
+	responses PoolResult
 }{
-	{true , votationResult{"B", PoolResult{"B":"B", "C":"B"}}},
-	{false, votationResult{"B", PoolResult{"B":"A", "C":"C"}}},
-	{false, votationResult{"A", PoolResult{"B":"B", "C":"B", "D":"A"}}},
+	{true, PoolResult{"B": true, "C": true}},
+	{true, PoolResult{"B": true, "C": false}},
+	//{false, PoolResult{"B":true, "C":false, "D":false}},
+	//{true, PoolResult{"B":true, "C":false, "D":false, "E":true}},
 }
 
 func TestEvaluateResponses(t *testing.T) {
 	r := &Raft{
-		node:         node.Node{"A",1},
-		mates:        map[string]node.Node{"B:2":node.Node{"B",2}, "C:3":node.Node{"C",3}},
+		node:  node.Node{"A", 1},
+		mates: map[string]node.Node{"B:2": node.Node{"B", 2}, "C:3": node.Node{"C", 3}},
 	}
 
 	for _, item := range flagtests {
+		if item.result != r.evaluate(item.responses) {
+			t.Error("unexpected result ", item)
+		}
+	}
+}
+
+var flagtestsBig = []struct {
+	result    bool
+	responses PoolResult
+}{
+	{true, PoolResult{"B": true, "C": true, "D": true, "E": true, "F": false}},
+	{false, PoolResult{"B": true, "C": false, "D": false, "E": false, "F": false}},
+	{false, PoolResult{"B": true, "C": false, "D": false, "E": true, "F": false}}, //empate!
+	{true, PoolResult{"B": true, "C": false, "D": false, "E": true, "F": true}},
+}
+
+func TestEvaluateResponsesFiveNodes(t *testing.T) {
+	r := &Raft{
+		node:  node.Node{"A", 1},
+		mates: map[string]node.Node{"B:2": node.Node{"B", 2}, "C:3": node.Node{"C", 3}, "D:4": node.Node{"D", 4}, "E:5": node.Node{"E", 5}, "F:6": node.Node{"F", 6}},
+	}
+
+	for _, item := range flagtestsBig {
 		if item.result != r.evaluate(item.responses) {
 			t.Error("unexpected result ", item)
 		}

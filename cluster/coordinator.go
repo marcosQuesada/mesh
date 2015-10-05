@@ -169,7 +169,7 @@ func (c *Coordinator) poolRequest(msgs []message.Message) raft.PoolResult {
 			log.Println("--- PoolRequest unexpected type ", reflect.TypeOf(rsp).String())
 			continue
 		}
-		response[rsp.From.String()] = rsp.Vote
+		response[rsp.From.String()] = rsp.VoteGranted
 	}
 
 	return response

@@ -2,22 +2,23 @@ package raft
 
 import (
 	"fmt"
+	"github.com/marcosQuesada/mesh/message"
 	"github.com/marcosQuesada/mesh/node"
+	"github.com/marcosQuesada/mesh/router/handler"
 	"log"
 	"math"
 	"math/rand"
 	"reflect"
+	"sync"
 	"time"
-	"github.com/marcosQuesada/mesh/message"
-	"github.com/marcosQuesada/mesh/router/handler"
 )
 
 const (
 	PingIntervalBaseDuration = time.Second * 10
 	MaxRandomDuration        = 10000
-	FOLLOWER = "follower"
-	CANDIDATE = "candidate"
-	LEADER = "leader"
+	FOLLOWER                 = "follower"
+	CANDIDATE                = "candidate"
+	LEADER                   = "leader"
 )
 
 type RaftAction interface {
@@ -25,14 +26,16 @@ type RaftAction interface {
 }
 
 type Raft struct {
-	node    node.Node
-	mates   map[string]node.Node
-	leader  node.Node
-	sndChan chan interface{}
-	rcvChan chan interface{}
-	ready   chan bool
-	timer   *raftTimer
-	state   string
+	node        node.Node
+	mates       map[string]node.Node
+	leader      node.Node
+	sndChan     chan interface{}
+	rcvChan     chan interface{}
+	ready       chan bool
+	timer       *raftTimer
+	state       string
+	currentTerm int
+	termMutex   sync.Mutex
 }
 
 type raftTimer struct {
@@ -41,7 +44,7 @@ type raftTimer struct {
 	timerSignal chan bool
 }
 
-type PoolResult map[string]string
+type PoolResult map[string]bool
 
 type RaftRequest struct {
 	ResponseChan chan interface{}
@@ -66,20 +69,21 @@ func New(localNode node.Node, mates map[string]node.Node) *FSM {
 		timerStop:   make(chan bool, 10),
 		timerSignal: make(chan bool, 10),
 	}
-	//delete(mates, node.String())
-	newMates := make(map[string]node.Node, len(mates) -1)
+
+	cleanMates := make(map[string]node.Node, len(mates)-1)
 	for k, v := range mates {
 		if k != localNode.String() {
-			newMates[k] = v
+			cleanMates[k] = v
 		}
 	}
+
 	r := &Raft{
-		node:        localNode,
-		mates:       newMates,
-		sndChan:     make(chan interface{}, 10),
-		rcvChan:     make(chan interface{}, 10),
-		ready:       make(chan bool, 0),
-		timer:       t,
+		node:    localNode,
+		mates:   cleanMates,
+		sndChan: make(chan interface{}, 10),
+		rcvChan: make(chan interface{}, 10),
+		ready:   make(chan bool, 0),
+		timer:   t,
 	}
 
 	return &FSM{
@@ -140,7 +144,7 @@ func (r *Raft) FollowerState() StateHandler {
 	//When boot enable timer to jump to candidate
 	if r.voidLeader() {
 		tWait := getRandomDuration(r.node)
-		log.Println("NO LEADER On Follower State, TWAIT IS ", tWait)
+		log.Println("Follower:  No Leader, wait ", tWait)
 		r.timer.timerIn <- tWait
 	}
 
@@ -151,11 +155,10 @@ func (r *Raft) FollowerState() StateHandler {
 		case handler.Request:
 			req := rcvMsg.(handler.Request)
 			msg := req.Msg.(*message.RaftVoteRequest)
-			vote := r.leader.String()
-			if r.voidLeader() {
-				vote = msg.Candidate.String()
-			}
-			log.Println("Follower: Vote Request Vote for myself", vote)
+
+			//On nil leader vote true
+			vote := r.voidLeader()
+			log.Println("Follower: Vote Request Candiate", msg.Candidate,"vote", vote, "treqTerm", msg.Term, "current term", r.currentTerm)
 			req.ResponseChan <- vote
 
 		//On Heartbeat received, Leader still alive, restart timeout
@@ -171,6 +174,9 @@ func (r *Raft) FollowerState() StateHandler {
 		return r.FollowerState
 
 	case <-r.timer.timerSignal:
+		log.Println("Follower state timeout, removing leader")
+		r.leader = node.Node{}
+
 		return r.CandidateState
 	}
 }
@@ -178,19 +184,22 @@ func (r *Raft) FollowerState() StateHandler {
 func (r *Raft) CandidateState() StateHandler {
 	r.setState(CANDIDATE)
 
+	r.termMutex.Lock()
+	r.currentTerm++
+	r.termMutex.Unlock()
+
 	//Send Vote request
-	r.sndChan <-r.voteRequest(r.node)
+	r.sndChan <- r.voteRequest(r.node)
 	r.timer.timerIn <- time.Second * 2
 	select {
 	case rcvMsg := <-r.rcvChan:
 		switch v := rcvMsg.(type) {
-
 		//On Vote Request my answer is that I'm Candidate to leader
 		case handler.Request:
 			req := rcvMsg.(handler.Request)
 			msg := req.Msg.(*message.RaftVoteRequest)
-			log.Println("Candiadate: Vote Request from:", msg.Candidate ,"Vote for myself", r.node.String())
-			req.ResponseChan <- r.node.String()
+			log.Println("Candiadate: Vote Request from:", msg.Candidate, "treqTerm", msg.Term, "current term", r.currentTerm, r.node.String())
+			req.ResponseChan <- false
 
 		//On Heartbeat received, do nothing! wait vote Request progress
 		case *message.RaftHeartBeatRequest:
@@ -200,7 +209,7 @@ func (r *Raft) CandidateState() StateHandler {
 		//On Pool Result evaluate!
 		case PoolResult:
 			r.timer.timerIn <- time.Hour
-			if r.evaluate(votationResult{expected: r.node.String(), responses: rcvMsg.(PoolResult)}) {
+			if r.evaluate(rcvMsg.(PoolResult)) {
 				return r.LeaderState
 			}
 		default:
@@ -212,7 +221,6 @@ func (r *Raft) CandidateState() StateHandler {
 	}
 	return r.FollowerState
 }
-
 
 //leader pings followers on random time < Max time -10
 func (r *Raft) LeaderState() StateHandler {
@@ -231,9 +239,8 @@ func (r *Raft) LeaderState() StateHandler {
 		case handler.Request:
 			req := rcvMsg.(handler.Request)
 			msg := req.Msg.(*message.RaftVoteRequest)
-			log.Println("Leader has received VoteRequest from:", msg.Candidate ,"Vote for myself", r.node.String())
-			req.ResponseChan <- r.node.String()
-
+			log.Println("Leader has received VoteRequest from:", msg.Candidate, "treqTerm", msg.Term, "current term", r.currentTerm)
+			req.ResponseChan <- false
 
 		//On Heartbeat received, maybe there's new leader, go candidate!
 		case *message.RaftHeartBeatRequest:
@@ -274,16 +281,28 @@ func (f *FSM) Response() chan interface{} {
 }
 
 func (r *Raft) sendHearBeat() {
-	for _, mate:= range r.mates {
-		go func(n node.Node){
+	for _, mate := range r.mates {
+		go func(n node.Node) {
 			r.sndChan <- &message.RaftHeartBeatRequest{Id: message.NewId(), From: r.node, To: n, Leader: r.node}
 		}(mate)
 	}
 }
 
 func (r *Raft) voteRequest(candidate node.Node) (msgs []message.Message) {
-	for _, node := range r.mates {
-		msg := &message.RaftVoteRequest{Id: message.NewId(), From: r.node, To: node, Candidate: candidate}
+	r.termMutex.Lock()
+	term := r.currentTerm
+	r.termMutex.Unlock()
+
+	for _, mate := range r.mates {
+		msg := &message.RaftVoteRequest{
+			Id:        message.NewId(),
+			From:      r.node,
+			To:        mate,
+			Candidate: candidate,
+			Term:      term,
+			/*			LastLogIndex ID
+						LastLogTerm  ID*/
+		}
 		msgs = append(msgs, msg)
 	}
 
@@ -317,16 +336,24 @@ func (r *Raft) setLeader(n node.Node) {
 
 }
 
-func (r *Raft) evaluate(vr votationResult) bool {
+func (r *Raft) evaluate(vr PoolResult) bool {
 	var favVotes, negVotes int
-	for _, a := range vr.responses {
-		if a == vr.expected {
+	//local Node is Candidate Request, allways vote true!
+	favVotes = 1
+	for _, a := range vr {
+		if a {
 			favVotes++
 			continue
 		}
 		negVotes++
 	}
-	reqMajority := int(math.Floor(float64(len(r.mates))/2)) + 1
+
+	//quorum is halft part + 1 vote!
+	reqMajority := int(math.Floor(float64(len(r.mates)+1)/2 + 0.5))
+	if math.Mod(float64(len(r.mates)+1), 2) == 0 {
+		reqMajority++
+	}
+
 	log.Println("FavVotes ", favVotes, "NegVotes", negVotes, "required", reqMajority)
 
 	return favVotes >= reqMajority
@@ -345,4 +372,3 @@ func getRandomDuration(node node.Node) time.Duration {
 
 	return time.Millisecond * time.Duration(rnd)
 }
-
