@@ -221,7 +221,7 @@ type Error struct {
 	Id    ID
 	From  n.Node
 	To    n.Node
-	Error interface{} //@TODO: Provisional!
+	Err   Error
 }
 
 func (h Error) MessageType() MsgType {

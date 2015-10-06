@@ -91,7 +91,7 @@ func (r *defaultRouter) AggregateChan(ch chan handler.Request) {
 				response, err := r.route(h.Msg.(message.Message))
 				if err != nil {
 					log.Println("Forwarding Msg from aggregateChan ERROR", err, h)
-					h.ResponseChan <- message.Error{Id: h.Msg.ID()}
+					h.ResponseChan <- message.Error{Id: h.Msg.ID(), Err: err}
 
 					return
 				}
