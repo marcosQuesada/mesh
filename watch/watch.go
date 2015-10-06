@@ -89,7 +89,12 @@ func (w *defaultWatcher) Watch(p peer.NodePeer) {
 
 	for {
 		select {
-		case <- s.peer.ResetWatcherChan():
+		case _, open := <- s.peer.ResetWatcherChan():
+			if !open {
+				log.Println("Closed Reset Watcher Chan, exiting watcher")
+				return
+			}
+
 			s.ticker.Stop()
 			s.ticker = w.newTicker()
 			continue

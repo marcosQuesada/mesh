@@ -26,7 +26,7 @@ const (
 
 type Manager interface {
 	Run()
-	Ready() chan bool
+	Ready() chan n.Node
 	Request() chan interface{}
 	Response() chan interface{}
 	Handlers() map[message.MsgType]handler.Handler
@@ -35,10 +35,11 @@ type Manager interface {
 }
 
 type Coordinator struct {
-	manager   Manager
 	from      n.Node
 	members   map[string]n.Node
 	connected map[string]bool
+	manager   Manager
+	leader    n.Node
 	sndChan   chan handler.Request
 	exitChan  chan bool
 	status    message.Status
@@ -79,9 +80,10 @@ func (c *Coordinator) Run() {
 			runOnce.Do(func() {
 				go c.manager.Run()
 			})
-		case <-c.manager.Ready():
+		case leader := <-c.manager.Ready():
 			c.status = ClusterStatusInService
-			log.Println("XXX CLUSTER IN SERVICE! XXX")
+			log.Println("XXX CLUSTER IN SERVICE! LEADER ", leader.String(), "XXX ")
+			c.leader = leader
 		}
 	}
 }
