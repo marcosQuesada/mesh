@@ -16,8 +16,9 @@ func TestBasicCliServer(t *testing.T) {
 
 	// Register RPC Handlers
 	arith := new(Arith)
-	srv.Register("divide", arith.Divide)
-	srv.Register("multiply", arith.Multiply)
+/*	srv.Register("divide", arith.Divide)
+	srv.Register("multiply", arith.Multiply)*/
+	srv.RegisterCommands(arith)
 	go srv.Run()
 
 	time.Sleep(time.Second * 1)
@@ -99,6 +100,12 @@ type Quotient struct {
 }
 
 type Arith int
+func (a *Arith) CliHandlers() map[string]Definition {
+	return map[string]Definition{
+		"divide": Definition{a.Divide, "divide method example"},
+		"multiply": Definition{a.Multiply, "multiply method example"},
+	}
+}
 
 func (t *Arith) Multiply(args []interface{}) (interface{}, error) {
 	if len(args) != 2 {

@@ -17,7 +17,16 @@ type CliSession struct {
 	finish bool
 }
 
+type Definition struct{
+	Handler Handler
+	Description string
+}
+
 type Handler func([]interface{}) (interface{}, error)
+
+type CliHandler interface {
+	CliHandlers() map[string]Definition
+}
 
 type Command struct {
 	Name string
@@ -31,18 +40,18 @@ func (cmd *Command) Execute() (interface{}, error) {
 
 type Server struct {
 	port int
-	handlers map[string]Handler
-}
-
-func (c *CliSession) Handle() {
-
+	handlers map[string]Definition
 }
 
 func New(port int) *Server {
-	return &Server{
+	srv :=  &Server{
 		port: port,
-		handlers: make(map[string]Handler),
+		handlers: make(map[string]Definition),
 	}
+
+	srv.Register("help", Definition{srv.Help, "Display registered commands"})
+
+	return srv
 }
 
 func (s *Server) Run() {
@@ -67,7 +76,16 @@ func (s *Server) Run() {
 	}
 }
 
-func (s *Server) Register(name string, h Handler) {
+func (s *Server) RegisterCommands(i CliHandler) {
+	cmds, ok := i.(CliHandler)
+	if ok {
+		for cmd, h := range cmds.CliHandlers() {
+			s.Register(cmd, h)
+		}
+	}
+}
+
+func (s *Server) Register(name string, h Definition) {
 	s.handlers[name] = h
 }
 
@@ -115,7 +133,7 @@ func (s *Server) HandleReq(b []byte) (interface{}, error) {
 	cmd := &Command{
 		Name: cmdParts[0],
 		Args: args,
-		Fn:   f,
+		Fn:   f.Handler,
 	}
 
 	res, err := cmd.Execute()
@@ -141,4 +159,13 @@ func (s *Server) prepareResponse(rsp interface{}) []byte {
 	case string:
 		return []byte(rsp.(string) + "\n")
 	}
+}
+
+func (s *Server) Help(args []interface{}) (interface{}, error) {
+	content := ""
+	for k, v := range s.handlers {
+		content = content + fmt.Sprintf("Command %s Description %s \n ", k, v.Description)
+	}
+
+	return content, nil
 }

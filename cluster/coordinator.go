@@ -9,6 +9,7 @@ import (
 	"reflect"
 	"sync"
 	"time"
+"github.com/marcosQuesada/mesh/cli"
 )
 
 // Coordinator takes cares on all cluster related tasks
@@ -188,6 +189,11 @@ func (c *Coordinator) sendRequest(msg message.Message) message.Message {
 	return result.(message.Message)
 }
 
+// CliHandlers exports command cli definitions
+func  (c *Coordinator) CliHandlers() map[string]cli.Definition {
+	return map[string]cli.Definition{}
+}
+
 func (c *Coordinator) isComplete() bool {
 	if len(c.connected) != len(c.members)-1 {
 		return false
@@ -201,3 +207,4 @@ func (c *Coordinator) isComplete() bool {
 
 	return true
 }
+

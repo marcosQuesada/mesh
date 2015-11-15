@@ -8,7 +8,6 @@ import (
 	"github.com/marcosQuesada/mesh/cluster"
 	"github.com/marcosQuesada/mesh/config"
 	"github.com/marcosQuesada/mesh/dispatcher"
-	//"github.com/marcosQuesada/mesh/message"
 	n "github.com/marcosQuesada/mesh/node"
 	"github.com/marcosQuesada/mesh/peer"
 	"github.com/marcosQuesada/mesh/router"
@@ -49,6 +48,12 @@ func (s *Server) Start() {
 	s.startDialPeers()
 	s.startServer()
 	s.run()
+
+	//Boot Cli Server
+	cli := cli.New(s.config.Addr.Port)
+	cli.RegisterCommands(c)
+	cli.RegisterCommands(s.router)
+	go cli.Run()
 
 	//TODO: aggregate watcher snd chan
 	//s.router.AggregateChan(c.SndChan())
@@ -106,35 +111,4 @@ func (s *Server) startDialPeers() {
 
 		go s.router.InitDialClient(node)
 	}
-}
-
-// Cli Socket server
-func (s *Server) startCliServer() error {
-	listener, err := net.Listen("tcp", s.config.Addr.String())
-	if err != nil {
-		log.Println("Error Listening Cli Server")
-		return err
-	}
-	go func() error {
-		for {
-			conn, err := listener.Accept()
-			if err != nil {
-				log.Println("Error Accepting")
-				return err
-			}
-
-			go s.handleCliConnection(conn)
-		}
-	}()
-
-	return nil
-}
-
-// Socket Client access
-func (s *Server) handleCliConnection(conn net.Conn) {
-	c := &cli.CliSession{
-		Conn: conn,
-		//server: s,
-	}
-	c.Handle()
 }

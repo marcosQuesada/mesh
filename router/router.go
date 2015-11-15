@@ -12,6 +12,7 @@ import (
 	"github.com/marcosQuesada/mesh/peer"
 	"github.com/marcosQuesada/mesh/router/handler"
 	"github.com/marcosQuesada/mesh/watch"
+"github.com/marcosQuesada/mesh/cli"
 )
 
 type Router interface {
@@ -21,6 +22,7 @@ type Router interface {
 	Events() chan dispatcher.Event
 	AggregateChan(chan handler.Request)
 	Exit()
+	CliHandlers()map[string]cli.Definition
 
 	InitDialClient(destination node.Node) //HEre??? NO
 }
@@ -321,4 +323,9 @@ func (r *defaultRouter) removePeer(p peer.NodePeer) error {
 	delete(r.peerIDs, p.Id())
 
 	return nil
+}
+
+// CliHandlers exports command cli definitions
+func  (r *defaultRouter) CliHandlers() map[string]cli.Definition {
+	return map[string]cli.Definition{}
 }
