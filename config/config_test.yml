@@ -1,0 +1,11 @@
+development:
+  database:
+    host: localhost
+  users:
+    - name: calvin
+      password: yukon
+    - name: hobbes
+      password: tuna
+production:
+  database:
+    host: 192.168.1.1

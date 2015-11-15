@@ -3,6 +3,7 @@ package config
 import (
 	n "github.com/marcosQuesada/mesh/node"
 	"testing"
+	yml "github.com/olebedev/config"
 )
 
 func TestNodeAddress(t *testing.T) {
@@ -56,5 +57,21 @@ func TestParseOnErrors(t *testing.T) {
 
 	if len(nodes) != 2 {
 		t.Error("Bad Result parsing Node List, expected 2, are:", nodes)
+	}
+}
+
+func TestConfigFromYml(t *testing.T) {
+	cfg, err := yml.ParseYamlFile("config_test.yml")
+	if err != nil {
+		t.Error("Unexpected Error Parsing Yml ", err)
+	}
+
+	host, err := cfg.String("development.database.host")
+	if err != nil {
+		t.Error("Unexpected Error Parsing development.database.host ", err)
+	}
+
+	if host != "localhost" {
+		t.Error("Unexpected result", host)
 	}
 }

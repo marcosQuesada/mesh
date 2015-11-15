@@ -78,7 +78,6 @@ func (s *Server) startServer() {
 		log.Println("Error starting Socket Server: ", err)
 		return
 	}
-
 	go s.startAcceptorPeers(listener)
 }
 
@@ -123,7 +122,7 @@ func (s *Server) startCliServer() error {
 				log.Println("Error Accepting")
 				return err
 			}
-			defer conn.Close()
+
 			go s.handleCliConnection(conn)
 		}
 	}()
@@ -133,8 +132,6 @@ func (s *Server) startCliServer() error {
 
 // Socket Client access
 func (s *Server) handleCliConnection(conn net.Conn) {
-	defer conn.Close()
-
 	c := &cli.CliSession{
 		Conn: conn,
 		//server: s,
