@@ -1,59 +1,144 @@
 package cli
 
 import (
-	//"bufio"
-	//"fmt"
+	"bufio"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
 	"log"
 	"net"
 	"strings"
+	//"github.com/socialpoint/sprocket/pkg/dumper"
 )
 
 type CliSession struct {
 	Conn net.Conn
-	//server *Server // Used as reflection
 	finish bool
 }
 
-func (c *CliSession) Handle() {
-	/*	defer c.conn.Close()
-		for !c.finish {
-			message, err := bufio.NewReader(c.conn).ReadString('\n')
-			if err != nil {
-				log.Print("Error Receiving on server, err ", err)
-				return
-			}
+type Handler func([]interface{}) (interface{}, error)
 
-			c.process(message)
-
-			log.Println("Server received Message ", message)
-		}*/
+type Command struct {
+	Name string
+	Args []interface{}
+	Fn   Handler
 }
 
-func (c *CliSession) process(line string) {
-	var response string = "Ask for HELP! \n"
+func (cmd *Command) Execute() (interface{}, error) {
+	return cmd.Fn(cmd.Args)
+}
 
-	switch strings.Trim(strings.ToUpper(line), "\r\n") {
-	case "HELP":
-		response = "Available commands:\n LIST \n SHUTDOWN \n EXIT \n"
-	case "LIST":
-		/*		response = fmt.Sprintf("Total Peers: %d \n", len(c.server.Links()))
-				for key, _ := range c.server.Links() {
-					response = response + " " + key + "\n"
-				}*/
-	case "SHUTDOWN":
-		//c.server.Close()
-		response = "Server Shutting down \n"
-	case "EXIT":
-		c.finish = true
-		response = "Closing cli session, Bye Bye! \n"
+type Server struct {
+	port int
+	handlers map[string]Handler
+}
+
+func (c *CliSession) Handle() {
+
+}
+
+func New(port int) *Server {
+	return &Server{
+		port: port,
+		handlers: make(map[string]Handler),
+	}
+}
+
+func (s *Server) Run() {
+	addy, err := net.ResolveTCPAddr("tcp", fmt.Sprintf("0.0.0.0:%d", s.port))
+	if err != nil {
+		log.Fatal(err)
 	}
 
-	c.send(response)
+	inbound, err := net.ListenTCP("tcp", addy)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for {
+		conn, err := inbound.Accept()
+		if err != nil {
+			log.Println("rpc.Serve: accept:", err.Error())
+
+			continue
+		}
+		go s.handleConn(conn)
+	}
 }
 
-func (c *CliSession) send(response string) {
-	_, err := c.Conn.Write([]byte(response))
+func (s *Server) Register(name string, h Handler) {
+	s.handlers[name] = h
+}
+
+func (s *Server) handleConn(conn net.Conn) {
+	buf := bufio.NewReader(conn)
+	for {
+		buffer, err := buf.ReadBytes('\n')
+		if err != nil {
+			if err != io.ErrClosedPipe && err != io.EOF {
+				log.Print("Socket Reader err: ", err)
+			}
+		}
+
+		//@TODO: Quit command ends session
+		if string(buffer) == "quit\r\n" {
+			conn.Close()
+			return
+		}
+
+		result, err := s.HandleReq(buffer)
+		if err != nil {
+			log.Println("Error ", err)
+		}
+
+		if result != nil {
+			output := s.prepareResponse(result)
+			conn.Write(output)
+		}
+	}
+}
+
+func (s *Server) HandleReq(b []byte) (interface{}, error) {
+	cmdParts := strings.Split(string(b), "\r\n")
+	cmdParts = strings.Split(cmdParts[0], " ")
+	f, ok := s.handlers[cmdParts[0]]
+	if !ok {
+		return nil, errors.New("Command Not found \n")
+	}
+
+	args := []interface{}{}
+	for _, v := range cmdParts[1:] {
+		args = append(args, v)
+	}
+
+	cmd := &Command{
+		Name: cmdParts[0],
+		Args: args,
+		Fn:   f,
+	}
+
+	res, err := cmd.Execute()
 	if err != nil {
-		log.Println("Error Writting on socket ", err)
+		log.Println("Error executing", cmd.Name)
+		return nil, err
+	}
+
+	return res, nil
+}
+
+func (s *Server) prepareResponse(rsp interface{}) []byte {
+	switch rsp.(type) {
+	default:
+		r, err := json.Marshal(rsp)
+		if err != nil {
+			log.Println("Error encoding response ", err)
+			return nil
+		}
+		return []byte(string(r) + "\n")
+	case int:
+		return []byte(fmt.Sprintf("%d\n", rsp))
+	case string:
+		return []byte(rsp.(string) + "\n")
 	}
 }
