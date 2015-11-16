@@ -40,7 +40,7 @@ func (r *defaultRouter) Transactions() map[message.MsgType]bool{
 //HandleHello Request
 func (r *defaultRouter) HandleHello(c peer.NodePeer, msg message.Message) (message.Message, error) {
 	c.Identify(msg.(*message.Hello).From)
-	if r.existPeer(c) {
+	if r.peerExists(c) {
 		return &message.Abort{Id: msg.(*message.Hello).Id, From: r.from}, nil
 	}
 

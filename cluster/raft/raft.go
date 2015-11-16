@@ -14,12 +14,12 @@ import (
 )
 
 const (
-	BootMaxRandomDuration = 10000
+	BootMaxRandomDuration   = 10000
 	RaftHearBeatMaxDuration = 5000
-	VoteRequestTimeOut = time.Second * 1
-	FOLLOWER                 = "follower"
-	CANDIDATE                = "candidate"
-	LEADER                   = "leader"
+	VoteRequestTimeOut      = time.Second * 1
+	FOLLOWER                = "follower"
+	CANDIDATE               = "candidate"
+	LEADER                  = "leader"
 )
 
 type RaftAction interface {
@@ -37,7 +37,7 @@ type Raft struct {
 	state       string
 	currentTerm int
 	termMutex   sync.Mutex
-	booted bool
+	booted      bool
 }
 
 type raftTimer struct {
@@ -168,7 +168,8 @@ func (r *Raft) FollowerState() StateHandler {
 			cmd := rcvMsg.(*message.RaftHeartBeatRequest)
 			r.setLeader(cmd.Leader)
 			r.timer.timerIn <- RaftHearBeatMaxDuration * time.Millisecond
-
+		case PoolResult:
+			log.Println("XXXXX Unexpected Pool Result On Follower State! ", v)
 		default:
 			fmt.Println("Follower unknown", reflect.TypeOf(v).String())
 		}
@@ -222,6 +223,7 @@ func (r *Raft) CandidateState() StateHandler {
 	case <-r.timer.timerSignal:
 		log.Println("On Candidate Timeout")
 	}
+
 	return r.FollowerState
 }
 
@@ -262,7 +264,7 @@ func (r *Raft) LeaderState() StateHandler {
 	case <-r.timer.timerSignal:
 		r.sendHearBeat()
 		//restart random timer
-		r.timer.timerIn <- time.Millisecond * 500 + r.getRandomDuration(RaftHearBeatMaxDuration - 500)
+		r.timer.timerIn <- time.Millisecond*500 + r.getRandomDuration(RaftHearBeatMaxDuration-500)
 	}
 
 	return r.LeaderState
@@ -306,8 +308,8 @@ func (r *Raft) voteRequest(candidate node.Node) (msgs []message.Message) {
 			To:        mate,
 			Candidate: candidate,
 			Term:      term,
-/*			LastLogIndex ID
-			LastLogTerm  ID*/
+			/*			LastLogIndex ID
+						LastLogTerm  ID*/
 		}
 		msgs = append(msgs, msg)
 	}

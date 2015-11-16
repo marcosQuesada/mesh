@@ -6,13 +6,14 @@ import (
 	"reflect"
 	"sync"
 
+	"github.com/marcosQuesada/mesh/cli"
 	"github.com/marcosQuesada/mesh/dispatcher"
 	"github.com/marcosQuesada/mesh/message"
 	"github.com/marcosQuesada/mesh/node"
 	"github.com/marcosQuesada/mesh/peer"
 	"github.com/marcosQuesada/mesh/router/handler"
+	"github.com/marcosQuesada/mesh/router/request"
 	"github.com/marcosQuesada/mesh/watch"
-"github.com/marcosQuesada/mesh/cli"
 )
 
 type Router interface {
@@ -22,9 +23,8 @@ type Router interface {
 	Events() chan dispatcher.Event
 	AggregateChan(chan handler.Request)
 	Exit()
-	CliHandlers()map[string]cli.Definition
-
-	InitDialClient(destination node.Node) //HEre??? NO
+	CliHandlers() map[string]cli.Definition
+	RequestListener() *request.RequestListener
 }
 
 type defaultRouter struct {
@@ -36,14 +36,14 @@ type defaultRouter struct {
 	watcher         watch.Watcher
 	handlers        map[message.MsgType]handler.Handler
 	notifiers       map[message.MsgType]bool
-	transactionals map[message.MsgType]bool
+	transactionals  map[message.MsgType]bool
 	mutex           sync.Mutex
-	requestListener *watch.RequestListener
+	requestListener *request.RequestListener
 }
 
 func New(n node.Node) *defaultRouter {
 	evChan := make(chan dispatcher.Event, 10)
-	reqList := watch.NewRequestListener()
+	reqList := request.NewRequestListener()
 	w := watch.New(reqList, evChan, 10)
 
 	r := &defaultRouter{
@@ -68,6 +68,10 @@ func New(n node.Node) *defaultRouter {
 	r.registerTransactionals(r.Transactions())
 
 	return r
+}
+
+func (r *defaultRouter) RequestListener() *request.RequestListener {
+	return r.requestListener
 }
 
 func (r *defaultRouter) RegisterHandlersFromInstance(h handler.MessageHandler) {
@@ -114,19 +118,31 @@ func (r *defaultRouter) Accept(c *peer.Peer) {
 			case <-r.exit:
 				log.Println("Exit", c.From(), c.Mode())
 				return
+
 			case msg, open := <-c.ReceiveChan():
 				if !open {
-					r.startPeerRecovering(c)
+					r.peerDisconnected(c)
 					return
 				}
 
 				r.logCommand(msg)
-				r.notifyTransaction(msg)
+
+				// Notify waiting listener if required
+				if v, ok := r.notifiers[msg.MessageType()]; ok && v {
+					r.requestListener.Notify(msg, msg.ID())
+				}
+
 				response := r.Handle(c, msg)
 				if response != nil {
 					c.Commit(response)
-					r.startTransaction(response)
 
+					// Start new request transaction if required
+					v, ok := r.transactionals[msg.MessageType()]
+					if  ok && v {
+						go r.requestListener.Register(response.ID())
+					}
+
+					// On abort disconnect acceptor
 					if response.MessageType() == message.ABORT {
 						c.Exit()
 						return
@@ -160,12 +176,6 @@ func (r *defaultRouter) Events() chan dispatcher.Event {
 	return r.eventChan
 }
 
-func (r *defaultRouter) InitDialClient(destination node.Node) {
-	p, requestID := peer.InitDialClient(r.from, destination)
-	go r.requestListener.Transaction(requestID)
-	r.Accept(p)
-}
-
 func (r *defaultRouter) Exit() {
 	close(r.exit)
 }
@@ -194,55 +204,24 @@ func (r *defaultRouter) route(msg message.Message) (message.Message, error) {
 
 	peer.Commit(msg)
 
-	//Open transaction iif required and wait response
+	//Open transaction if required and wait response
 	v, ok := r.transactionals[msg.MessageType()]
+	if v && ok {
+		return r.requestListener.RegisterAndWait(msg.ID())
+	}
+
 	if !ok {
 		log.Fatal("Transactioner not found ", msg.MessageType())
-	}
-	if v {
-		response := r.requestListener.Transaction(msg.ID())
-
-		return response, nil
 	}
 
 	return nil, nil
 }
 
-func (r *defaultRouter) startPeerRecovering(c *peer.Peer) {
+func (r *defaultRouter) peerDisconnected(c *peer.Peer) {
 	if _, ok := r.peerIDs[c.Id()]; ok {
 		log.Println("Unregister Peer:", c.Node(), "mode:", c.Mode(), "id", c.Id())
 		r.removePeer(c)
-		r.eventChan <- &peer.OnPeerDisconnectedEvent{c.From(), peer.PeerStatusDisconnected}
-		go r.InitDialClient(c.Node())
-	}
-}
-
-func (r *defaultRouter) logCommand(msg message.Message) {
-	cmdData := ""
-	if cmd, ok := msg.(*message.Command); ok {
-		cmdData = reflect.TypeOf(cmd.Command).String()
-	}
-	log.Println("---RCV ", reflect.TypeOf(msg).String(), msg.ID(), msg.Origin(), cmdData)
-}
-
-func (r *defaultRouter) notifyTransaction(msg message.Message) {
-	v, ok := r.notifiers[msg.MessageType()]
-	if !ok {
-		log.Fatal("Notifier not found ", msg.MessageType())
-	}
-	if v {
-		r.requestListener.Notify(msg, msg.ID())
-	}
-}
-
-func (r *defaultRouter) startTransaction(msg message.Message) {
-	v, ok := r.transactionals[msg.MessageType()]
-	if !ok {
-		log.Fatal("Transactioner not found ", msg.MessageType())
-	}
-
-	if v {
-		go r.requestListener.Transaction(msg.ID())
+		r.eventChan <- &peer.OnPeerDisconnectedEvent{c.Node(), peer.PeerStatusDisconnected}
 	}
 }
 
@@ -270,12 +249,6 @@ func (r *defaultRouter) registerNotifiers(notifiers map[message.MsgType]bool) {
 	}
 }
 
-func (r *defaultRouter) registerTransactionals(transactionals map[message.MsgType]bool) {
-	for msg, s := range transactionals {
-		r.registerTransactional(msg, s)
-	}
-}
-
 func (r *defaultRouter) registerNotifier(msgType message.MsgType, st bool) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
@@ -286,6 +259,12 @@ func (r *defaultRouter) registerNotifier(msgType message.MsgType, st bool) {
 	}
 
 	r.notifiers[msgType] = st
+}
+
+func (r *defaultRouter) registerTransactionals(transactionals map[message.MsgType]bool) {
+	for msg, s := range transactionals {
+		r.registerTransactional(msg, s)
+	}
 }
 
 func (r *defaultRouter) registerTransactional(msgType message.MsgType, st bool) {
@@ -300,7 +279,7 @@ func (r *defaultRouter) registerTransactional(msgType message.MsgType, st bool) 
 	r.transactionals[msgType] = st
 }
 
-func (r *defaultRouter) existPeer(p peer.NodePeer) bool {
+func (r *defaultRouter) peerExists(p peer.NodePeer) bool {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
@@ -326,6 +305,14 @@ func (r *defaultRouter) removePeer(p peer.NodePeer) error {
 }
 
 // CliHandlers exports command cli definitions
-func  (r *defaultRouter) CliHandlers() map[string]cli.Definition {
+func (r *defaultRouter) CliHandlers() map[string]cli.Definition {
 	return map[string]cli.Definition{}
+}
+
+func (r *defaultRouter) logCommand(msg message.Message) {
+	cmdData := ""
+	if cmd, ok := msg.(*message.Command); ok {
+		cmdData = reflect.TypeOf(cmd.Command).String()
+	}
+	log.Println("---RCV ", reflect.TypeOf(msg).String(), msg.ID(), msg.Origin(), cmdData)
 }

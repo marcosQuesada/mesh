@@ -13,11 +13,16 @@ import (
 	"sync"
 	"time"
 
+	"errors"
 	"github.com/marcosQuesada/mesh/dispatcher"
 	"github.com/marcosQuesada/mesh/message"
 	"github.com/marcosQuesada/mesh/peer"
-	"errors"
+	"github.com/marcosQuesada/mesh/router/request"
 )
+
+type Watcher interface {
+	Watch(peer.NodePeer)
+}
 
 type defaultWatcher struct {
 	eventChan       chan dispatcher.Event
@@ -25,16 +30,16 @@ type defaultWatcher struct {
 	pingInterval    int
 	mutex           sync.RWMutex
 	index           map[string]*subject
-	requestListener *RequestListener
+	requestListener *request.RequestListener
 	wg              sync.WaitGroup
 }
 
 type subject struct {
-	peer   peer.NodePeer
-	ticker *time.Ticker
-	id     message.ID
-	Done   chan bool
-	mutex  sync.Mutex
+	peer     peer.NodePeer
+	ticker   *time.Ticker
+	id       message.ID
+	Done     chan bool
+	mutex    sync.Mutex
 	lastSeen time.Time
 }
 
@@ -57,7 +62,7 @@ func init() {
 	rand.Seed(time.Now().UTC().UnixNano())
 }
 
-func New(rqLst *RequestListener, evCh chan dispatcher.Event, interval int) *defaultWatcher {
+func New(rqLst *request.RequestListener, evCh chan dispatcher.Event, interval int) *defaultWatcher {
 	return &defaultWatcher{
 		eventChan:       evCh,
 		exit:            make(chan bool, 0),
@@ -74,10 +79,10 @@ func (w *defaultWatcher) Watch(p peer.NodePeer) {
 
 	subjectDone := make(chan bool, 10)
 	s := &subject{
-		peer:   p,
-		ticker: w.newTicker(),
-		Done:   subjectDone,
-		id: message.NewId(),
+		peer:     p,
+		ticker:   w.newTicker(),
+		Done:     subjectDone,
+		id:       message.NewId(),
 		lastSeen: time.Now(),
 	}
 	defer close(s.Done)
@@ -89,7 +94,7 @@ func (w *defaultWatcher) Watch(p peer.NodePeer) {
 
 	for {
 		select {
-		case _, open := <- s.peer.ResetWatcherChan():
+		case _, open := <-s.peer.ResetWatcherChan():
 			if !open {
 				log.Println("Closed Reset Watcher Chan, exiting watcher")
 				return
@@ -103,10 +108,15 @@ func (w *defaultWatcher) Watch(p peer.NodePeer) {
 			p.Commit(&message.Ping{Id: requestId, From: p.From(), To: node})
 			s.ticker.Stop()
 
-			//wait ping response
-			msg := w.requestListener.Transaction(requestId)
+			// @TODO: Handle request transaction error
+			msg, err := w.requestListener.RegisterAndWait(requestId)
+			if err != nil {
+				log.Println("XXXXX Error Waiting Response ", err)
+			}
+
 			if msg.MessageType() != message.PONG {
 				log.Println("Error Unexpected Received type, expected PONG ", msg.MessageType(), "RequestListener ", requestId)
+
 				//@TODO: used to check development stability
 				panic(errors.New("PONG CRASH"))
 			}

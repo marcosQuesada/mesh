@@ -35,6 +35,7 @@ func (s *Server) Start() {
 	disp := dispatcher.New()
 	disp.RegisterListener(&peer.OnPeerConnectedEvent{}, c.OnPeerConnectedEvent)
 	disp.RegisterListener(&peer.OnPeerDisconnectedEvent{}, c.OnPeerDisconnected)
+	disp.RegisterListener(&peer.OnPeerDisconnectedEvent{}, s.OnPeerDisconnected)
 	disp.RegisterListener(&peer.OnPeerAbortedEvent{}, c.OnPeerAborted)
 	disp.RegisterListener(&peer.OnPeerErroredEvent{}, c.OnPeerErrored)
 	go disp.ConsumeEventChan()
@@ -109,6 +110,17 @@ func (s *Server) startDialPeers() {
 			continue
 		}
 
-		go s.router.InitDialClient(node)
+		go s.InitDialClient(node)
 	}
+}
+
+func (s *Server) InitDialClient(destination n.Node) {
+	p, requestID := peer.InitDialClient(s.node, destination)
+	go s.router.RequestListener().Register(requestID)
+	s.router.Accept(p)
+}
+
+func (s *Server) OnPeerDisconnected (e dispatcher.Event) {
+	event := e.(*peer.OnPeerDisconnectedEvent)
+	go s.InitDialClient(event.Node)
 }

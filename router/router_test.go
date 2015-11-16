@@ -8,7 +8,7 @@ import (
 	"github.com/marcosQuesada/mesh/node"
 	"github.com/marcosQuesada/mesh/peer"
 	"github.com/marcosQuesada/mesh/router/handler"
-	"github.com/marcosQuesada/mesh/watch"
+	"github.com/marcosQuesada/mesh/router/request"
 )
 
 func TestBasicRouterHandling(t *testing.T) {
@@ -19,11 +19,6 @@ func TestBasicRouterHandling(t *testing.T) {
 
 	msg := &message.Ping{}
 	r.registerHandler(msg.MessageType(), fakePingHandler)
-	/*
-		nodeA := node.Node{Host: "A", Port: 1}
-		a, _ := net.Pipe()
-
-		c1 := peer.NewAcceptor(a, nodeA)*/
 	c1 := &peer.NopPeer{}
 	result := r.Handle(c1, msg)
 	if result.MessageType() != 4 {
@@ -37,7 +32,7 @@ func TestRouterAccept(t *testing.T) {
 		notifiers:       make(map[message.MsgType]bool),
 		transactionals:  make(map[message.MsgType]bool),
 		exit:            make(chan bool, 1),
-		requestListener: watch.NewRequestListener(),
+		requestListener: request.NewRequestListener(),
 	}
 
 	hello := &message.Hello{}

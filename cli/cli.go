@@ -147,6 +147,10 @@ func (s *Server) HandleReq(b []byte) (interface{}, error) {
 
 func (s *Server) prepareResponse(rsp interface{}) []byte {
 	switch rsp.(type) {
+	case int:
+		return []byte(fmt.Sprintf("%d\n", rsp))
+	case string:
+		return []byte(rsp.(string) + "\n")
 	default:
 		r, err := json.Marshal(rsp)
 		if err != nil {
@@ -154,10 +158,6 @@ func (s *Server) prepareResponse(rsp interface{}) []byte {
 			return nil
 		}
 		return []byte(string(r) + "\n")
-	case int:
-		return []byte(fmt.Sprintf("%d\n", rsp))
-	case string:
-		return []byte(rsp.(string) + "\n")
 	}
 }
 
