@@ -42,7 +42,7 @@ func TestDispatcherRun(t *testing.T) {
 	}
 
 	e := make(chan Event, 0)
-	go d.AggregateChan(e)
+	go d.Aggregate(e)
 	eventB := &OnFakeEvent{Id: 456}
 	e <- eventB
 

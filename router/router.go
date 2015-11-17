@@ -20,7 +20,7 @@ type Router interface {
 	Accept(*peer.Peer)
 	Handle(peer.NodePeer, message.Message) message.Message
 	RegisterHandlersFromInstance(handler.MessageHandler)
-	Events() chan dispatcher.Event
+	//Events() chan dispatcher.Event
 	AggregateChan(chan handler.Request)
 	Exit()
 	CliHandlers() map[string]cli.Definition
@@ -39,10 +39,11 @@ type defaultRouter struct {
 	transactionals  map[message.MsgType]bool
 	mutex           sync.Mutex
 	requestListener *request.RequestListener
+	dispatcher      dispatcher.Dispatcher
 }
 
-func New(n node.Node) *defaultRouter {
-	evChan := make(chan dispatcher.Event, 10)
+func New(n node.Node, dispatcher dispatcher.Dispatcher) *defaultRouter {
+	evChan := dispatcher.SndChan()
 	reqList := request.NewRequestListener()
 	w := watch.New(reqList, evChan, 10)
 
@@ -57,6 +58,7 @@ func New(n node.Node) *defaultRouter {
 		exit:            make(chan bool),
 		watcher:         w,
 		requestListener: reqList,
+		dispatcher:      dispatcher,
 	}
 
 	//RegisterHandlers & Notifiers from watcher
@@ -138,7 +140,7 @@ func (r *defaultRouter) Accept(c *peer.Peer) {
 
 					// Start new request transaction if required
 					v, ok := r.transactionals[msg.MessageType()]
-					if  ok && v {
+					if ok && v {
 						go r.requestListener.Register(response.ID())
 					}
 
@@ -170,10 +172,6 @@ func (r *defaultRouter) Handle(c peer.NodePeer, msg message.Message) message.Mes
 	}
 
 	return result
-}
-
-func (r *defaultRouter) Events() chan dispatcher.Event {
-	return r.eventChan
 }
 
 func (r *defaultRouter) Exit() {
@@ -221,7 +219,8 @@ func (r *defaultRouter) peerDisconnected(c *peer.Peer) {
 	if _, ok := r.peerIDs[c.Id()]; ok {
 		log.Println("Unregister Peer:", c.Node(), "mode:", c.Mode(), "id", c.Id())
 		r.removePeer(c)
-		r.eventChan <- &peer.OnPeerDisconnectedEvent{c.Node(), peer.PeerStatusDisconnected}
+
+		r.dispatcher.Dispatch(&peer.OnPeerDisconnectedEvent{c.Node(), peer.PeerStatusDisconnected})
 	}
 }
 

@@ -1,7 +1,9 @@
 package cluster
 
 import (
+	"github.com/marcosQuesada/mesh/cli"
 	"github.com/marcosQuesada/mesh/cluster/raft"
+	"github.com/marcosQuesada/mesh/dispatcher"
 	"github.com/marcosQuesada/mesh/message"
 	n "github.com/marcosQuesada/mesh/node"
 	"github.com/marcosQuesada/mesh/router/handler"
@@ -9,7 +11,6 @@ import (
 	"reflect"
 	"sync"
 	"time"
-"github.com/marcosQuesada/mesh/cli"
 )
 
 // Coordinator takes cares on all cluster related tasks
@@ -36,17 +37,18 @@ type Manager interface {
 }
 
 type Coordinator struct {
-	from      n.Node
-	members   map[string]n.Node
-	connected map[string]bool
-	manager   Manager
-	leader    n.Node
-	sndChan   chan handler.Request
-	exitChan  chan bool
-	status    message.Status
+	from       n.Node
+	members    map[string]n.Node
+	connected  map[string]bool
+	manager    Manager
+	leader     n.Node
+	sndChan    chan handler.Request
+	exitChan   chan bool
+	status     message.Status
+	dispatcher dispatcher.Dispatcher
 }
 
-func Start(from n.Node, members map[string]n.Node) *Coordinator {
+func Start(from n.Node, members map[string]n.Node, dispatcher dispatcher.Dispatcher) *Coordinator {
 	log.Println("Starting coordinator on Node %s members: ", from.String(), members)
 
 	r := raft.New(from, members)
@@ -58,10 +60,11 @@ func Start(from n.Node, members map[string]n.Node) *Coordinator {
 		exitChan:  make(chan bool, 0),
 		sndChan:   make(chan handler.Request, 10),
 		status:    ClusterStatusStarting,
+		dispatcher: dispatcher,
 	}
 
 	//enable manager to send and receive requests
-	c.addSender(r.Request(), r.Response())
+	go c.addSender(r.Request(), r.Response())
 	go c.Run()
 
 	return c
@@ -102,28 +105,26 @@ func (c *Coordinator) Exit() {
 }
 
 func (c *Coordinator) addSender(sendChan chan interface{}, rcvChan chan interface{}) {
-	go func() {
-		for {
-			select {
-			case msg := <-sendChan:
-				switch v := msg.(type) {
-				case message.Message:
-					go func() {
-						r := c.sendRequest(msg.(message.Message))
-						if r != nil {
-							rcvChan <- r
-						}
-					}()
-				case []message.Message:
-					go func() {
-						rcvChan <- c.poolRequest(msg.([]message.Message))
-					}()
-				default:
-					log.Println("Coordinator addSender unexpected request type", v, reflect.TypeOf(msg).String())
-				}
+	for {
+		select {
+		case msg := <-sendChan:
+			switch v := msg.(type) {
+			case message.Message:
+				go func() {
+					r := c.sendRequest(msg.(message.Message))
+					if r != nil {
+						rcvChan <- r
+					}
+				}()
+			case []message.Message:
+				go func() {
+					rcvChan <- c.poolRequest(msg.([]message.Message))
+				}()
+			default:
+				log.Println("Coordinator addSender unexpected request type", v, reflect.TypeOf(msg).String())
 			}
 		}
-	}()
+	}
 }
 
 func (c *Coordinator) waitUntilComplete(done chan bool) {
@@ -190,7 +191,7 @@ func (c *Coordinator) sendRequest(msg message.Message) message.Message {
 }
 
 // CliHandlers exports command cli definitions
-func  (c *Coordinator) CliHandlers() map[string]cli.Definition {
+func (c *Coordinator) CliHandlers() map[string]cli.Definition {
 	return map[string]cli.Definition{}
 }
 
@@ -207,4 +208,3 @@ func (c *Coordinator) isComplete() bool {
 
 	return true
 }
-

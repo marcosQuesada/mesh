@@ -6,11 +6,13 @@ import (
 	"log"
 	"strconv"
 	"strings"
+	yml "github.com/olebedev/config"
 )
 
 type Config struct {
 	Addr    n.Node
 	Cluster map[string]n.Node
+	CliPort int
 }
 
 func NewConfig(addr, cluster string) *Config {
@@ -24,6 +26,53 @@ func NewConfig(addr, cluster string) *Config {
 	return &Config{
 		Addr:    addrNode,
 		Cluster: parseList(cluster),
+		CliPort: 1234,
+	}
+}
+
+
+func ParseYML(cfgFile string) *Config {
+	cfg, err := yml.ParseYamlFile(cfgFile)
+	if err != nil {
+		log.Println("Unexpected Error Parsing Yml", err)
+		return nil
+	}
+
+	addrNode, err := cfg.String("cluster.node")
+	if err != nil {
+		log.Println("Unexpected Error Parsing cluster.node", err)
+		return nil
+	}
+	localNode, err := parse(addrNode)
+	if err != nil {
+		log.Println("Unexpected Error Parsing LocalNode", err)
+		return nil
+	}
+	memberList, err := cfg.List("cluster.members")
+	if err != nil {
+		log.Println("Unexpected Error Parsing cluster.members", err)
+		return nil
+	}
+
+	members := make(map[string]n.Node, len(memberList))
+	for _, nodePart := range memberList {
+		node, err := parse(nodePart.(string))
+		if err != nil {
+			continue
+		}
+		members[node.String()] = node
+	}
+
+	cliPort, err := cfg.Int("cli.port")
+	if err != nil {
+		log.Println("Unexpected Error Parsing cli.port", err)
+		return nil
+	}
+
+	return &Config{
+		Addr:    localNode,
+		Cluster: members,
+		CliPort: cliPort,
 	}
 }
 

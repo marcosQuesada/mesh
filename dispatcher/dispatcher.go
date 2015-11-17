@@ -5,13 +5,19 @@ import (
 	"sync"
 )
 
+type EventType string
+
+type Event interface {
+	GetEventType() EventType
+}
+
 type Listener func(Event)
 
 type Dispatcher interface {
 	RegisterListener(Event, Listener)
 	Dispatch(Event)
 	Aggregate(chan Event)
-	Run()
+	SndChan() chan Event
 	Exit()
 }
 
@@ -52,8 +58,16 @@ func (d *defaultDispatcher) ConsumeEventChan() {
 	}
 }
 
+func (d *defaultDispatcher) Dispatch(e Event) {
+	d.EventChan <- e
+}
+
+func (d *defaultDispatcher) SndChan() chan Event {
+	return d.EventChan
+}
+
 //Enable event channel aggregation
-func (d *defaultDispatcher) AggregateChan(e chan Event) {
+func (d *defaultDispatcher) Aggregate(e chan Event) {
 	for {
 		select {
 		case m, open := <-e:

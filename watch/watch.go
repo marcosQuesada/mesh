@@ -108,10 +108,13 @@ func (w *defaultWatcher) Watch(p peer.NodePeer) {
 			p.Commit(&message.Ping{Id: requestId, From: p.From(), To: node})
 			s.ticker.Stop()
 
-			// @TODO: Handle request transaction error
 			msg, err := w.requestListener.RegisterAndWait(requestId)
+			s.incId()
+			s.ticker = w.newTicker()
+			// @TODO: Handle response error
 			if err != nil {
 				log.Println("XXXXX Error Waiting Response ", err)
+				continue
 			}
 
 			if msg.MessageType() != message.PONG {
@@ -120,9 +123,6 @@ func (w *defaultWatcher) Watch(p peer.NodePeer) {
 				//@TODO: used to check development stability
 				panic(errors.New("PONG CRASH"))
 			}
-
-			s.incId()
-			s.ticker = w.newTicker()
 		case <-s.Done:
 			return
 		}

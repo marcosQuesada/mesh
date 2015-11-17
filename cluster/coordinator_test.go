@@ -1,12 +1,10 @@
 package cluster
 
 import (
-	//"fmt"
-	//"github.com/marcosQuesada/mesh/message"
 	"github.com/marcosQuesada/mesh/node"
-	//"net"
 	"testing"
 	"time"
+	"github.com/marcosQuesada/mesh/dispatcher"
 )
 
 var o *Coordinator
@@ -98,7 +96,7 @@ func TestForwardingChannel(t *testing.T) {
 	members[n.String()] = n
 	members[from.String()] = from // as fake local node
 
-	o = Start(from, members)
+	o = Start(from, members, dispatcher.New())
 	go o.Run()
 	time.Sleep(time.Second)
 	o.Exit()
