@@ -9,18 +9,20 @@ import (
 	"github.com/marcosQuesada/mesh/peer"
 	"github.com/marcosQuesada/mesh/router/handler"
 	"github.com/marcosQuesada/mesh/router/request"
+	"sync"
 )
 
 func TestBasicRouterHandling(t *testing.T) {
 	r := &defaultRouter{
 		handlers: make(map[message.MsgType]handler.Handler),
 		exit:     make(chan bool, 1),
+		mutex: &sync.Mutex{},
 	}
 
 	msg := &message.Ping{}
 	r.registerHandler(msg.MessageType(), fakePingHandler)
 	c1 := &peer.NopPeer{}
-	result := r.Handle(c1, msg)
+	result := r.handle(c1, msg)
 	if result.MessageType() != 4 {
 		t.Error("unexpected response ", result)
 	}
@@ -33,6 +35,7 @@ func TestRouterAccept(t *testing.T) {
 		transactionals:  make(map[message.MsgType]bool),
 		exit:            make(chan bool, 1),
 		requestListener: request.NewRequestListener(),
+		mutex: &sync.Mutex{},
 	}
 
 	hello := &message.Hello{}

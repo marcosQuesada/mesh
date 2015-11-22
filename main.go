@@ -18,6 +18,7 @@ func main() {
 
 	//Parse config
 	cfgFile := flag.String("config", "", "Config file")
+	logOut := flag.Bool("log", false, "logger out path")
 	addr := flag.String("addr", "127.0.0.1:12000", "Port where Mesh is listen on")
 	cluster := flag.String("cluster", "127.0.0.1:12000,127.0.0.1:12001,127.0.0.1:12002", "cluster list definition separated by commas")
 	flag.Parse()
@@ -33,13 +34,15 @@ func main() {
 	//Init logger
 	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds | log.Lshortfile)
 
-	f, err := os.OpenFile(fmt.Sprintf("%s.log", *addr), os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	f, err := os.OpenFile(fmt.Sprintf("log/%s.log", *addr), os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {
 		log.Panic("error opening file: %v", err)
 	}
 	defer f.Close()
 
-	//log.SetOutput(f)
+	if *logOut {
+		log.SetOutput(f)
+	}
 	s := server.New(cfg)
 	c := make(chan os.Signal, 1)
 

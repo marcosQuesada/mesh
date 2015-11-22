@@ -68,16 +68,11 @@ func (d *defaultDispatcher) SndChan() chan Event {
 
 //Enable event channel aggregation
 func (d *defaultDispatcher) Aggregate(e chan Event) {
-	for {
-		select {
-		case m, open := <-e:
-			if !open {
-				log.Println("Closed EventChan, Exiting AggregateChan Run loop")
-				return
-			}
-			d.EventChan <- m
+	go func() {
+		for {
+			d.EventChan <- <-e
 		}
-	}
+	}()
 }
 
 func (d *defaultDispatcher) Exit() {

@@ -53,12 +53,12 @@ func (r *defaultRouter) HandleHello(c peer.NodePeer, msg message.Message) (messa
 func (r *defaultRouter) HandleWelcome(c peer.NodePeer, msg message.Message) (message.Message, error) {
 	err := r.accept(c)
 	if err != nil {
-		r.eventChan <- &peer.OnPeerErroredEvent{c.Node(), peer.PeerStatusError, err}
+		r.events <- &peer.OnPeerErroredEvent{c.Node(), peer.PeerStatusError, err}
 
 		return &message.Error{Id: msg.(*message.Welcome).Id, From: r.from}, err
 	}
 	c.State(peer.PeerStatusConnected)
-	r.eventChan <- &peer.OnPeerConnectedEvent{c.Node(), peer.PeerStatusConnected, c.Mode()}
+	r.events <- &peer.OnPeerConnectedEvent{c.Node(), peer.PeerStatusConnected, c.Mode()}
 
 	go r.watcher.Watch(c)
 
@@ -67,7 +67,7 @@ func (r *defaultRouter) HandleWelcome(c peer.NodePeer, msg message.Message) (mes
 }
 
 func (r *defaultRouter) HandleAbort(c peer.NodePeer, msg message.Message) (message.Message, error) {
-	r.eventChan <- &peer.OnPeerAbortedEvent{c.Node(), peer.PeerStatusAbort}
+	r.events <- &peer.OnPeerAbortedEvent{c.Node(), peer.PeerStatusAbort}
 	c.State(peer.PeerStatusAbort)
 	c.Exit()
 
@@ -81,7 +81,7 @@ func (r *defaultRouter) HandleAck(c peer.NodePeer, msg message.Message) (message
 	}
 
 	c.State(peer.PeerStatusConnected)
-	r.eventChan <- &peer.OnPeerConnectedEvent{msg.(*message.Ack).From, peer.PeerStatusConnected, c.Mode()}
+	r.events <- &peer.OnPeerConnectedEvent{msg.(*message.Ack).From, peer.PeerStatusConnected, c.Mode()}
 
 	go r.watcher.Watch(c)
 

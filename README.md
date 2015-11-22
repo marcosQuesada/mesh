@@ -2,29 +2,20 @@
 
 Mesh [WIP]
 ==========
+ Cluster proof of concept using Raft quorum.
+ 
+## Milestones
+ * Communication between peers using message passing
+ * Basic Raft leader implementation
+ * Command Quorum execution
+ * State Machine replication
 
- Proof of concept on how to build a basic cluster structure using Raft
-
-Milestones
-===========
--Basic Raft cluster
--Command Quorum execution
-
-Cluster definition will be something like that
-==============================================
-
+### Boot Cluster definition (3 member nodes as default)
+```bash
 mesh -addr=127.0.0.1:12000 -cluster=127.0.0.1:12000,127.0.0.1:12001,127.0.0.1:12002
-
 mesh -addr=127.0.0.1:12001 -cluster=127.0.0.1:12000,127.0.0.1:12001,127.0.0.1:12002
-
 mesh -addr=127.0.0.1:12002 -cluster=127.0.0.1:12000,127.0.0.1:12001,127.0.0.1:12002
-
+```
 Where:
-	addr: Port where Mesh is listen on
-	cluster: cluster list definition separated by commas
-
-
-
-#NOTES
-Node Name is Server:Port 
-Communication between peers using message passing
+ * addr: Port where Mesh is listen on
+ * cluster: cluster list definition separated by commas

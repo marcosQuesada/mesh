@@ -18,26 +18,24 @@ import (
 
 type Router interface {
 	Accept(*peer.Peer)
-	Handle(peer.NodePeer, message.Message) message.Message
 	RegisterHandlersFromInstance(handler.MessageHandler)
-	//Events() chan dispatcher.Event
 	AggregateChan(chan handler.Request)
-	Exit()
 	CliHandlers() map[string]cli.Definition
 	RequestListener() *request.RequestListener
+	Exit()
 }
 
 type defaultRouter struct {
-	from            node.Node
-	peers           map[string]peer.NodePeer
+	from            node.Node                //Origin node
+	peers           map[string]peer.NodePeer //Peer neighbour
 	peerIDs         map[peer.ID]bool
-	eventChan       chan dispatcher.Event
+	events          chan dispatcher.Event
 	exit            chan bool
 	watcher         watch.Watcher
 	handlers        map[message.MsgType]handler.Handler
 	notifiers       map[message.MsgType]bool
 	transactionals  map[message.MsgType]bool
-	mutex           sync.Mutex
+	mutex           *sync.Mutex
 	requestListener *request.RequestListener
 	dispatcher      dispatcher.Dispatcher
 }
@@ -51,12 +49,13 @@ func New(n node.Node, dispatcher dispatcher.Dispatcher) *defaultRouter {
 		from:            n,
 		peers:           make(map[string]peer.NodePeer),
 		peerIDs:         make(map[peer.ID]bool, 0),
-		eventChan:       evChan,
+		events:          evChan,
+		exit:            make(chan bool),
+		watcher:         w,
 		handlers:        make(map[message.MsgType]handler.Handler),
 		notifiers:       make(map[message.MsgType]bool),
 		transactionals:  make(map[message.MsgType]bool),
-		exit:            make(chan bool),
-		watcher:         w,
+		mutex:           &sync.Mutex{},
 		requestListener: reqList,
 		dispatcher:      dispatcher,
 	}
@@ -134,13 +133,12 @@ func (r *defaultRouter) Accept(c *peer.Peer) {
 					r.requestListener.Notify(msg, msg.ID())
 				}
 
-				response := r.Handle(c, msg)
+				response := r.handle(c, msg)
 				if response != nil {
 					c.Commit(response)
 
 					// Start new request transaction if required
-					v, ok := r.transactionals[msg.MessageType()]
-					if ok && v {
+					if r.isTransactional(msg) {
 						go r.requestListener.Register(response.ID())
 					}
 
@@ -155,7 +153,11 @@ func (r *defaultRouter) Accept(c *peer.Peer) {
 	}()
 }
 
-func (r *defaultRouter) Handle(c peer.NodePeer, msg message.Message) message.Message {
+func (r *defaultRouter) Exit() {
+	close(r.exit)
+}
+
+func (r *defaultRouter) handle(c peer.NodePeer, msg message.Message) message.Message {
 	fn, ok := r.handlers[msg.MessageType()]
 	if !ok {
 		log.Fatalf("Handler %s not found", msg.MessageType())
@@ -172,10 +174,6 @@ func (r *defaultRouter) Handle(c peer.NodePeer, msg message.Message) message.Mes
 	}
 
 	return result
-}
-
-func (r *defaultRouter) Exit() {
-	close(r.exit)
 }
 
 func (r *defaultRouter) accept(p peer.NodePeer) error {
@@ -197,19 +195,14 @@ func (r *defaultRouter) route(msg message.Message) (message.Message, error) {
 	to := msg.Destination()
 	peer, ok := r.peers[to.String()]
 	if !ok {
-		return nil, fmt.Errorf("Router error: Destination Peer Not found ", to.String())
+		return nil, fmt.Errorf("Router error: Destination Peer Not found %s", to.String())
 	}
 
 	peer.Commit(msg)
 
 	//Open transaction if required and wait response
-	v, ok := r.transactionals[msg.MessageType()]
-	if v && ok {
+	if r.isTransactional(msg) {
 		return r.requestListener.RegisterAndWait(msg.ID())
-	}
-
-	if !ok {
-		log.Fatal("Transactioner not found ", msg.MessageType())
 	}
 
 	return nil, nil
@@ -258,6 +251,15 @@ func (r *defaultRouter) registerNotifier(msgType message.MsgType, st bool) {
 	}
 
 	r.notifiers[msgType] = st
+}
+
+func (r *defaultRouter) isTransactional(msg message.Message) bool {
+	v, ok := r.transactionals[msg.MessageType()]
+	if !ok {
+		log.Fatal("Transactioner not found ", msg.MessageType())
+	}
+
+	return v && ok
 }
 
 func (r *defaultRouter) registerTransactionals(transactionals map[message.MsgType]bool) {
