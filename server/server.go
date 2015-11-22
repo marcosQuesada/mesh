@@ -67,11 +67,17 @@ func (s *Server) Start() {
 
 //@TODO: Solve system shutdown
 func (s *Server) Close() {
-	//d.Exit()
-
+	s.router.Exit()
 	close(s.exit)
 }
 
+// OnPeerDisconnected start peer recovering
+func (s *Server) OnPeerDisconnected(e dispatcher.Event) {
+	event := e.(*peer.OnPeerDisconnectedEvent)
+	go s.initDialClient(event.Node)
+}
+
+//Used to shutdown server gracefully
 func (s *Server) run() {
 	for {
 		select {
@@ -99,34 +105,29 @@ func (s *Server) startPeerAcceptor(listener net.Listener) {
 			return
 		}
 
-		c := peer.NewAcceptor(conn, s.node)
-		go c.Run()
+		p := peer.NewAcceptor(conn, s.node)
+		go p.Run()
 
-		s.router.Accept(c)
+		s.router.Accept(p)
 	}
 }
 
-//Start Dial Peers
+//Start Dial Peers to all neighbours
 func (s *Server) startDialPeers() {
 	for _, node := range s.config.Cluster {
 		//avoid local connexion
 		if node.String() == s.node.String() {
 			continue
 		}
-
-		go s.InitDialClient(node)
+		go s.initDialClient(node)
 	}
 }
 
 // InitDialClient starts a dial peer to a remote destination
-func (s *Server) InitDialClient(destination n.Node) {
+func (s *Server)initDialClient(destination n.Node) {
 	p, requestID := peer.InitDialClient(s.node, destination)
+
+	// Register Hello request, wait and handle response
 	go s.router.RequestListener().Register(requestID)
 	s.router.Accept(p)
-}
-
-// OnPeerDisconnected start peer recovering
-func (s *Server) OnPeerDisconnected(e dispatcher.Event) {
-	event := e.(*peer.OnPeerDisconnectedEvent)
-	go s.InitDialClient(event.Node)
 }
