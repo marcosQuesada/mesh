@@ -2,3 +2,5 @@ log/
 *.db
 *.log
 *.log~
+.idea
+vendor/
