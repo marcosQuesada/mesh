@@ -51,8 +51,8 @@ func TestRouterAccept(t *testing.T) {
 	r.registerTransactional(pong.MessageType(), true)
 	r.registerTransactional(welcome.MessageType(), false)
 
-	nodeA := node.Node{Host: "A", Port: 1}
-	nodeB := node.Node{Host: "B", Port: 2}
+	nodeA := &node.Node{Host: "A", Port: 1}
+	nodeB := &node.Node{Host: "B", Port: 2}
 	a, b := net.Pipe()
 
 	c1 := peer.NewAcceptor(a, nodeA)
@@ -84,7 +84,7 @@ func TestRouterAccept(t *testing.T) {
 	}
 
 	id := message.NewId()
-	msg := message.Ping{
+	msg := &message.Ping{
 		Id:   id,
 		From: nodeA,
 		To:   nodeB,
@@ -100,7 +100,7 @@ func TestRouterAccept(t *testing.T) {
 	if pong.Id != id {
 		t.Error("Unexpected result Id")
 	}
-	if pong.From != nodeB {
+	if pong.From.Host != nodeB.Host {
 		t.Error("Unexpected result From")
 	}
 
@@ -109,12 +109,12 @@ func TestRouterAccept(t *testing.T) {
 	c1Mirror.Exit()
 }
 
-func fakeHelloHandler(c peer.NodePeer, msg message.Message) (message.Message, error) {
+func fakeHelloHandler(c peer.PeerNode, msg message.Message) (message.Message, error) {
 	hello := msg.(*message.Hello)
 	return &message.Welcome{hello.Id, hello.To, hello.From}, nil
 }
 
-func fakePingHandler(c peer.NodePeer, msg message.Message) (message.Message, error) {
+func fakePingHandler(c peer.PeerNode, msg message.Message) (message.Message, error) {
 	ping := msg.(*message.Ping)
 	return &message.Pong{ping.Id, ping.To, ping.From}, nil
 }

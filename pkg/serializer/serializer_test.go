@@ -7,7 +7,7 @@ import (
 )
 
 func TestJsonSerializer(t *testing.T) {
-	node := n.Node{Host: "localhost", Port: 13123}
+	node := &n.Node{Host: "localhost", Port: 13123}
 
 	msg := m.Hello{
 		Id:      m.NewId(),

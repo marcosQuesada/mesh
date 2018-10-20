@@ -27,12 +27,12 @@ type RaftAction interface {
 }
 
 type Raft struct {
-	node        node.Node
-	mates       map[string]node.Node
-	leader      node.Node
+	node        *node.Node
+	mates       map[string]*node.Node
+	leader      *node.Node
 	sndChan     chan interface{}
 	rcvChan     chan interface{}
-	ready       chan node.Node
+	ready       chan *node.Node
 	timer       *raftTimer
 	state       string
 	currentTerm int
@@ -56,12 +56,12 @@ type RaftRequest struct {
 // FSM declaration
 type StateHandler func() StateHandler
 type FSM struct {
-	node  node.Node
-	State interface{}
+	node  *node.Node
+	State interface{} //@TODO: FIX
 	exit  chan struct{}
 }
 
-func New(localNode node.Node, mates map[string]node.Node) *FSM {
+func New(localNode *node.Node, mates map[string]*node.Node) *FSM {
 	internalTimer := &raftTimer{
 		timerIn:     make(chan time.Duration, 10),
 		timerStop:   make(chan bool, 10),
@@ -72,7 +72,7 @@ func New(localNode node.Node, mates map[string]node.Node) *FSM {
 		delete(mates, localNode.String())
 	}*/
 
-	cleanMates := make(map[string]node.Node, len(mates)-1)
+	cleanMates := make(map[string]*node.Node, len(mates)-1)
 	for k, v := range mates {
 		if k != localNode.String() {
 			cleanMates[k] = v
@@ -84,7 +84,7 @@ func New(localNode node.Node, mates map[string]node.Node) *FSM {
 		mates:   cleanMates,
 		sndChan: make(chan interface{}, 10),
 		rcvChan: make(chan interface{}, 10),
-		ready:   make(chan node.Node, 0),
+		ready:   make(chan *node.Node, 0),
 		timer:   internalTimer,
 	}
 
@@ -127,7 +127,7 @@ func (f *FSM) Exit() {
 	close(f.exit)
 }
 
-func (f *FSM) Ready() chan node.Node {
+func (f *FSM) Ready() chan *node.Node {
 	e, ok := f.State.(*Raft)
 	if !ok {
 		log.Panic("FMT State is not Raft!")
@@ -182,7 +182,7 @@ func (r *Raft) FollowerState() StateHandler {
 
 	case <-r.timer.timerSignal:
 		log.Println("Follower state timeout, removing leader")
-		r.leader = node.Node{}
+		r.leader = &node.Node{}
 
 		return r.CandidateState
 	}
@@ -294,13 +294,13 @@ func (f *FSM) Response() chan interface{} {
 
 func (r *Raft) sendHearBeat() {
 	for _, mate := range r.mates {
-		go func(n node.Node) {
+		go func(n *node.Node) {
 			r.sndChan <- &message.RaftHeartBeatRequest{Id: message.NewId(), From: r.node, To: n, Leader: r.node}
 		}(mate)
 	}
 }
 
-func (r *Raft) voteRequest(candidate node.Node) (msgs []message.Message) {
+func (r *Raft) voteRequest(candidate *node.Node) (msgs []message.Message) {
 	r.termMutex.Lock()
 	term := r.currentTerm
 	r.termMutex.Unlock()
@@ -323,7 +323,7 @@ func (r *Raft) voteRequest(candidate node.Node) (msgs []message.Message) {
 
 //run internal Timer
 func (r *Raft) runTimer() {
-	var timeout *time.Timer = time.NewTimer(time.Hour)
+	timeout := time.NewTimer(time.Hour)
 	for {
 		select {
 		case tSize := <-r.timer.timerIn:
@@ -337,10 +337,10 @@ func (r *Raft) runTimer() {
 }
 
 func (r *Raft) voidLeader() bool {
-	return r.leader == (node.Node{})
+	return r.leader == nil
 }
 
-func (r *Raft) setLeader(n node.Node) {
+func (r *Raft) setLeader(n *node.Node) {
 	if r.voidLeader() {
 		//send ready Signal
 		r.ready <- n

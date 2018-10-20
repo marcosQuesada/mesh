@@ -28,7 +28,7 @@ const (
 
 type Manager interface {
 	Run()
-	Ready() chan n.Node
+	Ready() chan *n.Node
 	Request() chan interface{}
 	Response() chan interface{}
 	Handlers() map[message.MsgType]handler.Handler
@@ -37,18 +37,18 @@ type Manager interface {
 }
 
 type Coordinator struct {
-	from       n.Node
-	members    map[string]n.Node
+	from       *n.Node
+	members    map[string]*n.Node
 	connected  map[string]bool
 	manager    Manager
-	leader     n.Node
+	leader     *n.Node
 	sndChan    chan handler.Request
 	exitChan   chan bool
 	status     message.Status
 	dispatcher dispatcher.Dispatcher
 }
 
-func Start(from n.Node, members map[string]n.Node, dispatcher dispatcher.Dispatcher) *Coordinator {
+func Start(from *n.Node, members map[string]*n.Node, dispatcher dispatcher.Dispatcher) *Coordinator {
 	log.Printf("Starting coordinator on Node %s members: %v", from.String(), members)
 
 	r := raft.New(from, members)

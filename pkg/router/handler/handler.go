@@ -7,7 +7,7 @@ import (
 
 //Handler represent a method to be invoked with message
 //error will be returned on unexpected handling
-type Handler func(peer.NodePeer, message.Message) (message.Message, error)
+type Handler func(peer.PeerNode, message.Message) (message.Message, error)
 
 type MessageHandler interface {
 	Handlers() map[message.MsgType]Handler

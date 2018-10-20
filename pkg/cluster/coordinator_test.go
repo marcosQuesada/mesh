@@ -90,9 +90,9 @@ func startBasicTestServer() error {
 }*/
 
 func TestForwardingChannel(t *testing.T) {
-	from := node.Node{Host: "localhost", Port: 9000}
-	n := node.Node{Host: "localhost", Port: 9011}
-	members := make(map[string]node.Node, 2)
+	from := &node.Node{Host: "localhost", Port: 9000}
+	n := &node.Node{Host: "localhost", Port: 9011}
+	members := make(map[string]*node.Node, 2)
 	members[n.String()] = n
 	members[from.String()] = from // as fake local node
 

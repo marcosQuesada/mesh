@@ -11,16 +11,6 @@ type Serializer interface {
 	Deserialize([]byte) (message.Message, error)
 }
 
-type nopSerializer struct{}
-
-func (s *nopSerializer) Serialize(m message.Message) []byte {
-	return nil
-}
-
-func (s *nopSerializer) Deserialize(m []byte) message.Message {
-	return nil
-}
-
 type JsonSerializer struct{}
 
 func (s *JsonSerializer) Serialize(m message.Message) ([]byte, error) {

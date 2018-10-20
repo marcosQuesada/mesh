@@ -26,8 +26,8 @@ type Router interface {
 }
 
 type defaultRouter struct {
-	from            node.Node                //Origin node
-	peers           map[string]peer.NodePeer //Peer neighbour
+	from            *node.Node               //Origin node
+	peers           map[string]peer.PeerNode //neighbours
 	peerIDs         map[peer.ID]bool
 	events          chan dispatcher.Event
 	exit            chan bool
@@ -40,14 +40,14 @@ type defaultRouter struct {
 	dispatcher      dispatcher.Dispatcher
 }
 
-func New(n node.Node, dispatcher dispatcher.Dispatcher) *defaultRouter {
+func New(n *node.Node, dispatcher dispatcher.Dispatcher) *defaultRouter {
 	evChan := dispatcher.SndChan()
 	reqList := request.NewRequestListener()
 	w := watch.New(reqList, evChan, 10)
 
 	r := &defaultRouter{
 		from:            n,
-		peers:           make(map[string]peer.NodePeer),
+		peers:           make(map[string]peer.PeerNode),
 		peerIDs:         make(map[peer.ID]bool, 0),
 		events:          evChan,
 		exit:            make(chan bool),
@@ -139,7 +139,7 @@ func (r *defaultRouter) Accept(c *peer.Peer) {
 
 					// Start new request transaction if required
 					if r.isTransactional(msg) {
-						go r.requestListener.Register(response.ID())
+						go r.requestListener.Register(response.ID()) //@TODO: RETHINK SYNC
 					}
 
 					// On abort disconnect acceptor
@@ -157,7 +157,7 @@ func (r *defaultRouter) Exit() {
 	close(r.exit)
 }
 
-func (r *defaultRouter) handle(c peer.NodePeer, msg message.Message) message.Message {
+func (r *defaultRouter) handle(c peer.PeerNode, msg message.Message) message.Message {
 	fn, ok := r.handlers[msg.MessageType()]
 	if !ok {
 		log.Fatalf("Handler %v not found", msg.MessageType())
@@ -176,11 +176,11 @@ func (r *defaultRouter) handle(c peer.NodePeer, msg message.Message) message.Mes
 	return result
 }
 
-func (r *defaultRouter) accept(p peer.NodePeer) error {
+func (r *defaultRouter) accept(p peer.PeerNode) error {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
-	var node node.Node = p.Node()
+	var node = p.Node()
 	if _, ok := r.peers[node.String()]; ok {
 		return fmt.Errorf("Peer: %s Already registered", node.String())
 	}
@@ -280,17 +280,17 @@ func (r *defaultRouter) registerTransactional(msgType message.MsgType, st bool) 
 	r.transactionals[msgType] = st
 }
 
-func (r *defaultRouter) peerExists(p peer.NodePeer) bool {
+func (r *defaultRouter) peerExists(p peer.PeerNode) bool {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
-	var node node.Node = p.Node()
+	var node = p.Node()
 	_, ok := r.peers[node.String()]
 
 	return ok
 }
 
-func (r *defaultRouter) removePeer(p peer.NodePeer) error {
+func (r *defaultRouter) removePeer(p peer.PeerNode) error {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 

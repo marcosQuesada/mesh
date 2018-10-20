@@ -17,8 +17,8 @@ func TestPeerMessagingUnderPipes(t *testing.T) {
 
 	c1 := &Peer{
 		Link:         NewJSONSocketLink(a),
-		from:         node.Node{Host: "foo"},
-		to:           node.Node{Host: "bar"},
+		from:         &node.Node{Host: "foo"},
+		to:           &node.Node{Host: "bar"},
 		dataChan:     make(chan message.Message, 10),
 		sendChan:     make(chan message.Message, 10),
 		messageChan:  make(chan message.Message, 10),
@@ -31,8 +31,8 @@ func TestPeerMessagingUnderPipes(t *testing.T) {
 
 	c1Mirror := &Peer{
 		Link:         NewJSONSocketLink(b),
-		from:         node.Node{Host: "bar"},
-		to:           node.Node{Host: "foo"},
+		from:         &node.Node{Host: "bar"},
+		to:           &node.Node{Host: "foo"},
 		dataChan:     make(chan message.Message, 10),
 		sendChan:     make(chan message.Message, 10),
 		messageChan:  make(chan message.Message, 10),
@@ -107,7 +107,7 @@ func TestBasicNopPeerTest(t *testing.T) {
 
 	msg := message.Hello{
 		Id:      message.NewId(),
-		From:    node.Node{"localhost", 9000},
+		From:    &node.Node{"localhost", 9000},
 		Details: map[string]interface{}{"foo": "bar"},
 	}
 
@@ -122,10 +122,10 @@ func TestBasicNopPeerTest(t *testing.T) {
 func TestBasicPingPongChannel(t *testing.T) {
 	a, b := net.Pipe()
 
-	c1 := NewAcceptor(a, node.Node{})
+	c1 := NewAcceptor(a, &node.Node{})
 	go c1.Run()
 
-	c1Mirror := NewAcceptor(b, node.Node{})
+	c1Mirror := NewAcceptor(b, &node.Node{})
 	go c1Mirror.Run()
 
 	resChan := make(chan message.Message, 6)
@@ -196,8 +196,8 @@ func TestBasicPingPongChannel(t *testing.T) {
 }
 
 func TestPeersUsingPipes(t *testing.T) {
-	nodeA := node.Node{Host: "A", Port: 1}
-	nodeB := node.Node{Host: "B", Port: 2}
+	nodeA := &node.Node{Host: "A", Port: 1}
+	nodeB := &node.Node{Host: "B", Port: 2}
 	a, b := net.Pipe()
 
 	c1 := NewAcceptor(a, nodeA)

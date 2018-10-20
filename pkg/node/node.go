@@ -18,7 +18,7 @@ func (n *Node) String() string {
 func ParseNodeString(nds string) (*Node, error) {
 	parts := strings.Split(nds, ":")
 	if len(parts) != 2 {
-		return nil, fmt.Errorf("Bad Nodestring!")
+		return nil, fmt.Errorf("Bad Nodestring! parts %d", len(parts))
 	}
 	port, err := strconv.ParseInt(parts[1], 10, 64)
 	if err != nil {

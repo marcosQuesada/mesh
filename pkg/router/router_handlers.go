@@ -38,7 +38,7 @@ func (r *defaultRouter) Transactions() map[message.MsgType]bool {
 }
 
 //HandleHello Request
-func (r *defaultRouter) HandleHello(c peer.NodePeer, msg message.Message) (message.Message, error) {
+func (r *defaultRouter) HandleHello(c peer.PeerNode, msg message.Message) (message.Message, error) {
 	c.Identify(msg.(*message.Hello).From)
 	if r.peerExists(c) {
 		return &message.Abort{Id: msg.(*message.Hello).Id, From: r.from}, nil
@@ -50,7 +50,7 @@ func (r *defaultRouter) HandleHello(c peer.NodePeer, msg message.Message) (messa
 }
 
 //HandleWelcome Request
-func (r *defaultRouter) HandleWelcome(c peer.NodePeer, msg message.Message) (message.Message, error) {
+func (r *defaultRouter) HandleWelcome(c peer.PeerNode, msg message.Message) (message.Message, error) {
 	err := r.accept(c)
 	if err != nil {
 		r.events <- &peer.OnPeerErroredEvent{c.Node(), peer.PeerStatusError, err}
@@ -66,7 +66,7 @@ func (r *defaultRouter) HandleWelcome(c peer.NodePeer, msg message.Message) (mes
 
 }
 
-func (r *defaultRouter) HandleAbort(c peer.NodePeer, msg message.Message) (message.Message, error) {
+func (r *defaultRouter) HandleAbort(c peer.PeerNode, msg message.Message) (message.Message, error) {
 	r.events <- &peer.OnPeerAbortedEvent{c.Node(), peer.PeerStatusAbort}
 	c.State(peer.PeerStatusAbort)
 	c.Exit()
@@ -74,7 +74,7 @@ func (r *defaultRouter) HandleAbort(c peer.NodePeer, msg message.Message) (messa
 	return nil, nil
 }
 
-func (r *defaultRouter) HandleAck(c peer.NodePeer, msg message.Message) (message.Message, error) {
+func (r *defaultRouter) HandleAck(c peer.PeerNode, msg message.Message) (message.Message, error) {
 	err := r.accept(c)
 	if err != nil {
 		log.Println("Unexpected Error accepting Peer on HandleAck ", c.Node(), "msg:", msg)
@@ -88,7 +88,7 @@ func (r *defaultRouter) HandleAck(c peer.NodePeer, msg message.Message) (message
 	return nil, nil
 }
 
-func (r *defaultRouter) HandleError(c peer.NodePeer, msg message.Message) (message.Message, error) {
+func (r *defaultRouter) HandleError(c peer.PeerNode, msg message.Message) (message.Message, error) {
 	log.Println("HandleError ", c.Node(), "msg:", msg)
 
 	return nil, nil

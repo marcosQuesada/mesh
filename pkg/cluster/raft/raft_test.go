@@ -38,8 +38,8 @@ var flagtests = []struct {
 
 func TestEvaluateResponses(t *testing.T) {
 	r := &Raft{
-		node:  node.Node{"A", 1},
-		mates: map[string]node.Node{"B:2": node.Node{"B", 2}, "C:3": node.Node{"C", 3}},
+		node:  &node.Node{"A", 1},
+		mates: map[string]*node.Node{"B:2": &node.Node{"B", 2}, "C:3": &node.Node{"C", 3}},
 	}
 
 	for _, item := range flagtests {
@@ -61,8 +61,8 @@ var flagtestsBig = []struct {
 
 func TestEvaluateResponsesFiveNodes(t *testing.T) {
 	r := &Raft{
-		node:  node.Node{"A", 1},
-		mates: map[string]node.Node{"B:2": node.Node{"B", 2}, "C:3": node.Node{"C", 3}, "D:4": node.Node{"D", 4}, "E:5": node.Node{"E", 5}, "F:6": node.Node{"F", 6}},
+		node:  &node.Node{"A", 1},
+		mates: map[string]*node.Node{"B:2": &node.Node{"B", 2}, "C:3": &node.Node{"C", 3}, "D:4": &node.Node{"D", 4}, "E:5": &node.Node{"E", 5}, "F:6": &node.Node{"F", 6}},
 	}
 
 	for _, item := range flagtestsBig {

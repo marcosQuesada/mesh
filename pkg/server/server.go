@@ -4,7 +4,6 @@ import (
 	"log"
 	"net"
 
-	//"github.com/marcosQuesada/mesh/cli"
 	"github.com/marcosQuesada/mesh/pkg/cli"
 	"github.com/marcosQuesada/mesh/pkg/cluster"
 	"github.com/marcosQuesada/mesh/pkg/config"
@@ -16,9 +15,9 @@ import (
 
 type Server struct {
 	config *config.Config
-	node   n.Node
-	exit   chan bool
+	node   *n.Node
 	router router.Router
+	exit   chan bool
 }
 
 func New(c *config.Config) *Server {
@@ -84,6 +83,7 @@ func (s *Server) run() {
 // OnPeerDisconnected start peer recovering
 func (s *Server) OnPeerDisconnected(e dispatcher.Event) {
 	event := e.(*peer.OnPeerDisconnectedEvent)
+	log.Println("On Peer Disconnected ", event.Node)
 	go s.initDialClient(event.Node)
 }
 
@@ -123,7 +123,7 @@ func (s *Server) startDialPeers() {
 }
 
 // InitDialClient starts a dial peer to a remote destination
-func (s *Server) initDialClient(destination n.Node) {
+func (s *Server) initDialClient(destination *n.Node) {
 	p, requestID := peer.InitDialClient(s.node, destination)
 
 	// Register Hello request, wait and handle response

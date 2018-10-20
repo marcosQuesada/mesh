@@ -27,12 +27,12 @@ func (w *defaultWatcher) Transactions() map[message.MsgType]bool {
 	}
 }
 
-func (w *defaultWatcher) HandlePing(c peer.NodePeer, msg message.Message) (message.Message, error) {
+func (w *defaultWatcher) HandlePing(c peer.PeerNode, msg message.Message) (message.Message, error) {
 	ping := msg.(*message.Ping)
 
 	return &message.Pong{Id: ping.Id, From: ping.To, To: ping.From}, nil
 }
 
-func (w *defaultWatcher) HandlePong(c peer.NodePeer, msg message.Message) (message.Message, error) {
+func (w *defaultWatcher) HandlePong(c peer.PeerNode, msg message.Message) (message.Message, error) {
 	return nil, nil
 }

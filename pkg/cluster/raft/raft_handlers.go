@@ -32,7 +32,7 @@ func (f *FSM) Transactions() map[message.MsgType]bool {
 	}
 }
 
-func (r *Raft) HandleRaftVoteRequest(p peer.NodePeer, msg message.Message) (message.Message, error) {
+func (r *Raft) HandleRaftVoteRequest(p peer.PeerNode, msg message.Message) (message.Message, error) {
 	cmdMsg := msg.(*message.RaftVoteRequest)
 	responseChn := make(chan interface{}, 1)
 	r.rcvChan <- handler.Request{ResponseChan: responseChn, Msg: cmdMsg}
@@ -51,11 +51,11 @@ func (r *Raft) HandleRaftVoteRequest(p peer.NodePeer, msg message.Message) (mess
 }
 
 //Handled using request listeners on coordinator poolRequest
-func (r *Raft) HandleRaftVoteResponse(p peer.NodePeer, msg message.Message) (message.Message, error) {
+func (r *Raft) HandleRaftVoteResponse(p peer.PeerNode, msg message.Message) (message.Message, error) {
 	return nil, nil
 }
 
-func (r *Raft) HandleRaftHeartBeat(p peer.NodePeer, msg message.Message) (message.Message, error) {
+func (r *Raft) HandleRaftHeartBeat(p peer.PeerNode, msg message.Message) (message.Message, error) {
 	r.rcvChan <- msg.(*message.RaftHeartBeatRequest)
 
 	return nil, nil

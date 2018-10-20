@@ -1,6 +1,6 @@
 package watch
 
-//Takes care to regular pull peers to update its link state
+// Takes care to regular pull peers to update its link state
 // Adds a ticker on each peer added,
 // Each watcher is a goroutine sending pooling messages to a channel
 // Master goroutine forwards pool requests to peers and awaits answer
@@ -21,7 +21,30 @@ import (
 )
 
 type Watcher interface {
-	Watch(peer.NodePeer)
+	Watch(peer.PeerNode)
+}
+
+type subject struct {
+	peer     peer.PeerNode
+	ticker   *time.Ticker
+	id       message.ID
+	Done     chan bool
+	mutex    sync.RWMutex
+	lastSeen time.Time
+}
+
+func (s *subject) incId() { //@TODO: TO atomic pointers
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	s.id = message.NewId()
+}
+
+func (s *subject) getId() message.ID {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+
+	return s.id
 }
 
 type defaultWatcher struct {
@@ -34,35 +57,9 @@ type defaultWatcher struct {
 	wg              sync.WaitGroup
 }
 
-type subject struct {
-	peer     peer.NodePeer
-	ticker   *time.Ticker
-	id       message.ID
-	Done     chan bool
-	mutex    sync.Mutex
-	lastSeen time.Time
-}
-
-func (s *subject) incId() {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
-	s.id = message.NewId()
-}
-
-func (s *subject) getId() message.ID {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
-	return s.id
-}
-
-func init() {
-	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds | log.Lshortfile)
-	rand.Seed(time.Now().UTC().UnixNano())
-}
-
 func New(rqLst *request.RequestListener, evCh chan dispatcher.Event, interval int) *defaultWatcher {
+	rand.Seed(time.Now().UTC().UnixNano())
+
 	return &defaultWatcher{
 		eventChan:       evCh,
 		exit:            make(chan bool, 0),
@@ -72,7 +69,7 @@ func New(rqLst *request.RequestListener, evCh chan dispatcher.Event, interval in
 	}
 }
 
-func (w *defaultWatcher) Watch(p peer.NodePeer) {
+func (w *defaultWatcher) Watch(p peer.PeerNode) {
 	//add watcher to waitGroup
 	w.wg.Add(1)
 	defer w.wg.Done()

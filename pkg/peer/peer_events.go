@@ -7,7 +7,7 @@ import (
 )
 
 type OnPeerConnectedEvent struct {
-	Node  node.Node
+	Node  *node.Node
 	Event message.Status
 	Mode  string
 }
@@ -17,7 +17,7 @@ func (m OnPeerConnectedEvent) GetEventType() dispatcher.EventType {
 }
 
 type OnPeerAbortedEvent struct {
-	Node  node.Node
+	Node  *node.Node
 	Event message.Status
 }
 
@@ -26,7 +26,7 @@ func (m OnPeerAbortedEvent) GetEventType() dispatcher.EventType {
 }
 
 type OnPeerErroredEvent struct {
-	Node  node.Node
+	Node  *node.Node
 	Event message.Status
 	Error error
 }
@@ -36,9 +36,9 @@ func (m OnPeerErroredEvent) GetEventType() dispatcher.EventType {
 }
 
 type OnPeerDisconnectedEvent struct {
-	Node  node.Node
+	Node  *node.Node
 	Event message.Status
-	//Peer  NodePeer
+	//Peer  PeerNode
 }
 
 func (m OnPeerDisconnectedEvent) GetEventType() dispatcher.EventType {

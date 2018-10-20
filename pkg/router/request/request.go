@@ -33,11 +33,13 @@ func (r *RequestListener) Register(requestID message.ID) {
 }
 
 func (r *RequestListener) Notify(msg message.Message, requestID message.ID) {
-	if l, ok := r.listeners[requestID]; ok {
-		l <- msg
+	l, ok := r.listeners[requestID]
+	if !ok {
+		log.Println("No listener found for request", requestID, "type", reflect.TypeOf(msg).String())
 		return
 	}
-	log.Println("No listener found for request", requestID, "type", reflect.TypeOf(msg).String())
+
+	l <- msg
 }
 
 func (r *RequestListener) Wait(requestID message.ID) (msg message.Message, err error) {
@@ -45,7 +47,7 @@ func (r *RequestListener) Wait(requestID message.ID) (msg message.Message, err e
 	if !ok {
 		return nil, fmt.Errorf("unknown listener ID: %v", requestID)
 	} else {
-		var timeout *time.Timer = time.NewTimer(time.Second * 1)
+		timeout := time.NewTimer(time.Second * 1)
 		select {
 		case msg = <-waitChannel:
 			timeout.Stop()
@@ -54,7 +56,10 @@ func (r *RequestListener) Wait(requestID message.ID) (msg message.Message, err e
 		}
 	}
 	close(waitChannel)
+
+	r.mutex.Lock()
 	delete(r.listeners, requestID)
+	r.mutex.Unlock()
 
 	return
 }

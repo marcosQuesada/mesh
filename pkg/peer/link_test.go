@@ -28,14 +28,14 @@ func TestLinksOnPipes(t *testing.T) {
 		outChan: make(chan *message.Hello, 1),
 		exit:    make(chan bool, 1),
 	}
-	go tp.handleLink(linkA, node.Node{Host: "localhost", Port: 5000})
-	go tp.handleLink(linkB, node.Node{Host: "localhost", Port: 5005})
+	go tp.handleLink(linkA, &node.Node{Host: "localhost", Port: 5000})
+	go tp.handleLink(linkB, &node.Node{Host: "localhost", Port: 5005})
 
 	id := message.NewId()
 	//first message
 	msg := message.Hello{
 		Id:      id,
-		From:    node.Node{Host: "localhost", Port: 5000},
+		From:    &node.Node{Host: "localhost", Port: 5000},
 		Details: map[string]interface{}{"foo": "bar"},
 	}
 	linkA.Send(msg)
@@ -54,7 +54,7 @@ func TestLinksOnPipes(t *testing.T) {
 	}
 }
 
-func (ph *testLinkHandler) handleLink(p *SocketLink, from node.Node) {
+func (ph *testLinkHandler) handleLink(p *SocketLink, from *node.Node) {
 	defer func() {
 		ph.outChan <- ph.lastMsg
 	}()
